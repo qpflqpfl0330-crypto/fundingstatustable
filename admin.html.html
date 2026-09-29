@@ -445,7 +445,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
               <div class="tc-item" data-k="v"><b>작성 전표 파일</b><div class="ilbo-drop" tabindex="0">전표 엑셀 (.xls/.xlsx)</div><input type="file" hidden accept=".xls,.xlsx"></div>
               <div class="tc-item" data-k="t"><b>대량이체 파일</b><div class="ilbo-drop" tabindex="0">이체파일 엑셀 (.xls/.xlsx)</div><input type="file" hidden accept=".xls,.xlsx"></div>
             </div>
-            <div class="toolbar" style="margin-top:12px"><button class="btn primary" id="btnTcRun">점검 실행</button><button class="btn sm" id="btnTcOut">대량이체결과 다운로드</button>
+            <div class="toolbar" style="margin-top:12px"><button class="btn primary" id="btnTcRun">점검 실행</button><button class="btn sm" id="btnTcOut">대량이체결과 다운로드</button><button class="btn sm" id="btnTcSlip" disabled>전표작성파일 다운로드</button>
               <div class="seg" id="tcSeg"><button data-f="all" aria-pressed="true">전체</button><button data-f="error">불일치·누락만</button><button data-f="note">표기 차이·참고</button></div><span class="mini" id="tcNote"></span></div>
           </div>
           <div class="pad"><div class="kpis ar-kpis" id="tcKpis"></div><div id="tcAlert"></div></div>
@@ -977,20 +977,28 @@ var SEED_SN = [
 ["농협","301-0372-9001-91","농협 0372",7,"원화","007.[농협]수금용 · 농협카드"],["부산","103-13-002514-4","부산 103",8,"원화","008.[부산]수금용"],
 ["하나","559-810016-63304","하나 63304",9,"원화","009.[하나]수금용"],["하나","338-890006-98004","하나 98004",10,"원화","010.[하나]수금용"],
 ["기업","065-061148-04-018","기업 065",11,"원화","011.[기업]수금용"],["씨티","129-52190-243","씨티 243",12,"원화","012.[씨티]수금용"],
-["신한","527-03-004809","신한 004809",13,"원화","013.[신한]수금용"],["우리","364-358709-13-002","우리 358709",14,"원화","014.[우리]수금용 · 장기미사용"],
-["부산","113-2017-8229-09","부산 113",15,"원화","015.[부산]수금용 · 장기미사용"],["신한","100-038-883526","신한 883526",16,"원화","016.[신한]AICMS 펌뱅킹"],
-["농협","355-0097-5960-23","농협 5960",17,"원화","016.[농협]수금용 · 강원인삼농협"],["하나","165-910037-03504","하나 03504",18,"원화","017.[하나](-)대출"],
-["산업","022-9200-0055-867","산업 867",19,"원화","018.[산업]수금용 · (-)대출"],["국민","358801-04-247484","국민 247484",20,"원화","019.[국민](-)대출"],
-["농협","301-0351-6890-11","농협 0351",21,"원화","020.[농협](-)대출"],["하나","287-910035-89304","하나 89304",22,"원화","101.하도급지킴이 일반"],
-["하나","287-910035-92604","하나 92604",23,"원화","103.하도급지킴이 노무비"],["하나","287-910035-90304","하나 90304",24,"원화","102.하도급지킴이 고정"],
-["하나","287-910035-91004","하나 91004",25,"원화","104.하도급지킴이 선금"],["하나","165-910003-67952","하나 67952",26,"원화","201.[하나]MMT · 9시~4시 인출"],
-["하나","287-910053-40804","하나 40804",27,"원화","202.[하나]MMDA"],["농협","353-8874-8590-44","농협 8590",28,"원화","501.[농협]정기예금 · 2027-08-05 만기"],
-["하나","287-910040-68504","하나 68504",29,"원화","203.[하나]스톡옵션"],["신한","527-01-012944","신한 093133",30,"국고","301.[신한]국고용 · 자금이동 불가"],
-["하나","165-910042-32304","하나 32304",31,"국고","302.[하나]국고용"],["하나","287-910042-75004","하나 75004",32,"국고","303.[하나]국고용"],
-["하나","287-910042-99004","하나 99004",33,"국고","304.[하나]국고용"],["하나","287-910047-31604","하나 31604",34,"국고","305.[하나]국고용"],
-["신한","180-005-819249","신한 819249",35,"외화","401.[신한]외화 다통화"],["씨티","129-00561-438","씨티 438",36,"외화","406.[씨티]외화 USD"],
-["하나","287-890040-64838","하나 64838",37,"외화","408.[하나]외화 다통화"],["국민","358868-11-029126","국민 029126",38,"외화","410.[국민]외화 USD"],
-["농협","452-0048-4488-81","농협 0048",39,"외화","411.[농협]외화 USD"]
+["신한","527-03-004809","신한 004809",13,"원화","013.[신한]수금용"],
+/* [v32] 2026-09-29 CMS 계좌잔액조회 기준 순번 재정비 — 014~022 (부산 113-2020-8271-07 신규) */
+["농협","355-0097-5960-23","농협 5960",14,"원화","014.[농협]수금용 · 강원인삼농협"],
+["우리","364-358709-13-002","우리 358709",15,"원화","015.[우리]수금용 · 장기미사용"],
+["부산","113-2017-8229-09","부산 113",16,"원화","016.[부산]수금용"],
+["부산","113-2020-8271-07","부산 8271",17,"원화","017.[부산]수금용"],
+["신한","100-038-883526","신한 883526",18,"원화","018.[신한]AICMS 펌뱅킹"],
+["하나","165-910037-03504","하나 03504",19,"원화","019.[하나](-)대출"],
+["산업","022-9200-0055-867","산업 867",20,"원화","020.[산업]수금용 · (-)대출"],
+["국민","358801-04-247484","국민 247484",21,"원화","021.[국민](-)대출"],
+["농협","301-0351-6890-11","농협 0351",22,"원화","022.[농협](-)대출"],
+/* 이후(하도급·MMT·정기예금·국고·외화)는 기존 순서 유지, order만 23부터 1씩 뒤로 */
+["하나","287-910035-89304","하나 89304",23,"원화","101.하도급지킴이 일반"],
+["하나","287-910035-92604","하나 92604",24,"원화","103.하도급지킴이 노무비"],["하나","287-910035-90304","하나 90304",25,"원화","102.하도급지킴이 고정"],
+["하나","287-910035-91004","하나 91004",26,"원화","104.하도급지킴이 선금"],["하나","165-910003-67952","하나 67952",27,"원화","201.[하나]MMT · 9시~4시 인출"],
+["하나","287-910053-40804","하나 40804",28,"원화","202.[하나]MMDA"],["농협","353-8874-8590-44","농협 8590",29,"원화","501.[농협]정기예금 · 2027-08-05 만기"],
+["하나","287-910040-68504","하나 68504",30,"원화","203.[하나]스톡옵션"],["신한","527-01-012944","신한 093133",31,"국고","301.[신한]국고용 · 자금이동 불가"],
+["하나","165-910042-32304","하나 32304",32,"국고","302.[하나]국고용"],["하나","287-910042-75004","하나 75004",33,"국고","303.[하나]국고용"],
+["하나","287-910042-99004","하나 99004",34,"국고","304.[하나]국고용"],["하나","287-910047-31604","하나 31604",35,"국고","305.[하나]국고용"],
+["신한","180-005-819249","신한 819249",36,"외화","401.[신한]외화 다통화"],["씨티","129-00561-438","씨티 438",37,"외화","406.[씨티]외화 USD"],
+["하나","287-890040-64838","하나 64838",38,"외화","408.[하나]외화 다통화"],["국민","358868-11-029126","국민 029126",39,"외화","410.[국민]외화 USD"],
+["농협","452-0048-4488-81","농협 0048",40,"외화","411.[농협]외화 USD"]
 ];
 var SEED_GU = [
 ["하나","165-910005-81304","하나 81304",1,"원화","001.[하나]지급용"],["하나","165-910005-82004","하나 82004",2,"원화","002.[하나]수금용"],
@@ -1023,10 +1031,12 @@ var SEED_GS = [
 ["우리","1005-203-573069","우리 573069",3,"원화","003.[우리]수금용 · 매월 10일 수수료 후불"],["신한","140-012-430011","신한 430011",4,"원화","004.[신한]수금용 · 1회 10억 한도"],
 ["국민","358801-04-258132","국민 258132",5,"원화","005.[국민]수금용"],["산업","022-9200-0039-867","산업 867",6,"원화","006.[산업](-)대출"],
 ["농협","301-0372-9063-31","농협 9063",7,"원화","007.[농협]수금용"],["농협","355-0097-5966-43","농협 5966",8,"원화","008.[농협]수금용"],
-["하나","287-910076-87152","하나 87152",9,"원화","101.[하나]MMT"],["농협","032-0116-3904-71","농협 3904",10,"원화","102.[농협]MMT"],
-["농협","353-8874-9185-24","농협 9185",11,"원화","501.정기예금 · 2027-08-05 만기"],["삼성선물","23438-001","삼성선물",12,"원화","선물계좌"],
-["하나","287-910005-88138","하나 88138",13,"외화","401.[하나]외화 USD"],
-["NH투자증권","202-01-026803","NH 026803",14,"원화","증권계좌"]
+/* [v32] 2026-09-29 CMS 신규 — 원본 계좌번호 1012097773304(하이픈 없음)는 digitsOnly 비교로 매칭 */
+["부산","101-2097-7733-04","부산 7733",9,"원화","009.[부산]수금용"],
+["하나","287-910076-87152","하나 87152",10,"원화","101.[하나]MMT"],["농협","032-0116-3904-71","농협 3904",11,"원화","102.[농협]MMT"],
+["농협","353-8874-9185-24","농협 9185",12,"원화","501.정기예금 · 2027-08-05 만기"],["삼성선물","23438-001","삼성선물",13,"원화","선물계좌"],
+["하나","287-910005-88138","하나 88138",14,"외화","401.[하나]외화 USD"],
+["NH투자증권","202-01-026803","NH 026803",15,"원화","증권계좌"]
 ];
 /* 차입 약정: 주영님 금융권 거래정보 자료 기준 (금리·실행 이력 포함) */
 var SEED_LOAN_ROWS = [
@@ -1132,10 +1142,11 @@ function daysTo(iso, end){
   var a=new Date(iso), b=new Date(end);
   return Math.round((b-a)/86400000);
 }
-var SN_SEC_ACCTS=[["삼성증권","42914404-01","삼성증권 01",34.01],["미래에셋대우","029-22-5068864","미래에셋대우 5068864",34.02],["미래에셋대우","296-75-0411680","미래에셋대우 0411680",34.03],
-  ["신한금융투자","187-11-011983","신한금융투자 011983",34.04],["신한금융투자","003-11-342687","신한금융투자 342687",34.05],["KB증권","362-377-412-01","KB증권 01",34.06],
-  ["NH투자증권","200-01-052780","NH투자증권 052780",34.07],["NH투자증권","207-01-985621","NH투자증권 985621",34.08],["삼성선물","23417-001","삼성선물 001",34.09],
-  ["씨티","1-042893-043-01","씨티 01",36.5,"외화","씨티 외화(JPY)"]];
+/* [v32] SEED_SN order가 23부터 1씩 밀렸으므로 증권(305 국고 다음)·씨티 JPY(씨티 USD 다음) 자리도 함께 +1 */
+var SN_SEC_ACCTS=[["삼성증권","42914404-01","삼성증권 01",35.01],["미래에셋대우","029-22-5068864","미래에셋대우 5068864",35.02],["미래에셋대우","296-75-0411680","미래에셋대우 0411680",35.03],
+  ["신한금융투자","187-11-011983","신한금융투자 011983",35.04],["신한금융투자","003-11-342687","신한금융투자 342687",35.05],["KB증권","362-377-412-01","KB증권 01",35.06],
+  ["NH투자증권","200-01-052780","NH투자증권 052780",35.07],["NH투자증권","207-01-985621","NH투자증권 985621",35.08],["삼성선물","23417-001","삼성선물 001",35.09],
+  ["씨티","1-042893-043-01","씨티 01",37.5,"외화","씨티 외화(JPY)"]];
 function snSecAccts(){ return SN_SEC_ACCTS.map(function(a){ return {bank:a[0],num:a[1],label:a[2],order:a[3],group:a[4]||"원화",note:a[5]||"증권계좌"}; }); }
 function mkAccts(rows){ return rows.map(function(a){ return {bank:a[0],num:a[1],label:a[2],order:a[3],group:a[4],note:a[5]}; }); }
 
@@ -1656,7 +1667,15 @@ function accountLabel(c, bank, acctNum){
   var tail=parts.length>1?parts[parts.length-1]:String(acctNum||"").slice(-5);
   return (bank||"?")+" "+tail;
 }
-function acctOf(c,label){ for(var i=0;i<c.accounts.length;i++) if(c.accounts[i].label===label) return c.accounts[i]; return null; }
+/* [v32] SN 거래내역 가공 매크로(3.SN_거래내역) 계좌표기 변경 — CMS가 부산 113-2017/113-2020을 하이픈 없이(1132017822909·1132020827107) 내보내
+   매크로가 MID(계좌,4,4)로 "부산 2017"·"부산 2020"을 만든다. 자금일보 입출금 내역 '구분'에 이 표기가 와도 등록 계좌로 연결한다. */
+var ACCT_LABEL_ALIAS={SN:{"부산 2017":"1132017822909","부산 2020":"1132020827107"}};
+function acctOf(c,label){
+  for(var i=0;i<c.accounts.length;i++) if(c.accounts[i].label===label) return c.accounts[i];
+  var al=ACCT_LABEL_ALIAS[c.id], d=al&&al[label];
+  if(d) for(var j=0;j<c.accounts.length;j++) if(digitsOnly(c.accounts[j].num)===d) return c.accounts[j];
+  return null;
+}
 function internalNums(c){ var s={}; c.accounts.forEach(function(a){ var d=digitsOnly(a.num); if(d)s[d]=1; }); return s; }
 function isMMT(c, acctNum, label){
   var d=digitsOnly(acctNum);
@@ -2179,7 +2198,7 @@ function buildSheetDay(c, one){
     var isIn=t.deposit>0;
     var ac=acctOf(c,t.acct);
     var kind = (ac&&ac.group==="외화") ? (isIn?"외화(입금)":"외화(출금)") : (isIn?"수입":"지출");
-    return {date:t.date, acct:t.acct, bank:(ac&&ac.bank)||"", acctNum:(ac&&ac.num)||"",
+    return {date:t.date, acct:(ac&&ac.label)||t.acct, bank:(ac&&ac.bank)||"", acctNum:(ac&&ac.num)||"",
       summary:"", client:t.client, deposit:t.deposit, withdraw:t.withdraw,
       after:0, hasAfter:false, txType:"보고서", kind:kind,
       /* [v24] 보고서 외화 행은 원화금액이 이미 확정(krwBooked) — 보고서에 적힌 구분(판매대·기타 등)을 그대로 유지 */
@@ -5364,6 +5383,9 @@ function applyTheme(){
   if(t==="system") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme",t);
 }
+/* [v32] 계좌 시드 동기화 버전 · 09.29 신규 계좌(임시 표기 교정 대상) */
+var ACCT_SYNC_V=32;
+var ACCT_NEW_V32={SN:["113-2020-8271-07"], GS:["101-2097-7733-04"]};
 function migrate(){
   if(!D.companies){
     var old=D, b=blankDB();
@@ -5411,6 +5433,37 @@ function migrate(){
       });
     }
     Object.keys(ex.days).forEach(function(d){ if(Array.isArray(ex.days[d])) ex.days[d]={source:"cms",txns:ex.days[d]}; });
+    /* [v32] 2026-09-29 CMS·예적금현황표 계좌 변동 동기화 — SN 부산 113-2020-8271-07 · GS 부산 101-2097-7733-04 신규, 순번 재정비
+       · 이미 저장된 계좌 목록(공용 저장소/브라우저)에 없으면 추가, 있으면 order·비고만 새 시드로 1회 갱신
+         (계좌표기(label)는 과거 거래가 표기로 연결돼 있어 건드리지 않는다)
+       · 완료 표시(acctSyncV)는 법인 정보 문서(co/ID/info/main)에 계좌 목록과 함께 저장 → 계좌만 저장되고 표시는 빠지는 부분 저장이 생기지 않음 */
+    if(ex.id==="SN"||ex.id==="GS"){
+      if((+ex.acctSyncV||0) < ACCT_SYNC_V){
+        var seedRows = ex.id==="SN" ? mkAccts(SEED_SN).concat(snSecAccts()) : mkAccts(SEED_GS);
+        seedRows.forEach(function(a){
+          var d=digitsOnly(a.num), hit=null;
+          ex.accounts.forEach(function(x){ if(!hit && digitsOnly(x.num)===d) hit=x; });
+          if(!hit){ ex.accounts.push(a); return; }
+          hit.order=a.order; hit.note=a.note;
+          if(!hit.group) hit.group=a.group;
+          if(!hit.bank) hit.bank=a.bank;
+        });
+        ex.acctSyncV=ACCT_SYNC_V;
+      }
+      /* 신규 계좌가 등록되기 전에 올린 CMS·보고서 데이터는 임시 표기(예: "부산 27107"·"부산 07"·"부산 73304")로 저장돼 있다 → 등록 표기로 교정.
+         보고서 입출금 내역에 매크로 새 표기("부산 2017"·"부산 2020")로 들어온 거래도 등록 계좌로 연결 */
+      var fix={}, al=ACCT_LABEL_ALIAS[ex.id]||{};
+      (ACCT_NEW_V32[ex.id]||[]).forEach(function(n){ var d=digitsOnly(n); ex.accounts.forEach(function(x){ if(digitsOnly(x.num)===d) fix[d]=x.label; }); });
+      Object.keys(ex.days).forEach(function(k){
+        var r=ex.days[k]; if(!r || Array.isArray(r)) return;
+        (r.txns||[]).forEach(function(t){
+          var d=digitsOnly(t.acctNum);
+          if(d && fix[d]){ if(t.acct!==fix[d]) t.acct=fix[d]; return; }
+          if(!d && al[t.acct]){ var a2=acctOf(ex,t.acct); if(a2){ t.acct=a2.label; t.bank=a2.bank; t.acctNum=a2.num; } }
+        });
+        (r.accts||[]).forEach(function(a){ var d=digitsOnly(a.num); if(d && fix[d] && a.label!==fix[d]) a.label=fix[d]; });
+      });
+    }
   });
   if(!Array.isArray(D.contacts) || !D.contacts.length) D.contacts=mkContacts();
   D.contacts.forEach(function(k,i){ if(!k.id) k.id="K"+(i+1); if(!Array.isArray(k.history)) k.history=[]; });
@@ -7572,12 +7625,30 @@ function bankKey(name){
   for(var i=0;i<BANK_ALIASES.length;i++) if(BANK_ALIASES[i][1].test(b)) return BANK_ALIASES[i][0];
   return b;
 }
+/* [v32] 전표작성파일 적요 접미사 기본값 (화면 입력창에서 변경 가능 → TCS.suffix) */
+var TC_SLIP_SUFFIX="-현금지급";
 var TC=(function(){
   var str=function(v){ return String(v==null?"":v).trim(); };
   var num=function(v){ if(typeof v==="number") return v; var n=parseFloat(String(v==null?"":v).replace(/[,\s원]/g,"")); return isFinite(n)?n:0; };
   var acctDigits=function(v){ return (typeof v==="number"?v.toFixed(0):String(v==null?"":v)).replace(/\D/g,""); };
   var acctText=function(v){ return typeof v==="number"?v.toFixed(0):str(v); };
-  function holderKey(n){ return str(n).normalize("NFKC").replace(/\(주\)|㈜|주식회사|^주\)|\(유\)|유한회사|\(사\)|사단법인|\(재\)|재단법인/g,"").replace(/[\s()[\]{}.,·]/g,"").toUpperCase(); }
+  /* [v32] '+'와 닮은 글자 통일 — 전표 NM_MNGD4의 "LGUᐩ에스넷시스템(주)"는 '+'(U+002B)가 아니라 ᐩ(U+1429, 캐나다 음절 문자)다.
+     ＋·﹢·⁺·₊는 NFKC가 '+'로 바꿔 주고, NFKC가 못 바꾸는 닮은꼴(ᐩ ➕ ˖ ᛭)만 여기서 '+'로 통일 */
+  var PLUS_LIKE=/[ᐩ➕˖᛭]/g;
+  function holderKey(n){ return str(n).normalize("NFKC").replace(PLUS_LIKE,"+").replace(/\(주\)|㈜|주식회사|^주\)|\(유\)|유한회사|\(사\)|사단법인|\(재\)|재단법인/g,"").replace(/[\s()[\]{}.,·]/g,"").toUpperCase(); }
+  /* [v32] 예금주 대조 — 은행 대량이체 파일(.xls)은 CP949로 못 쓰는 글자를 '?'(0x3F)로 바꿔 저장한다
+     (SN_이체파일.xls 74행 "LGU?에스넷시스템(주)" ↔ 전표 "LGUᐩ에스넷시스템(주)").
+     이체파일 쪽 '?' 1글자가 전표 쪽 '한글·영문·숫자가 아닌' 1글자와 같은 자리에 있으면 같은 예금주로 본다.
+     한글·영문·숫자는 CP949로 모두 저장되므로 '?'가 될 수 없어 이 경우는 여전히 불일치로 남는다. 반환: "exact" | "cp949" | false */
+  function holderMatch(vh,th){
+    var a=holderKey(vh), b=holderKey(th);
+    if(a===b) return "exact";
+    if(b.indexOf("?")<0) return false;
+    var A=Array.from(a), B=Array.from(b);
+    if(A.length!==B.length) return false;
+    for(var i=0;i<B.length;i++){ if(A[i]===B[i]) continue; if(B[i]!=="?" || /[가-힣A-Z0-9]/.test(A[i])) return false; }
+    return "cp949";
+  }
   /* NM_MNGD4 "004/국민은행/659001-04-014336/(주)그린페이퍼" — 은행명은 bankKey로 정규화한 bankKey 필드를 함께 돌려준다 */
   function parseAccountText(text){
     var raw=str(text); if(!raw) return {bank:"",bankKey:"",account:"",holder:"",raw:raw,ok:false};
@@ -7598,7 +7669,8 @@ var TC=(function(){
       if(dc==="대변"){ controlTotal+=num(x[c.credit]); creditCount++; continue; }
       if(dc!=="차변") continue;
       var amt=str(x[c.amount])!==""?num(x[c.amount]):num(x[c.debit]), p=parseAccountText(x[c.info]);
-      lines.push({rowNo:r+1, amount:amt, vendor:str(x[c.vendor]), vendorCode:str(x[c.vendorCode]), desc:str(x[c.desc]), bank:p.bank, account:p.account, holder:p.holder, infoRaw:p.raw, infoOk:p.ok}); }
+      /* [v32] memo = 적요명(F열) 원문(trim·가공 없음, 전표작성파일용) · seq = 차변 행의 전표 원래 순서(0부터) */
+      lines.push({rowNo:r+1, seq:lines.length, amount:amt, vendor:str(x[c.vendor]), vendorCode:str(x[c.vendorCode]), desc:str(x[c.desc]), memo:(x[c.desc]==null?"":String(x[c.desc])), bank:p.bank, account:p.account, holder:p.holder, infoRaw:p.raw, infoOk:p.ok}); }
     return {lines:lines, controlTotal:controlTotal, creditCount:creditCount, total:lines.reduce(function(s,l){ return s+l.amount; },0)};
   }
   function parseTransfer(aoa){
@@ -7614,14 +7686,15 @@ var TC=(function(){
   /* 전표 1행 ↔ 이체 1행 판정 — 은행은 bankKey 정규화 키로 비교 (HSBX↔HSBC, SC은행↔제일은행↔SC제일은행 동일) */
   function checkTransferMatch(v,t){
     var ck={bank:bankKey(v.bank)===bankKey(t.bank), account:acctDigits(v.account)===acctDigits(t.account), amount:v.amount===t.amount, holder:null};
-    var errors=[], notes=[];
-    if(!v.holder){ ck.holder="blank"; notes.push("전표 예금주 공란(통과)"); } else ck.holder=holderKey(v.holder)===holderKey(t.holder);
+    var errors=[], notes=[], hm=null;
+    if(!v.holder){ ck.holder="blank"; notes.push("전표 예금주 공란(통과)"); } else { hm=holderMatch(v.holder,t.holder); ck.holder=!!hm; }
     if(!ck.bank) errors.push("은행 불일치");
     if(!ck.account) errors.push("계좌 불일치");
     if(!ck.amount) errors.push("금액 차이 "+(t.amount-v.amount).toLocaleString("ko-KR"));
     if(ck.holder===false) errors.push("예금주 불일치");
     if(ck.bank && str(v.bank)!==str(t.bank)) notes.push("은행 표기 "+v.bank+"→"+t.bank+" ("+bankKey(t.bank)+")");
-    if(ck.holder===true && str(v.holder)!==str(t.holder)) notes.push("예금주 표기 차이");
+    if(hm==="cp949") notes.push("예금주 ‘?’ = 이체파일 저장 시 특수문자 대체(전표: "+str(v.holder)+")");
+    else if(ck.holder===true && str(v.holder)!==str(t.holder)) notes.push("예금주 표기 차이");
     if(!v.infoOk) notes.push("NM_MNGD4 형식 확인");
     return {checks:ck, errors:errors, notes:notes};
   }
@@ -7650,9 +7723,36 @@ var TC=(function(){
     var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Sheet1"); return wb;
   }
   function resultFileName(n){ var b=str(n).replace(/\.(xlsx?|csv)$/i,""); return (b.indexOf("이체파일")>=0?b.replace("이체파일","대량이체결과"):(b||"대량이체")+"_대량이체결과")+".xlsx"; }
+  /* [v32] 전표작성파일 — 매크로 '1. 원전표' AQ열(=F2&$AQ$1, AQ1="-현금지급")과 동일.
+     점검한 전표의 차변 행만 전표 원래 순서대로, 값 = 적요명 원문 + 접미사. 대변(보통예금) 행 제외, 중복 적요명도 그대로 유지.
+     excludeError=true면 점검 결과가 '오류'인 차변 행만 뺀다(렌더 시점의 최신 status 기준). */
+  function buildSlipRows(st, opt){
+    opt=opt||{};
+    var R=st&&st.R; if(!R||!R.voucher) return [];
+    var suffix=opt.suffix==null?TC_SLIP_SUFFIX:String(opt.suffix);
+    var bad=new Set();
+    if(opt.excludeError) R.items.forEach(function(i){ if(i.v && i.status==="error") bad.add(i.v); });
+    return R.voucher.lines.slice().sort(function(a,b){ return a.seq-b.seq; })
+      .filter(function(l){ return !bad.has(l); })
+      .map(function(l){ return String(l.memo==null?"":l.memo)+suffix; });
+  }
+  function slipFileName(){ return "전표작성파일_"+String(curDate||todayISO()).replace(/\D/g,"").slice(0,8)+".xlsx"; }
+  function downloadSlipFile(){
+    if(!TCS.R){ toast("먼저 [점검 실행]을 눌러주세요"); return; }
+    var rows=buildSlipRows(TCS,{excludeError:!!TCS.slipExErr, suffix:TCS.suffix});
+    if(!rows.length){ toast("전표작성파일에 넣을 차변 행이 없습니다"); return; }
+    var ws=XLSX.utils.aoa_to_sheet(rows.map(function(s){ return [s]; }));       // 머리글 없음 · A열만 · 수식 아닌 값
+    rows.forEach(function(s,r){ var a=ws[XLSX.utils.encode_cell({r:r,c:0})]; if(a){ a.t="s"; a.v=s; } });
+    var wch=rows.reduce(function(m,s){ var w=0; Array.from(s).forEach(function(ch){ w+=ch.charCodeAt(0)>255?2:1; }); return Math.max(m,w); },0);
+    ws["!cols"]=[{wch:Math.min(120,Math.max(10,wch+2))}];
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Sheet1");
+    var n=rows.length, name=slipFileName();
+    Promise.resolve(saveWb(wb, name)).then(function(){ toast("전표작성파일 "+n+"건 다운로드 완료 · "+name); });   // 저장 알림 뒤에 건수 토스트
+  }
   function run(va,ta){ var v=parseVoucher(va), t=parseTransfer(ta), r=reconcile(v,t); r.voucher=v; r.transfer=t; return r; }
   return {parseAccountText:parseAccountText, parseVoucher:parseVoucher, parseTransfer:parseTransfer, checkTransferMatch:checkTransferMatch, reconcile:reconcile,
-    resultWorkbook:resultWorkbook, resultFileName:resultFileName, holderKey:holderKey, acctDigits:acctDigits, run:run};
+    resultWorkbook:resultWorkbook, resultFileName:resultFileName, holderKey:holderKey, holderMatch:holderMatch, acctDigits:acctDigits, run:run,
+    buildSlipRows:buildSlipRows, downloadSlipFile:downloadSlipFile, slipFileName:slipFileName};
 })();
 var parseAccountText=TC.parseAccountText, checkTransferMatch=TC.checkTransferMatch;
 
@@ -7780,16 +7880,21 @@ function saveWb(wb,name){ return offerDownload(name, new Blob([XLSX.write(wb,{bo
 var tileK=function(cls,l,v,d){ return '<div class="kpi '+cls+'"><div class="lbl">'+esc(l)+'</div><div class="v">'+v+'</div><div class="d">'+esc(d||"")+'</div></div>'; };
 
 /* ---- 대량이체 파일점검 ---- */
-var TCS={v:null,t:null,vName:"",tName:"",R:null,f:"all",ack:false};
+var TCS={v:null,t:null,vName:"",tName:"",R:null,f:"all",ack:false, suffix:TC_SLIP_SUFFIX, slipExErr:false};
 function renderTc(){
   var R=TCS.R;
   $("#btnTcOut").disabled=!R||!R.summary.okCount||(R.summary.errorCount&&!TCS.ack);
+  $("#btnTcSlip").disabled=!R||!R.voucher||!R.voucher.lines.length;             // [v32] 점검 실행 후에만 활성
   $$("#tcSeg button").forEach(function(b){ b.setAttribute("aria-pressed",b.dataset.f===TCS.f?"true":"false"); });
   if(!R){ $("#tcKpis").innerHTML=""; $("#tcAlert").innerHTML=""; $("#tcTbl").innerHTML='<tbody><tr><td class="empty" style="padding:22px">전표와 이체파일을 올리고 [점검 실행]을 누르세요.</td></tr></tbody>'; return; }
   var s=R.summary, balT=Math.round(s.transferTotal)===Math.round(s.voucherTotal);
   $("#tcKpis").innerHTML=tileK("lead","이체파일",fmt(s.transferCount)+"건",fmt(s.transferTotal)+"원")+tileK(balT?"i":"o ar-warn","전표 차변",fmt(s.voucherCount)+"건",fmt(s.voucherTotal)+"원"+(balT?" · 일치":" · 차이 "+fmt(s.transferTotal-s.voucherTotal)))+
     tileK("i","일치",fmt(s.okCount)+"건",fmt(s.okTotal)+"원")+tileK(s.errorCount?"o ar-warn":"i","오류",fmt(s.errorCount)+"건",s.errorCount?"불일치·누락":"없음");
-  $("#tcAlert").innerHTML=s.errorCount?'<div class="banner warn" style="margin-top:10px">결과 파일에는 정상 '+s.okCount+'건('+fmt(s.okTotal)+'원)만 들어갑니다. <label style="margin-left:8px"><input type="checkbox" id="tcAck"'+(TCS.ack?" checked":"")+'> 오류 '+s.errorCount+'건을 빼고 저장</label></div>':'';
+  /* [v32] 전표작성파일 안내 한 줄 — 건수는 '오류 건 제외' 체크에 따라 실시간 반영, 접미사는 입력창에서 변경 */
+  var slipN=TC.buildSlipRows(TCS,{excludeError:TCS.slipExErr, suffix:TCS.suffix}).length;
+  var slipLine='<div class="banner" style="margin-top:10px">전표작성파일: 차변 <b id="tcSlipN">'+slipN+'</b>건 (적요명 + ‘<input id="tcSuffix" value="'+esc(TCS.suffix)+'" aria-label="적요 접미사" style="width:92px;padding:1px 6px;font:inherit">’)'+
+    '<label style="margin-left:10px"><input type="checkbox" id="tcSlipEx"'+(TCS.slipExErr?" checked":"")+'> 오류 건 제외</label></div>';
+  $("#tcAlert").innerHTML=(s.errorCount?'<div class="banner warn" style="margin-top:10px">결과 파일에는 정상 '+s.okCount+'건('+fmt(s.okTotal)+'원)만 들어갑니다. <label style="margin-left:8px"><input type="checkbox" id="tcAck"'+(TCS.ack?" checked":"")+'> 오류 '+s.errorCount+'건을 빼고 저장</label></div>':'')+slipLine;
   var ack=$("#tcAck"); if(ack) ack.onchange=function(){ TCS.ack=this.checked; renderTc(); };
   var mk=function(ok){ return ok==null?'':ok===true?'<span class="tc-ok">✓</span>':ok==="blank"?'<span class="tc-bl">–</span>':'<span class="tc-ng">✗</span>'; };
   var cell=function(tv,vv,ok,cls){ var diff=vv!=null && String(vv)!==String(tv); return '<td class="'+(cls||"")+'">'+mk(ok)+' '+esc(tv)+(diff?'<div class="mini">'+(esc(vv)||"(공란)")+'</div>':'')+'</td>'; };
@@ -7811,6 +7916,10 @@ function bindTc(){
     }).catch(function(e){ toast(f.name+": "+e.message); }); }); });
   $("#btnTcRun").onclick=function(){ if(!TCS.v||!TCS.t){ toast("전표와 이체파일을 모두 올려주세요"); return; } TCS.R=TC.run(TCS.v,TCS.t); TCS.ack=false; TCS.f=TCS.R.summary.errorCount?"error":"all"; renderTc(); };
   $("#btnTcOut").onclick=function(){ if(TCS.R) saveWb(TC.resultWorkbook(TCS.R), TC.resultFileName(TCS.tName)); };
+  /* [v32] 전표작성파일 다운로드 · 오류 건 제외 체크 · 접미사 입력 (#tcAlert는 renderTc가 매번 다시 그리므로 컨테이너에 위임) */
+  $("#btnTcSlip").onclick=function(){ TC.downloadSlipFile(); };
+  $("#tcAlert").onchange=function(e){ if(e.target && e.target.id==="tcSlipEx"){ TCS.slipExErr=e.target.checked; renderTc(); } };
+  $("#tcAlert").oninput=function(e){ if(e.target && e.target.id==="tcSuffix") TCS.suffix=e.target.value; };   // 건수 불변 → 다시 그리지 않음(입력 포커스 유지)
   $$("#tcSeg button").forEach(function(b){ b.onclick=function(){ TCS.f=b.dataset.f; renderTc(); }; });
 }
 
