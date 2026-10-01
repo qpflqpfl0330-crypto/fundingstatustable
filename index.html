@@ -7613,7 +7613,7 @@ var BANK_ALIASES=[
   ["신한은행", /^신한은행|^신한$/],
   ["한국씨티은행", /^(한국씨티|씨티|CITI)/i],
   ["아이엠뱅크", /^(아이엠|iM|IM뱅크|대구)/i],
-  ["우체국", /^우체국/],
+  ["우체국", /우체국/i],      // [v33] '정보통신부 우체국'·'우체국(서울,경기)' 등 어디에든 '우체국'이 있으면 동일 키
   ["산업은행", /^(KDB|산업)/i],
   ["수협", /^수협/], ["새마을금고", /^(MG|새마을)/i], ["신협", /^신협/],
   ["카카오뱅크", /^카카오/], ["케이뱅크", /^(케이뱅크|K뱅크)/i], ["토스뱅크", /^토스/],
@@ -7692,7 +7692,8 @@ var TC=(function(){
     if(!ck.account) errors.push("계좌 불일치");
     if(!ck.amount) errors.push("금액 차이 "+(t.amount-v.amount).toLocaleString("ko-KR"));
     if(ck.holder===false) errors.push("예금주 불일치");
-    if(ck.bank && str(v.bank)!==str(t.bank)) notes.push("은행 표기 "+v.bank+"→"+t.bank+" ("+bankKey(t.bank)+")");
+    /* [v33] 정규화 키가 같고 원문만 다르면 오류가 아니라 '표기 차이 · 참고'(예: 전표 '정보통신부 우체국' ↔ 이체 '우체국(서울,경기)') */
+    if(ck.bank && str(v.bank)!==str(t.bank)) notes.push("은행 표기 차이 · 전표 "+str(v.bank)+" ↔ 이체 "+str(t.bank)+" ("+bankKey(t.bank)+")");
     if(hm==="cp949") notes.push("예금주 ‘?’ = 이체파일 저장 시 특수문자 대체(전표: "+str(v.holder)+")");
     else if(ck.holder===true && str(v.holder)!==str(t.holder)) notes.push("예금주 표기 차이");
     if(!v.infoOk) notes.push("NM_MNGD4 형식 확인");
@@ -7715,8 +7716,73 @@ var TC=(function(){
     return {items:items, summary:{transferCount:T.length, transferTotal:T0.total, voucherCount:V.length, voucherTotal:V0.total, controlTotal:V0.controlTotal,
       okCount:ok.length, okTotal:ok.reduce(function(s,i){ return s+i.t.amount; },0), errorCount:items.length-ok.length, noteCount:ok.filter(function(i){ return i.notes.length; }).length}};
   }
-  function resultWorkbook(R){
-    var aoa=[["지급은행","입금계좌번호","이체금액","예금주"]].concat(R.items.filter(function(i){ return i.status==="ok"; }).map(function(i){ return [i.t.bank,i.t.account,i.t.amount,i.t.holder]; }));
+  /* ---- [v33] 오류 건 사용자 처리: 정상 승인 · 전표 값으로 맞춤 · 인라인 수정 ----
+     · 이체 쪽 값(i.t)만 고친다. 전표(i.v)는 원본 그대로 — 전표작성파일 적요명은 영향 없음.
+     · 처음 값은 i.t0에 1회 보관(되돌리기용), 바뀐 칸은 i.edits[필드]={from,to}.
+     · 상태는 재판정(recheck)으로만 정한다: 승인(i.approved)이면 ok, 아니면 오류 유무. */
+  var TC_FIELDS={bank:"은행", account:"계좌", amount:"금액", holder:"예금주"};
+  function recheck(i){
+    if(i.v && i.t){ var m=checkTransferMatch(i.v,i.t); i.checks=m.checks; i.errors=m.errors; i.notes=m.notes; }
+    else if(i.v && !i.t){ i.checks={}; i.errors=["이체파일 누락"]; i.notes=i.v.infoOk?[]:["NM_MNGD4 형식 확인"]; }
+    else { i.checks={}; i.errors=["전표 미존재"]; i.notes=[]; }
+    Object.keys(i.edits||{}).forEach(function(f){ var e=i.edits[f]; i.notes.push(f==="row"?"이체 행 추가(전표 값)":"수정 · "+TC_FIELDS[f]+" "+(f==="amount"?num(e.from).toLocaleString("ko-KR"):str(e.from)||"(공란)")+" → "+(f==="amount"?num(e.to).toLocaleString("ko-KR"):str(e.to))); });
+    if(i.approved) i.notes.push("정상 승인"+(i.errors.length?" (원래: "+i.errors.join(", ")+")":""));
+    i.status = (i.approved || !i.errors.length) ? "ok" : "error";
+    return i;
+  }
+  /* 요약 카드·다운로드 대상은 items의 현재 상태에서 다시 센다(승인·수정 즉시 반영) */
+  function summarize(R){
+    var s=R.summary, withT=R.items.filter(function(i){ return i.t; }), ok=R.items.filter(function(i){ return i.status==="ok"; });
+    s.transferCount=withT.length; s.transferTotal=withT.reduce(function(a,i){ return a+num(i.t.amount); },0);
+    s.okCount=ok.length; s.okTotal=ok.reduce(function(a,i){ return a+(i.t?num(i.t.amount):0); },0);
+    s.errorCount=R.items.length-ok.length;
+    s.errorWithT=R.items.filter(function(i){ return i.status==="error" && i.t; }).length;
+    s.noteCount=ok.filter(function(i){ return i.notes.length; }).length;
+    s.approvedCount=R.items.filter(function(i){ return i.approved; }).length;
+    s.editedCount=R.items.filter(function(i){ return Object.keys(i.edits||{}).length; }).length;
+    return R;
+  }
+  function keepOrig(i){ if(i.t && !i.t0) i.t0={bank:i.t.bank, account:i.t.account, amount:i.t.amount, holder:i.t.holder}; if(!i.edits) i.edits={}; }
+  function setField(i,f,val){
+    keepOrig(i); var from=i.t0[f];
+    i.t[f]=val;
+    var same = f==="amount" ? num(val)===num(from) : str(val)===str(from);
+    if(same) delete i.edits[f]; else i.edits[f]={from:from, to:val};
+  }
+  /* [정상 승인] — 이체 행이 있는 건만(이체파일 누락 건은 결과 파일에 쓸 값이 없음 → [전표 값으로 맞춤]으로 행을 추가) */
+  function approve(R,k){ var i=R.items[k]; if(!i||!i.t) return false; i.approved=true; recheck(i); summarize(R); return true; }
+  function unapprove(R,k){ var i=R.items[k]; if(!i) return; i.approved=false; recheck(i); summarize(R); }
+  /* [전표 값으로 맞춤] — 은행(정규화 키가 다를 때만) · 계좌 · 예금주를 전표 값으로. 금액은 송금액이라 자동으로 바꾸지 않는다(인라인 수정으로만).
+     이체파일 누락 건은 전표 값으로 이체 행을 새로 만든다(금액 포함 — 전표 금액 그대로 송금할 행을 사용자가 명시적으로 추가하는 것). */
+  function syncToVoucher(R,k){
+    var i=R.items[k]; if(!i||!i.v) return false; var v=i.v;
+    if(!i.t){ i.t={rowNo:null, bank:v.bank, account:v.account, amount:v.amount, holder:v.holder||v.vendor, memo:"", added:true}; i.t0={bank:"",account:"",amount:0,holder:""}; i.edits={row:{from:"",to:""}}; }
+    else {
+      if(bankKey(v.bank)!==bankKey(i.t.bank)) setField(i,"bank",v.bank);
+      if(acctDigits(v.account)!==acctDigits(i.t.account)) setField(i,"account",v.account);
+      if(v.holder && !holderMatch(v.holder,i.t.holder)) setField(i,"holder",v.holder);
+    }
+    recheck(i); summarize(R); return true;
+  }
+  /* 인라인 수정 — 금액은 숫자(원 단위, 0 이상)만 허용 */
+  function editCell(R,k,f,raw){
+    var i=R.items[k]; if(!i||!i.t||!TC_FIELDS[f]) return {ok:false, msg:"수정할 이체 행이 없습니다"};
+    var val=str(raw);
+    if(f==="amount"){ var n=num(val); if(!/\d/.test(val)||!isFinite(n)||n<0) return {ok:false, msg:"금액은 숫자로 입력하세요"}; val=n; }
+    if(f==="account" && !acctDigits(val)) return {ok:false, msg:"계좌번호에 숫자가 없습니다"};
+    setField(i,f,val); recheck(i); summarize(R); return {ok:true};
+  }
+  /* [되돌리기] — 이체 원래 값으로 복원 + 승인 해제 (전표 값으로 추가한 행은 다시 '이체파일 누락') */
+  function revert(R,k){
+    var i=R.items[k]; if(!i) return;
+    if(i.t && i.t.added){ i.t=null; }
+    else if(i.t && i.t0){ i.t.bank=i.t0.bank; i.t.account=i.t0.account; i.t.amount=i.t0.amount; i.t.holder=i.t0.holder; }
+    i.t0=null; i.edits={}; i.approved=false; recheck(i); summarize(R);
+  }
+  /* 결과 파일 — 기본은 정상(승인 포함) 건만. includeError=true면 이체 행이 있는 오류 건까지 이체파일 순서대로 포함 */
+  function resultItems(R,opt){ opt=opt||{}; return R.items.filter(function(i){ return i.t && (i.status==="ok" || !!opt.includeError); }); }
+  function resultWorkbook(R,opt){
+    var aoa=[["지급은행","입금계좌번호","이체금액","예금주"]].concat(resultItems(R,opt).map(function(i){ return [i.t.bank,i.t.account,i.t.amount,i.t.holder]; }));
     var ws=XLSX.utils.aoa_to_sheet(aoa);
     for(var r=1;r<aoa.length;r++){ var a=ws[XLSX.utils.encode_cell({r:r,c:1})]; if(a){ a.t="s"; a.v=String(a.v); a.z="@"; } var m=ws[XLSX.utils.encode_cell({r:r,c:2})]; if(m) m.z="#,##0"; }
     ws["!cols"]=[{wch:14},{wch:22},{wch:14},{wch:28}];
@@ -7749,10 +7815,11 @@ var TC=(function(){
     var n=rows.length, name=slipFileName();
     Promise.resolve(saveWb(wb, name)).then(function(){ toast("전표작성파일 "+n+"건 다운로드 완료 · "+name); });   // 저장 알림 뒤에 건수 토스트
   }
-  function run(va,ta){ var v=parseVoucher(va), t=parseTransfer(ta), r=reconcile(v,t); r.voucher=v; r.transfer=t; return r; }
+  function run(va,ta){ var v=parseVoucher(va), t=parseTransfer(ta), r=reconcile(v,t); r.voucher=v; r.transfer=t; return summarize(r); }
   return {parseAccountText:parseAccountText, parseVoucher:parseVoucher, parseTransfer:parseTransfer, checkTransferMatch:checkTransferMatch, reconcile:reconcile,
     resultWorkbook:resultWorkbook, resultFileName:resultFileName, holderKey:holderKey, holderMatch:holderMatch, acctDigits:acctDigits, run:run,
-    buildSlipRows:buildSlipRows, downloadSlipFile:downloadSlipFile, slipFileName:slipFileName};
+    buildSlipRows:buildSlipRows, downloadSlipFile:downloadSlipFile, slipFileName:slipFileName,
+    recheck:recheck, summarize:summarize, approve:approve, unapprove:unapprove, syncToVoucher:syncToVoucher, editCell:editCell, revert:revert, resultItems:resultItems};
 })();
 var parseAccountText=TC.parseAccountText, checkTransferMatch=TC.checkTransferMatch;
 
@@ -7880,32 +7947,69 @@ function saveWb(wb,name){ return offerDownload(name, new Blob([XLSX.write(wb,{bo
 var tileK=function(cls,l,v,d){ return '<div class="kpi '+cls+'"><div class="lbl">'+esc(l)+'</div><div class="v">'+v+'</div><div class="d">'+esc(d||"")+'</div></div>'; };
 
 /* ---- 대량이체 파일점검 ---- */
-var TCS={v:null,t:null,vName:"",tName:"",R:null,f:"all",ack:false, suffix:TC_SLIP_SUFFIX, slipExErr:false};
+var TCS={v:null,t:null,vName:"",tName:"",R:null,f:"all",ack:true, suffix:TC_SLIP_SUFFIX, slipExErr:false};   // [v33] ack = '오류 N건을 빼고 저장'(기본 체크)
 function renderTc(){
   var R=TCS.R;
-  $("#btnTcOut").disabled=!R||!R.summary.okCount||(R.summary.errorCount&&!TCS.ack);
+  /* [v33] 대량이체결과: 체크(기본) = 정상·승인 건만 / 해제 = 이체 행이 있는 오류 건까지 포함 */
+  var outN=R?TC.resultItems(R,{includeError:!TCS.ack}).length:0;
+  $("#btnTcOut").disabled=!R||!outN;
   $("#btnTcSlip").disabled=!R||!R.voucher||!R.voucher.lines.length;             // [v32] 점검 실행 후에만 활성
   $$("#tcSeg button").forEach(function(b){ b.setAttribute("aria-pressed",b.dataset.f===TCS.f?"true":"false"); });
   if(!R){ $("#tcKpis").innerHTML=""; $("#tcAlert").innerHTML=""; $("#tcTbl").innerHTML='<tbody><tr><td class="empty" style="padding:22px">전표와 이체파일을 올리고 [점검 실행]을 누르세요.</td></tr></tbody>'; return; }
   var s=R.summary, balT=Math.round(s.transferTotal)===Math.round(s.voucherTotal);
   $("#tcKpis").innerHTML=tileK("lead","이체파일",fmt(s.transferCount)+"건",fmt(s.transferTotal)+"원")+tileK(balT?"i":"o ar-warn","전표 차변",fmt(s.voucherCount)+"건",fmt(s.voucherTotal)+"원"+(balT?" · 일치":" · 차이 "+fmt(s.transferTotal-s.voucherTotal)))+
-    tileK("i","일치",fmt(s.okCount)+"건",fmt(s.okTotal)+"원")+tileK(s.errorCount?"o ar-warn":"i","오류",fmt(s.errorCount)+"건",s.errorCount?"불일치·누락":"없음");
-  /* [v32] 전표작성파일 안내 한 줄 — 건수는 '오류 건 제외' 체크에 따라 실시간 반영, 접미사는 입력창에서 변경 */
+    tileK("i","일치",fmt(s.okCount)+"건",fmt(s.okTotal)+"원"+(s.approvedCount?" · 승인 "+s.approvedCount+"건 포함":""))+tileK(s.errorCount?"o ar-warn":"i","오류",fmt(s.errorCount)+"건",s.errorCount?"불일치·누락":"없음");
+  /* 결과 파일 안내 — 체크 해제 시 오류 포함을 빨간 배너로 경고 */
+  var outTotal=TC.resultItems(R,{includeError:!TCS.ack}).reduce(function(a,i){ return a+(+i.t.amount||0); },0);
+  var noRow=s.errorCount-s.errorWithT;
+  var fixLine=(s.approvedCount||s.editedCount)?'<div class="mini" style="margin-top:4px">정상 승인 '+s.approvedCount+'건 · 수정 '+s.editedCount+'건이 반영되었습니다.</div>':'';
+  var outBanner = s.errorCount
+    ? (TCS.ack
+        ? '<div class="banner warn" style="margin-top:10px">결과 파일에는 정상 '+s.okCount+'건('+fmt(s.okTotal)+'원)만 들어갑니다. <label style="margin-left:8px"><input type="checkbox" id="tcAck" checked> 오류 '+s.errorCount+'건을 빼고 저장</label>'+fixLine+'</div>'
+        : '<div class="banner bad" style="margin-top:10px">결과 파일에 <b>오류 '+s.errorWithT+'건까지 포함</b>해 '+outN+'건('+fmt(outTotal)+'원)을 저장합니다. 은행 업로드 전에 오류 행을 반드시 확인하세요.'+(noRow?' (이체파일 누락 '+noRow+'건은 이체 행이 없어 제외)':'')+
+          ' <label style="margin-left:8px"><input type="checkbox" id="tcAck"> 오류 '+s.errorCount+'건을 빼고 저장</label>'+fixLine+'</div>')
+    : (fixLine?'<div class="banner good" style="margin-top:10px">오류 없음 — 결과 파일 '+s.okCount+'건('+fmt(s.okTotal)+'원).'+fixLine+'</div>':'');
+  /* [v32] 전표작성파일 안내 한 줄 — 건수는 '오류 건 제외' 체크에 따라 실시간 반영(정상 승인 건은 포함), 접미사는 입력창에서 변경 */
   var slipN=TC.buildSlipRows(TCS,{excludeError:TCS.slipExErr, suffix:TCS.suffix}).length;
   var slipLine='<div class="banner" style="margin-top:10px">전표작성파일: 차변 <b id="tcSlipN">'+slipN+'</b>건 (적요명 + ‘<input id="tcSuffix" value="'+esc(TCS.suffix)+'" aria-label="적요 접미사" style="width:92px;padding:1px 6px;font:inherit">’)'+
     '<label style="margin-left:10px"><input type="checkbox" id="tcSlipEx"'+(TCS.slipExErr?" checked":"")+'> 오류 건 제외</label></div>';
-  $("#tcAlert").innerHTML=(s.errorCount?'<div class="banner warn" style="margin-top:10px">결과 파일에는 정상 '+s.okCount+'건('+fmt(s.okTotal)+'원)만 들어갑니다. <label style="margin-left:8px"><input type="checkbox" id="tcAck"'+(TCS.ack?" checked":"")+'> 오류 '+s.errorCount+'건을 빼고 저장</label></div>':'')+slipLine;
-  var ack=$("#tcAck"); if(ack) ack.onchange=function(){ TCS.ack=this.checked; renderTc(); };
+  $("#tcAlert").innerHTML=outBanner+slipLine;
   var mk=function(ok){ return ok==null?'':ok===true?'<span class="tc-ok">✓</span>':ok==="blank"?'<span class="tc-bl">–</span>':'<span class="tc-ng">✗</span>'; };
-  var cell=function(tv,vv,ok,cls){ var diff=vv!=null && String(vv)!==String(tv); return '<td class="'+(cls||"")+'">'+mk(ok)+' '+esc(tv)+(diff?'<div class="mini">'+(esc(vv)||"(공란)")+'</div>':'')+'</td>'; };
-  var view=R.items.filter(function(i){ return TCS.f==="all"||(TCS.f==="error"&&i.status==="error")||(TCS.f==="note"&&i.status==="ok"&&i.notes.length); });
-  $("#tcTbl").innerHTML='<thead><tr><th>상태</th><th style="text-align:right">이체 행</th><th style="text-align:right">전표 행</th><th>거래처명</th><th>지급은행</th><th>입금계좌번호</th><th style="text-align:right">이체금액</th><th>예금주</th><th>원인 · 참고</th></tr></thead><tbody>'+
-    (view.length?view.map(function(i){ var t=i.t||{}, v=i.v||{}, c=i.checks;
-      return '<tr class="'+(i.status==="error"?"tc-bad":"")+'"><td>'+(i.status==="ok"?'<span class="chip in">정상</span>':'<span class="chip ar-long">불일치</span>')+'</td><td class="num mini">'+(t.rowNo||"-")+'</td><td class="num mini">'+(v.rowNo||"-")+'</td><td>'+esc(v.vendor||t.memo||"")+'</td>'+
-        (i.t?cell(t.bank,i.v?v.bank:null,c.bank)+cell(t.account,i.v?v.account:null,c.account,"mono")+'<td class="num">'+mk(c.amount)+' '+fmt(t.amount)+(i.v&&v.amount!==t.amount?'<div class="mini">'+fmt(v.amount)+'</div>':'')+'</td>'+cell(t.holder,i.v?(v.holder||""):null,c.holder)
+  /* 이체 쪽 셀 — 더블클릭(또는 포커스 후 Enter/F2)으로 인라인 수정. 전표 값이 다르면 아래 작은 글씨로 전표 값 표시 */
+  var ed=function(k,fd,cls){ return ' class="tc-ed '+(cls||"")+'" data-i="'+k+'" data-fd="'+fd+'" tabindex="0" title="더블클릭해 수정"'; };
+  var cell=function(k,fd,tv,vv,ok,cls){ var diff=vv!=null && String(vv)!==String(tv); return '<td'+ed(k,fd,cls)+'>'+mk(ok)+' '+esc(tv)+(diff?'<div class="mini">'+(esc(vv)||"(공란)")+'</div>':'')+'</td>'; };
+  var needSync=function(i){ var v=i.v, t=i.t; if(!v) return false; if(!t) return true;
+    return bankKey(v.bank)!==bankKey(t.bank) || TC.acctDigits(v.account)!==TC.acctDigits(t.account) || (!!v.holder && !TC.holderMatch(v.holder,t.holder)); };
+  var btn=function(act,k,label,cls){ return '<button class="btn sm'+(cls?" "+cls:"")+'" data-act="'+act+'" data-i="'+k+'">'+label+'</button>'; };
+  var view=[]; R.items.forEach(function(i,k){ if(TCS.f==="all"||(TCS.f==="error"&&i.status==="error")||(TCS.f==="note"&&i.status==="ok"&&i.notes.length)) view.push({i:i,k:k}); });
+  $("#tcTbl").innerHTML='<thead><tr><th>상태</th><th style="text-align:right">이체 행</th><th style="text-align:right">전표 행</th><th>거래처명</th><th>지급은행</th><th>입금계좌번호</th><th style="text-align:right">이체금액</th><th>예금주</th><th>원인 · 참고</th><th>조치</th></tr></thead><tbody>'+
+    (view.length?view.map(function(x){ var i=x.i, k=x.k, t=i.t||{}, v=i.v||{}, c=i.checks, edited=Object.keys(i.edits||{}).length;
+      var chip = i.approved ? '<span class="chip tc-appr">승인</span>' : i.status==="ok" ? '<span class="chip in">정상</span>'+(edited?'<div class="mini">수정</div>':'') : '<span class="chip ar-long">불일치</span>';
+      var acts=[];
+      if(i.status==="error" && i.t) acts.push(btn("approve",k,"정상 승인","primary"));
+      if(i.status==="error" && needSync(i)) acts.push(btn("sync",k,i.t?"전표 값으로 맞춤":"전표 값으로 이체 행 추가"));
+      if(i.approved) acts.push(btn("unapprove",k,"승인 취소"));
+      if(edited) acts.push(btn("revert",k,"되돌리기"));
+      return '<tr class="'+(i.status==="error"?"tc-bad":i.approved?"tc-appr":"")+'"><td>'+chip+'</td><td class="num mini">'+(t.rowNo||(t.added?"추가":"-"))+'</td><td class="num mini">'+(v.rowNo||"-")+'</td><td>'+esc(v.vendor||t.memo||"")+'</td>'+
+        (i.t?cell(k,"bank",t.bank,i.v?v.bank:null,c.bank)+cell(k,"account",t.account,i.v?v.account:null,c.account,"mono")+
+             '<td'+ed(k,"amount","num")+'>'+mk(c.amount)+' '+fmt(t.amount)+(i.v&&v.amount!==t.amount?'<div class="mini">'+fmt(v.amount)+'</div>':'')+'</td>'+cell(k,"holder",t.holder,i.v?(v.holder||""):null,c.holder)
           :'<td class="mini">(이체파일 없음) '+esc(v.bank)+'</td><td class="mono mini">'+esc(v.account)+'</td><td class="num mini">'+fmt(v.amount)+'</td><td class="mini">'+esc(v.holder)+'</td>')+
-        '<td class="mini">'+i.errors.map(function(e){ return '<b style="color:var(--out)">'+esc(e)+'</b>'; }).concat(i.notes.map(esc)).join("<br>")+'</td></tr>'; }).join("")
-      :'<tr><td colspan="9" class="empty" style="padding:22px">해당하는 행이 없습니다.</td></tr>')+'</tbody>';
+        '<td class="mini">'+i.errors.map(function(e){ return '<b style="color:var(--out)">'+esc(e)+'</b>'; }).concat(i.notes.map(esc)).join("<br>")+'</td>'+
+        '<td class="tc-act">'+acts.join("")+'</td></tr>'; }).join("")
+      :'<tr><td colspan="10" class="empty" style="padding:22px">해당하는 행이 없습니다.</td></tr>')+'</tbody>';
+}
+/* [v33] 인라인 수정 편집기 — 셀 안에 입력창을 띄우고 Enter/포커스 이동 = 저장, Esc = 취소 */
+function tcOpenEditor(td){
+  var R=TCS.R; if(!R || td.querySelector("input")) return;
+  var k=+td.dataset.i, fd=td.dataset.fd, i=R.items[k]; if(!i||!i.t) return;
+  var cur=i.t[fd]; td.innerHTML='<input class="tc-in" aria-label="'+esc(fd)+' 수정" value="'+esc(fd==="amount"?String(cur==null?"":cur):String(cur==null?"":cur))+'"'+(fd==="amount"?' inputmode="numeric"':'')+'>';
+  var inp=td.querySelector("input"), done=false;
+  var finish=function(save){ if(done) return; done=true;
+    if(save){ var r=TC.editCell(R,k,fd,inp.value); if(!r.ok){ toast(r.msg); } else if(R.items[k].status==="ok") toast("수정 반영 · 정상으로 전환"); }
+    renderTc(); };
+  inp.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); finish(true); } else if(e.key==="Escape"){ e.preventDefault(); finish(false); } };
+  inp.onblur=function(){ finish(true); };
+  inp.focus(); inp.select();
 }
 function bindTc(){
   $$("#v-fep [data-tool=check] .tc-item").forEach(function(it){ bindDrop(it,function(f,box){
@@ -7914,12 +8018,30 @@ function bindTc(){
       else { var q=TC.parseTransfer(aoa); if(!q.rows.length) throw new Error("이체 행이 없습니다"); TCS.t=aoa; TCS.tName=f.name; box.textContent=f.name+" · 이체 "+q.rows.length+"건 "+fmt(q.total)+"원"; }
       box.classList.add("done"); TCS.R=null; if(TCS.v&&TCS.t) $("#btnTcRun").click(); else renderTc();
     }).catch(function(e){ toast(f.name+": "+e.message); }); }); });
-  $("#btnTcRun").onclick=function(){ if(!TCS.v||!TCS.t){ toast("전표와 이체파일을 모두 올려주세요"); return; } TCS.R=TC.run(TCS.v,TCS.t); TCS.ack=false; TCS.f=TCS.R.summary.errorCount?"error":"all"; renderTc(); };
-  $("#btnTcOut").onclick=function(){ if(TCS.R) saveWb(TC.resultWorkbook(TCS.R), TC.resultFileName(TCS.tName)); };
+  /* [점검 실행]은 파일 원본으로 다시 판정한다 → 이전 승인·수정은 초기화(알림) */
+  $("#btnTcRun").onclick=function(){ if(!TCS.v||!TCS.t){ toast("전표와 이체파일을 모두 올려주세요"); return; }
+    var prev=TCS.R?(TCS.R.summary.approvedCount||0)+(TCS.R.summary.editedCount||0):0;
+    TCS.R=TC.run(TCS.v,TCS.t); TCS.ack=true; TCS.f=TCS.R.summary.errorCount?"error":"all"; renderTc();
+    if(prev) toast("다시 점검했습니다 · 이전 승인·수정 "+prev+"건은 초기화되었습니다"); };
+  $("#btnTcOut").onclick=function(){ if(!TCS.R) return; var inc=!TCS.ack, n=TC.resultItems(TCS.R,{includeError:inc}).length, name=TC.resultFileName(TCS.tName);
+    Promise.resolve(saveWb(TC.resultWorkbook(TCS.R,{includeError:inc}), name)).then(function(){ toast("대량이체결과 "+n+"건"+(inc&&TCS.R.summary.errorWithT?" (오류 "+TCS.R.summary.errorWithT+"건 포함)":"")+" 다운로드 완료 · "+name); }); };
   /* [v32] 전표작성파일 다운로드 · 오류 건 제외 체크 · 접미사 입력 (#tcAlert는 renderTc가 매번 다시 그리므로 컨테이너에 위임) */
   $("#btnTcSlip").onclick=function(){ TC.downloadSlipFile(); };
-  $("#tcAlert").onchange=function(e){ if(e.target && e.target.id==="tcSlipEx"){ TCS.slipExErr=e.target.checked; renderTc(); } };
+  $("#tcAlert").onchange=function(e){ var id=e.target&&e.target.id;
+    if(id==="tcSlipEx"){ TCS.slipExErr=e.target.checked; renderTc(); }
+    else if(id==="tcAck"){ TCS.ack=e.target.checked; renderTc(); } };                 // [v33] 해제 = 오류 건 포함 저장
   $("#tcAlert").oninput=function(e){ if(e.target && e.target.id==="tcSuffix") TCS.suffix=e.target.value; };   // 건수 불변 → 다시 그리지 않음(입력 포커스 유지)
+  /* [v33] 결과 표: 조치 버튼(정상 승인·전표 값으로 맞춤·승인 취소·되돌리기) + 셀 더블클릭/Enter/F2 인라인 수정 */
+  var tbl=$("#tcTbl");
+  tbl.onclick=function(e){ var b=e.target.closest&&e.target.closest("button[data-act]"); if(!b||!TCS.R) return;
+    var k=+b.dataset.i, act=b.dataset.act, R=TCS.R, msg="";
+    if(act==="approve"){ if(TC.approve(R,k)) msg="정상 승인 · 결과 파일·전표작성파일에 포함됩니다"; }
+    else if(act==="sync"){ TC.syncToVoucher(R,k); msg=R.items[k].status==="ok"?"전표 값으로 맞춤 · 정상으로 전환":"전표 값으로 맞췄습니다 · 남은 오류: "+R.items[k].errors.join(", "); }
+    else if(act==="unapprove"){ TC.unapprove(R,k); msg="승인 취소"; }
+    else if(act==="revert"){ TC.revert(R,k); msg="이체 원래 값으로 되돌렸습니다"; }
+    renderTc(); if(msg) toast(msg); };
+  tbl.ondblclick=function(e){ var td=e.target.closest&&e.target.closest("td.tc-ed"); if(td) tcOpenEditor(td); };
+  tbl.onkeydown=function(e){ if(e.target.matches && e.target.matches("td.tc-ed") && (e.key==="Enter"||e.key==="F2")){ e.preventDefault(); tcOpenEditor(e.target); } };
   $$("#tcSeg button").forEach(function(b){ b.onclick=function(){ TCS.f=b.dataset.f; renderTc(); }; });
 }
 
@@ -8203,6 +8325,15 @@ window.__tr={get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, up
 tr.tc-bad td{background:var(--out-soft)}
 tr.tc-bad td:first-child{box-shadow:inset 3px 0 0 var(--out)}
 .tc-ok{color:var(--in);font-weight:700}.tc-ng{color:var(--out);font-weight:700}.tc-bl{color:var(--warn);font-weight:700}
+/* [v33] 대량이체 점검 — 인라인 수정·조치 버튼 */
+td.tc-ed{cursor:text}
+td.tc-ed:hover{box-shadow:inset 0 0 0 1px var(--rule-strong)}
+td.tc-ed:focus-visible{outline:2px solid var(--navy);outline-offset:-2px}
+.tc-in{width:100%;min-width:96px;box-sizing:border-box;font:inherit;padding:3px 6px;border:1px solid var(--navy);border-radius:6px;background:var(--surface);color:var(--ink)}
+td.tc-act{white-space:nowrap}
+td.tc-act .btn{margin:2px 4px 2px 0}
+tr.tc-appr td{background:var(--move-soft)}
+.chip.tc-appr{color:var(--move);background:var(--move-soft);border-color:var(--move)}
 .fep-sum td.fep-ok{color:var(--in);font-weight:700;background:var(--in-soft)}
 .fep-sum td.fep-ng{color:var(--out);font-weight:700;background:var(--out-soft)}
 
