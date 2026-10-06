@@ -474,12 +474,12 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
           <header><h2>4. 자금집행결과 조회</h2><span class="sub">양식 요약 블록과 같은 구성 · 출금(대변)만 집계</span>
             <div class="sp"><button class="btn primary sm" id="btnFerRun">조회</button></div></header>
           <div class="pad">
-            <details class="fxdetails fer-cfg"><summary>분류 설정 — 타행이체 수수료 · 지출로 볼 자사명 적요</summary>
+            <details class="fxdetails fer-cfg"><summary>분류 설정 — 은행별 타행이체 수수료 기준표 · (참고) 지출로 볼 자사명 적요</summary>
               <div class="fer-cfgbody">
-                <div class="mini" style="margin-bottom:6px">타행이체 수수료는 CMS 자금이동에서 빼고 CMS 지출에 더합니다(자금이동 전표에는 수수료가 없으므로). 공용 저장소에 저장됩니다.</div>
+                <div class="mini" style="margin-bottom:6px">타행이체 수수료 = 자금이동 출금액 − 다른 자사 계좌의 짝 입금액(차액 3,000원 이내). 이 금액을 CMS 자금이동에서 빼고 CMS 지출에 더합니다. 아래 표는 검증용 기준(은행 · 원/건)이며, 계산된 수수료가 다르면 ⑤에 노란 경고만 띄웁니다. 공용 저장소에 저장됩니다.</div>
                 <div class="scroll"><table class="tbl fer-tbl" id="ferFeeTbl"></table></div>
-                <div class="toolbar" style="margin-top:8px"><button class="btn sm" id="btnFerFeeAdd">규칙 추가</button><button class="btn sm" id="btnFerCfgReset">양식 기본값으로</button></div>
-                <div class="mini" style="margin:14px 0 6px">자사명이 들어 있지만 실제로는 지출인 적요 (CMS 구분 → 지출) · 한 줄에 하나</div>
+                <div class="toolbar" style="margin-top:8px"><button class="btn sm" id="btnFerFeeAdd">은행 추가</button><button class="btn sm" id="btnFerCfgReset">기본값으로</button></div>
+                <div class="mini" style="margin:14px 0 6px">(참고용 · v43부터 판정에 쓰지 않음) 자사명이 들어 있지만 실제로는 지출인 적요 — 이제는 '자사명만 단독일 때만 자금이동' 규칙이 대신합니다</div>
                 <div class="fer-excgrid" id="ferExc"></div>
               </div>
             </details>
@@ -498,15 +498,14 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
         </div>
 
         <div class="panel fer-panel">
-          <header><h2>7. 결과보고서 첨부 계좌</h2><span class="sub">결재 시 은행 거래내역·이체결과를 첨부해야 하는 계좌 (거래 1건이라도 필요면 필요)</span></header>
+          <header><h2>7. 결과보고서 첨부 계좌</h2><span class="sub">결재 시 은행 거래내역·이체결과를 첨부해야 하는 계좌 (거래 1건이라도 필요면 필요) · 화면 전용 — 엑셀·PDF에는 넣지 않습니다</span></header>
           <div class="pad" id="ferAtt"></div>
         </div>
 
         <div class="panel fer-panel">
-          <header><h2>8. 보고서 다운로드</h2><span class="sub">내장 양식(결과보고서 시트)에 값만 채웁니다 · 차이·합계는 양식 수식이 계산</span></header>
+          <header><h2>8. 보고서 다운로드</h2><span class="sub">엑셀: 내장 양식 파일의 셀 값만 바꿉니다(서식·인쇄 영역·수식 원본 그대로) · PDF: 양식 1페이지, '- 끝 -'에서 끝남</span></header>
           <div class="pad">
-            <div class="toolbar"><button class="btn primary" id="btnFerXlsx" disabled>엑셀 다운로드</button><button class="btn" id="btnFerPdf" disabled>PDF 저장</button>
-              <label class="mini"><input type="checkbox" id="ferAttPrint" checked> PDF 2페이지에 첨부 계좌 표 넣기</label><span class="mini fer-dlwarn" id="ferDlWarn"></span></div>
+            <div class="toolbar"><button class="btn primary" id="btnFerXlsx" disabled>엑셀 다운로드</button><button class="btn" id="btnFerPdf" disabled>PDF 저장</button><span class="mini fer-dlwarn" id="ferDlWarn"></span></div>
           </div>
         </div>
       </div>
@@ -8920,7 +8919,9 @@ function bindEx(){
 var FER_TPL_B64="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";
 var FER_COS=["SN","GU","GD","GS"];
 var FER_DEFAULTS={
-  /* 타행이체 수수료 — 양식 기본값. mode: flat(그 계좌에 출금>0 거래가 있으면 amount) / tier(그 계좌 출금 합계÷unit 올림 × amount) */
+  /* [v43] 은행별 타행이체 수수료 기준표(검증용) — 수수료 금액은 자금이동 출금−짝 입금으로 계산하고, 이 표와 다르면 경고만 띄운다 */
+  feeStd:[{bank:"부산", amount:500}, {bank:"신한", amount:500}],
+  /* [v35~v42] 계좌별 고정 수수료 규칙 — v43부터 계산에 쓰지 않음(저장값 보존용). 타행이체 수수료 — 양식 기본값. mode: flat(그 계좌에 출금>0 거래가 있으면 amount) / tier(그 계좌 출금 합계÷unit 올림 × amount) */
   fees:[
     {co:"SN", bank:"부산", num:"103-13-002514-4", mode:"flat", amount:500, unit:0},
     {co:"GU", bank:"신한", num:"140-005-891617", mode:"flat", amount:500, unit:0},
@@ -8939,6 +8940,7 @@ function ferCfg(){
   if(!s.fer) s.fer={fees:JSON.parse(JSON.stringify(FER_DEFAULTS.fees)), exc:JSON.parse(JSON.stringify(FER_DEFAULTS.exc))};
   ["notes","plans","fep"].forEach(function(k){ if(!s.fer[k]||typeof s.fer[k]!=="object") s.fer[k]={}; });
   if(!Array.isArray(s.fer.fees)) s.fer.fees=JSON.parse(JSON.stringify(FER_DEFAULTS.fees));
+  if(!Array.isArray(s.fer.feeStd)) s.fer.feeStd=JSON.parse(JSON.stringify(FER_DEFAULTS.feeStd));
   if(!s.fer.exc) s.fer.exc=JSON.parse(JSON.stringify(FER_DEFAULTS.exc));
   FER_COS.forEach(function(k){ if(!Array.isArray(s.fer.exc[k])) s.fer.exc[k]=(FER_DEFAULTS.exc[k]||[]).slice(); });
   return s.fer;
@@ -8990,57 +8992,88 @@ var FER=(function(){
     if(has(O,"현금")) return "현금";
     if(U==="인사팀") return "이체등록";
     if(U==="재무팀") return "확인필요";
-    if(O.slice(0,5)==="인터넷뱅킹") return "이체등록";
+    if(O.replace(/^[(\[]/,"").slice(0,5)==="인터넷뱅킹") return "이체등록";        // [v43] '(인터넷뱅킹)…' 도 인정
     if(O.slice(-3)==="수수료") return "자동이체";
     if(N==="기타제예금") return "자금이동";
     if(U==="경영관리팀") return "이체등록";
-    return "제외";
+    return (+L.cr||0)>0 ? "확인필요" : "제외";                              // [v43] 규칙에 안 걸린 보통예금 대변은 버리지 않고 확인필요(지출 포함)
   }
   function erpFinal(L,g){ if(g!=="외화") return g; return (has(L.memo,"현물환")||has(L.memo,"선물환")||has(L.memo,"자금이동"))?"자금이동":"이체등록"; }
 
-  /* ---------- 4-2. CMS 구분(CF열) · 최종구분(CG열) · 첨부 필요(CH열) ---------- */
+  /* ---------- 4-2. CMS 구분(CF열) · 최종구분(CG열) · 첨부 필요(CH열) ----------
+     [v43] 자금이동 판정 교체(프로젝트 문서 `자금집행결과보고서_수정_자금이동판정_프롬프트.md` §2)
+     ① 외화 계좌 → 기존 외화 규칙  ② 출금 ≤ 0 → 제외
+     ③ 적요가 숫자·하이픈뿐이고 그 법인 등록 계좌번호 → 자금이동(입금 짝은 수수료 계산용)
+     ④ 적요 또는 의뢰인/수취인이 자사명(normOwnName full/trunc) → 다른 자사 계좌 입금 짝이 있으면 자금이동, 없으면 지출(가상계좌 추정)
+     ⑤ 그 외 → 지출
+     기존 '지출로 볼 자사명 적요'(cfg.exc)는 ④의 정규화 규칙이 대신하므로 판정에 쓰지 않는다(설정값은 참고용으로 보존). */
+  var OWN_NAMES={SN:["에스넷시스템","에스넷"], GU:["굿어스"], GD:["굿어스데이터"], GS:["굿어스스마트솔루션"]};
+  var ALL_OWN=[]; Object.keys(OWN_NAMES).forEach(function(k){ OWN_NAMES[k].forEach(function(n){ ALL_OWN.push({co:k, n:n}); }); });
+  var BANK_PFX=["하나","신한","농협","우리","국민","기업","부산","씨티","산업","SC","KB","IBK","NH"];
+  /* 자사명 정규화 — {kind:"full"|"trunc"|"", rest, raw} */
+  function normOwnName(text, co){
+    var s=String(text==null?"":text).replace(/\s+/g,"").replace(/（/g,"(").replace(/）/g,")").replace(/＜/g,"<").replace(/＞/g,">");
+    var raw=s;
+    if(!s) return {kind:"", rest:"", raw:raw};
+    for(var i=0;i<BANK_PFX.length;i++){ var b=BANK_PFX[i];                    // 앞에 붙은 은행명 1개(은행명만 남으면 떼지 않음)
+      if(s.toUpperCase().indexOf(b)===0 && s.length>b.length){ s=s.slice(b.length); break; } }
+    s=s.replace(/\(주\)|㈜|<주>|주식회사/g,"");                              // 법인격 표기
+    for(var g=0; g<4; g++){ var before=s;                                     // 잘린 꼬리: (주 · ( · 주식회 · 주식 · 주
+      s=s.replace(/\(주$/,"").replace(/\($/,"").replace(/주식회$/,"").replace(/주식$/,"");
+      if(s===before) break; }
+    if(/주$/.test(s) && s.length>1){ var t=s.slice(0,-1); if((OWN_NAMES[co]||[]).indexOf(t)>=0) s=t; }   // '에스넷시스템주'
+    var names=OWN_NAMES[co]||[];
+    if(names.indexOf(s)>=0) return {kind:"full", rest:s, raw:raw};
+    var other=ALL_OWN.some(function(o){ return o.co!==co && o.n===s; });
+    if(!other && s.length>=5 && names.some(function(n){ return n.indexOf(s)===0; })) return {kind:"trunc", rest:s, raw:raw};
+    return {kind:"", rest:s, raw:raw};
+  }
+  function ownHit(t, co){ var a=normOwnName(t.summary,co), b=normOwnName(t.client,co); return a.kind?a:b.kind?b:null; }
+  /* 자사명이 '들어 있기는' 하지만 앞뒤 글자 때문에 자사명이 아닌 경우(근거 표시용) */
+  function ownInside(t, co){ var s=(S(t.summary)+"|"+S(t.client)).replace(/\s+/g,""); return (OWN_NAMES[co]||[]).some(function(n){ return s.indexOf(n)>=0; }); }
+  function cmpArr(a,b){ for(var i=0;i<a.length;i++){ if(a[i]<b[i]) return -1; if(a[i]>b[i]) return 1; } return 0; }
+  function invStr(x){ return String(x).split("").map(function(ch){ return String.fromCharCode(0xFFFF-ch.charCodeAt(0)); }).join(""); }
+  function tKey(t){ return String(t.at||"")+"#"+String(t._i==null?"":("000000"+t._i).slice(-6)); }
   function cmsClassify(co, c, rows, cfg){
-    var own=ownDigits(c), exc=(cfg.exc&&cfg.exc[co])||[];
+    var own=ownDigits(c);
+    rows.forEach(function(t,i){ t._i=i; });
     rows.forEach(function(t){
       var BT=S(t.summary), BU=S(t.client), BR=S(t.alias), BW=+t.deposit||0, BX=+t.withdraw||0;
       var lab=c?accountLabel(c,t.bank,t.acctNum):(t.bank+" "+t.acctNum);
       var reg=c?own[digitsOnly(t.acctNum)]:null;
       var isFx=has(BR,"외화") || !!(reg&&reg.group==="외화") || (!!t.ccy && t.ccy!=="KRW");
-      var sd=digitsOnly(BT), isOwn=!!(sd && own[sd]);
-      var excHit=exc.some(function(k){ return k && (BT===k || has(BT,k) || has(BU,k)); });
-      var g;
-      if(co==="SN"){
-        if(excHit) g="지출";
-        else if(has(BU,"에스넷시스템")||has(BT,"에스넷시스템")||isOwn) g="자금이동";
-        else if(isFx) g="외화";
-        else if(BX<=0) g="제외";
-        else g="지출";
-      } else if(co==="GU"){
-        if(isFx) g="외화";
-        else if(excHit && BX>0) g="지출";
-        else if(has(BU,"굿어스(주)")||has(BT,"굿어스주")||isOwn) g="자금이동";
-        else if(BX<=0) g="제외";
-        else g="지출";
-      } else if(co==="GD"){
-        if(isFx) g="외화";
-        else if(excHit && BX>0) g="지출";
-        else if(has(BU,"굿어스데")||has(BT,"굿어스데이터")||isOwn) g="자금이동";
-        else if(BX<=0) g="제외";
-        else g="지출";
-      } else {                                                          // GS — 출금 0 이하가 먼저 제외
-        if(BX<=0) g="제외";
-        else if(isFx) g="외화";
-        else if(excHit) g="지출";
-        else if(BU.indexOf("굿어스스마트")===0||BT.indexOf("굿어스스마트")===0||isOwn) g="자금이동";
-        else g="지출";
-      }
+      var g, basis="";
+      if(isFx) g="외화";
+      else if(BX<=0) g="제외";
+      else if(/^[\d\-]+$/.test(BT) && own[digitsOnly(BT)]){ g="자금이동"; basis="acct"; }
+      else if(ownHit(t,co)){ g="?own"; basis="name"; }
+      else { g="지출"; basis=ownInside(t,co)?"notown":""; }
       var f=g;
       if(g==="외화"){
         var mv = BT==="당발이체"||has(BT,"SNET")||has(BT,"ＦＸ")||has(BT,"환율")||has(BT,"OKT")||has(BU,"환전")||
                  (co==="GS"&&has(BT,"환전"))||(co==="SN"&&has(BT,"입금")&&BW>0);
         f=mv?"자금이동":"이체";
       }
-      var mmt=c?isMMT(c,t.acctNum,lab):false, need="";
+      t.fer={g:g, f:f, need:"", label:lab, mmt:c?isMMT(c,t.acctNum,lab):false, isFx:isFx, excHit:false, basis:basis, pair:null, fee:0};
+    });
+    /* 2-3. 입금 짝 찾기 — 같은 거래일자 · 다른 계좌 · 0 ≤ 출금−입금 ≤ 3,000 · 1:1 */
+    var used={}, deps=rows.filter(function(u){ return !u.fer.isFx && (+u.deposit||0)>0; });
+    rows.filter(function(t){ return t.fer.basis==="acct"||t.fer.basis==="name"; }).sort(function(a,b){ return tKey(a)<tKey(b)?-1:tKey(a)>tKey(b)?1:0; }).forEach(function(t){
+      var BX=+t.withdraw||0, ad=digitsOnly(t.acctNum), best=null, bs=null;
+      var cands=deps.filter(function(u){ if(used[u._i] || u.date!==t.date || digitsOnly(u.acctNum)===ad) return false; var d=BX-(+u.deposit||0); return d>=0 && d<=3000; });
+      /* 우선순위: 차액 작은 것 → 적요·수취인이 자사명인 것 → 출금 직후(같거나 늦은 거래일시 중 가장 이른 것) → 그 밖에는 가장 늦은 것 */
+      var ta=String(t.at||"");
+      var rank=function(u){ var ua=String(u.at||""); return [BX-(+u.deposit||0), ownHit(u,co)?0:1, ua>=ta?0:1, ua>=ta?ua:invStr(ua), tKey(u)]; };
+      cands.forEach(function(u){ var r=rank(u); if(!best || cmpArr(r,bs)<0){ best=u; bs=r; } });
+      if(best){ used[best._i]=1; t.fer.pair=best; t.fer.fee=BX-(+best.deposit||0); best.fer.pairOf=t; }
+      if(t.fer.basis==="name"){ if(best){ t.fer.g=t.fer.f="자금이동"; } else { t.fer.g=t.fer.f="지출"; t.fer.basis="nopair"; } }
+    });
+    /* 자사 계좌 입금과 금액만 같은 지출(이름이 사람·거래처) — 참고 표시만, 판정은 지출 그대로 */
+    rows.forEach(function(t){ if(t.fer.g!=="지출" || t.fer.basis) return; var BX=+t.withdraw||0, ad=digitsOnly(t.acctNum);
+      if(deps.some(function(u){ return !used[u._i] && u.date===t.date && digitsOnly(u.acctNum)!==ad && (+u.deposit||0)===BX; })) t.fer.amtMatch=true; });
+    /* 첨부 필요(CH열) — 종전 규칙 유지(구분이 바뀐 건은 바뀐 구분 기준) */
+    rows.forEach(function(t){
+      var g=t.fer.g, f=t.fer.f, BT=S(t.summary), BU=S(t.client), BW=+t.deposit||0, BX=+t.withdraw||0, mmt=t.fer.mmt, need="";
       if(co==="SN"){
         if(g==="지출") need="지출";
         else if(BW>0&&(has(BT,"에스넷시스템")||has(BT,"SNET")||has(BT,"FX"))) need="자금이동 입금";
@@ -9056,26 +9089,25 @@ var FER=(function(){
         else if(mmt&&BW>0) need="MMT 입금";
       } else {
         if(f==="지출") need="지출";
-        else if(BX>0&&has(BU,"굿어스스")) need="자금이동 출금";
+        else if(BX>0&&g==="자금이동"&&has(BU,"굿어스스")) need="자금이동 출금";
         else if(mmt&&BW>0) need="MMT 입금";
       }
-      t.fer={g:g, f:f, need:need, label:lab, mmt:mmt, isFx:isFx, excHit:excHit};
+      t.fer.need=need;
     });
     return rows;
   }
 
-  /* ---------- 5. 타행이체 수수료 ---------- */
+  /* ---------- 5. 타행이체 수수료 ----------
+     [v43] 수수료 = 자금이동 출금액 − 짝 입금액(0이면 없음). 은행별 기준표(cfg.feeStd, 기본 부산·신한 500원/건)는 검증용 — 다르면 경고만, 금액은 계산값.
+     v35 고정 수수료 표(cfg.fees)는 계산에 쓰지 않는다(이중 가산 방지 · 저장값은 보존). CMS에 별도 행으로 찍힌 수수료(당발이체·발급수수료납부 등)는 이미 지출. */
+  function bankBase(b){ return S(b).replace(/은행$/,"").replace(/\s/g,""); }
   function feeOf(co, c, rows, cfg){
-    var own=ownDigits(c), out={total:0, items:[]};
-    (cfg.fees||[]).filter(function(f){ return f.co===co && digitsOnly(f.num); }).forEach(function(f){
-      var d=digitsOnly(f.num), sum=0, any=false;
-      rows.forEach(function(t){ if(digitsOnly(t.acctNum)===d){ var x=+t.withdraw||0; sum+=x; if(x>0) any=true; } });
-      var amt=0;
-      if(f.mode==="tier"){ var u=+f.unit||0; amt = (u>0&&sum>0) ? Math.ceil(sum/u)*(+f.amount||0) : 0; }
-      else amt = any ? (+f.amount||0) : 0;
-      out.items.push({rule:f, sum:sum, amount:amt, registered:!!own[d], label:c?accountLabel(c,f.bank,f.num):f.num});
-      out.total+=amt;
-    });
+    var out={total:0, items:[]}, std=cfg.feeStd||[];
+    rows.forEach(function(t){ if(!t.fer || t.fer.g!=="자금이동" || !(t.fer.fee>0)) return;
+      var bk=bankBase(t.bank), s=std.filter(function(x){ return bankBase(x.bank)===bk; })[0], amt=t.fer.fee;
+      out.items.push({t:t, bank:bk, label:t.fer.label, num:t.acctNum, out:+t.withdraw||0, inn:+t.fer.pair.deposit||0, pairLabel:t.fer.pair.fer.label,
+        amount:amt, std:s?(+s.amount||0):null, warn:!s || (+s.amount||0)!==amt});
+      out.total+=amt; });
     return out;
   }
 
@@ -9172,7 +9204,7 @@ var FER=(function(){
       SPEND.forEach(function(k){ m.erp.parts[k]=blank(); });
       if(m.hasErp){
         erpLines.forEach(function(L){
-          var g=erpGubun(L), f=erpFinal(L,g); L.fer={g:g, f:f, feeSusp:(g==="자금이동"&&L.amount>0&&L.amount<=10000)};
+          var g=erpGubun(L), f=erpFinal(L,g); L.fer={g:g, f:f, feeSusp:(g==="자금이동"&&L.amount>0&&L.amount<=10000), chk:(g==="확인필요"?(L.dept==="재무팀"?"재무팀 작성":"규칙 밖 · "+(L.dept||"부서 없음")):"")};
           m.erp.all.push(L);
           var put=function(b){ b.list.push(L); if(L.amount){ b.amt+=L.amount; b.n++; } };
           if(g==="자금이동") put(m.erp.move);
@@ -9198,16 +9230,16 @@ var FER=(function(){
         m.cms.fxMove.amt=round2(m.cms.fxMove.amt); m.cms.fxXfer.amt=round2(m.cms.fxXfer.amt);
         m.cms.moveRaw=m.cms.move.amt; m.cms.spendRaw=m.cms.spend.amt;
         m.cms.move.amt-=m.fee.total; m.cms.spend.amt+=m.fee.total;           // 수수료: 자금이동에서 빼고 지출에 더함
-        /* ⚠ 가상계좌 의심 — 자금이동 출금인데 같은 날 같은 금액의 자금이동 입금이 다른 자사 계좌에 없음 */
-        var own=ownDigits(c);
-        m.cms.move.list.forEach(function(t){ var BX=+t.withdraw||0; if(!(BX>0)) return;
-          var pair=cmsRows.some(function(u){ return u!==t && u.fer.g==="자금이동" && (+u.deposit||0)===BX && u.date===t.date && digitsOnly(u.acctNum)!==digitsOnly(t.acctNum) && !!own[digitsOnly(u.acctNum)]; });
-          if(!pair){ t.fer.vaSusp=true; m.susp.va.push(t); } });
+        /* [v43] 판정 근거 — 자사명·입금 확인(자금이동) / 자사명 아님(앞뒤 글자) / 자사명·자사 입금 없음(가상계좌 추정) / 계좌번호 적요 / 금액만 일치(참고) */
+        m.basis={pair:[], acct:[], notown:[], nopair:[], amtMatch:[]};
+        cmsRows.forEach(function(t){ var b=t.fer.basis, BX=+t.withdraw||0; if(!(BX>0)) return;
+          if(b==="name") m.basis.pair.push(t); else if(b==="acct") m.basis.acct.push(t); else if(b==="notown") m.basis.notown.push(t); else if(b==="nopair"){ m.basis.nopair.push(t); m.susp.va.push(t); }
+          if(t.fer.amtMatch) m.basis.amtMatch.push(t); });
         /* 4-3. 결과보고서 첨부 계좌 (계좌 단위 — 1건이라도 필요면 필요) */
         var acc={}, order=[];
         cmsRows.forEach(function(t){ var k=digitsOnly(t.acctNum)||t.acctNum; if(!acc[k]){ acc[k]={bank:t.bank, num:t.acctNum, label:t.fer.label, need:false, why:{}, n:0, mmt:t.fer.mmt}; order.push(k); }
           var a=acc[k]; a.n++; if(t.fer.need){ a.need=true; a.why[t.fer.need]=(a.why[t.fer.need]||0)+1; } });
-        m.fee.items.forEach(function(it){ if(it.amount>0){ var k=digitsOnly(it.rule.num); if(!acc[k]){ acc[k]={bank:it.rule.bank, num:it.rule.num, label:it.label, need:false, why:{}, n:0}; order.push(k); }
+        m.fee.items.forEach(function(it){ if(it.amount>0){ var k=digitsOnly(it.num)||it.num; if(!acc[k]){ acc[k]={bank:it.bank, num:it.num, label:it.label, need:false, why:{}, n:0}; order.push(k); }
           acc[k].need=true; acc[k].why["타행이체수수료"]=1; } });
         m.att=order.map(function(k){ var a=acc[k]; a.reason=Object.keys(a.why).map(function(w){ return w==="타행이체수수료"?w:w+" "+a.why[w]+"건"; }).join(" · "); return a; })
           .sort(function(a,b){ return (b.need-a.need) || String(a.label).localeCompare(String(b.label)); });
@@ -9220,7 +9252,7 @@ var FER=(function(){
       var rec=function(k,label,e,cm,soft,fx){ var d=fx?round2(e.amt-cm.amt):(e.amt-cm.amt); var cand=[];
         if(d){ var ad=Math.abs(d); cm.list.forEach(function(t){ var v=+t.withdraw||0; if(fx?Math.abs(v-ad)<0.005:v===ad) cand.push({src:"CMS", t:t}); });
           e.list.forEach(function(L){ if(fx?Math.abs(L.amount-ad)<0.005:L.amount===ad) cand.push({src:"ERP", L:L}); });
-          if(k==="move"||k==="spend"){ m.susp.va.forEach(function(t){ cand.push({src:"VA", t:t}); }); m.susp.fee.forEach(function(L){ cand.push({src:"FEE", L:L}); }); } }
+          if(k==="move"||k==="spend"){ m.susp.fee.forEach(function(L){ cand.push({src:"FEE", L:L}); }); } }
         return {k:k, label:label, erp:e.amt, cms:cm.amt, diff:d, soft:!!soft, fx:!!fx, cand:cand}; };
       m.rec=(m.hasErp||m.hasCms)?[rec("move","자금이동",m.erp.move,m.cms.move), rec("spend","지출",m.erp.spend,m.cms.spend),
         rec("fxMove","외화 자금이동 (USD)",m.erp.fxMove,m.cms.fxMove,true,true), rec("fxXfer","외화 이체 (USD)",m.erp.fxXfer,m.cms.fxXfer,false,true)]:[];
@@ -9233,28 +9265,33 @@ var FER=(function(){
     var v=+t.withdraw||0, bank=S(t.bank), L=null;
     (fx?m.erp.fxXfer.list:m.erp.spend.list).forEach(function(x){ if(!L && (fx?Math.abs(x.amount-v)<0.005:x.amount===v)) L=x; });
     var hang=function(s){ return /[가-힣]/.test(S(s)); };
-    var txt0 = L ? S(String(L.memo).replace(/^[^)]*\)\s*/,"")) : "";
+    var txt0 = L ? S(String(L.memo).replace(/^[^()]{0,20}\)\s*/,"")) : "";            // [v43] 앞머리 '…)'만 뗌(괄호가 본문 끝에 있는 적요 보호)
     if(txt0){ var b=bank.replace(/은행$/,""); return (b && txt0.indexOf(b)!==0 ? b+"은행 " : "")+txt0; }
     return hang(t.summary)?S(t.summary):hang(t.txType)?S(t.txType):S(t.client)||S(t.summary)||"거래";
   }
-  function suggestNote(m, diff, fx){
+  /* [v43] 외화 지급을 원화 계좌에서 출금한 건(OTT·당발송금 · 수수료 제외) */
+  function fxFromKrw(m){ return m.cms.spend.list.filter(function(t){ var s=S(t.summary); return !t.fer.isFx && (+t.withdraw||0)>0 && (/^OTT\d/i.test(s)||has(s,"당발송금")||has(s,"해외송금")) && !has(s,"수수료"); }); }
+  function suggestNote(m, diff, fx, plan){
     if(!diff || !m.hasCms) return "";
     var ad=Math.abs(diff), seen={}, out=[];
+    var fk=fxFromKrw(m), usd=(plan&&plan.fx>0&&!m.cms.fxXfer.amt)?plan.fx:0;
+    if(fx){ if(diff<0 && fk.length) fk.forEach(function(t){ out.push("- "+(S(t.bank).replace(/은행$/,"")||"")+"은행 외화지급 건 원화계좌에서 출금 진행 "+fmt(+t.withdraw||0)+"원"+(fk.length===1&&usd?" ($"+fmtFx(usd)+")":"")+" — 원화 결과에 포함"); }); }
+    else fk.forEach(function(t){ var line="- "+(S(t.bank).replace(/은행$/,"")||"")+"은행 외화지급 건 원화계좌에서 출금 진행 "+fmt(+t.withdraw||0)+"원"+(fk.length===1&&usd?" ($"+fmtFx(usd)+")":""); if(!seen[line]){ seen[line]=1; out.push(line); } });
     var list=fx?m.cms.fxXfer.list:m.cms.spend.list;
     list.forEach(function(t){ var v=+t.withdraw||0; if(!(v>0)) return;
-      var hit = fx ? Math.abs(v-ad)<0.005 : (v===ad || has(t.summary,"수수료")||has(t.summary,"인증서")||has(t.txType,"수수료")||has(t.txType,"인증서"));
+      var hit = fx ? Math.abs(v-ad)<0.005 : (v===ad || has(t.summary,"수수료")||has(t.summary,"인증서")||has(t.txType,"수수료")||has(t.txType,"인증서")||(S(t.summary)==="당발이체"&&v<=50000));
       if(!hit) return; var line="- "+noteLabel(m,t,fx)+" "+(fx?"$"+fmtFx(v):fmt(v)+"원");
       if(!seen[line]){ seen[line]=1; out.push(line); } });
-    if(!fx) m.fee.items.forEach(function(it){ if(it.amount>0){ var b=S(it.rule.bank).replace(/은행$/,""); out.push("- "+(b?b+"은행 ":"")+"타행이체 시 수수료 "+fmt(it.amount)+"원"); } });
+    if(!fx) m.fee.items.forEach(function(it){ if(it.amount>0){ var b=S(it.bank).replace(/은행$/,""); out.push("- "+(b?b+"은행 ":"")+"타행이체 시 수수료 "+fmt(it.amount)+"원"); } });
     return out.join("\n");
   }
 
   return {parseErp:parseErp, erpGubun:erpGubun, erpFinal:erpFinal, cmsClassify:cmsClassify, feeOf:feeOf, planFromTokens:planFromTokens, parsePlanPdf:parsePlanPdf,
-    compute:compute, suggestNote:suggestNote, SPEND:SPEND, has:has};
+    compute:compute, suggestNote:suggestNote, SPEND:SPEND, has:has, normOwnName:normOwnName};
 })();
 
 /* ===================== [v35] 자금집행결과보고서 상태 · 화면 ===================== */
-var FERS={pdf:null, pdfName:"", pdfErr:"", erp:{}, cms:{}, date:"", model:null, ran:false, open:null, showExcl:false, attPrint:true, busy:false};
+var FERS={pdf:null, pdfName:"", pdfErr:"", erp:{}, cms:{}, date:"", model:null, ran:false, open:null, showExcl:false, busy:false, basisOpen:{}};
 function execResultModel(){ return FERS.model; }                       // (기존 이름 유지 — __tr 호환)
 /* 집행일: 계획서 PDF 제목 > ERP 회계일자(최빈) > CMS 거래일자(최빈) */
 function ferDates(){
@@ -9305,8 +9342,8 @@ function ferAutoNotes(){
   var N=cfg.notes[d]||(cfg.notes[d]={}), changed=false;
   FER_COS.forEach(function(co){ var m=M.cos[co]; if(!m||!m.hasCms) return; var p=ferPlan(co), n=N[co]||(N[co]={krw:"",fx:"",krwUser:false,fxUser:false});
     var dk=m.cms.spend.amt-p.krw, df=Math.round((m.cms.fxXfer.amt-p.fx)*100)/100;
-    if(!n.krwUser){ var s=dk?FER.suggestNote(m,dk,false):""; if(s!==n.krw){ n.krw=s; changed=true; } }
-    if(!n.fxUser){ var s2=df?FER.suggestNote(m,df,true):""; if(s2!==n.fx){ n.fx=s2; changed=true; } }
+    if(!n.krwUser){ var s=dk?FER.suggestNote(m,dk,false,p):""; if(s!==n.krw){ n.krw=s; changed=true; } }
+    if(!n.fxUser){ var s2=df?FER.suggestNote(m,df,true,p):""; if(s2!==n.fx){ n.fx=s2; changed=true; } }
   });
   if(changed) ferPersist();
 }
@@ -9406,7 +9443,7 @@ function ferRowsTable(side){
   var has=function(m){ return side==="erp"?m.hasErp:m.hasCms; };
   var cellOf=function(m,k){ if(m.gone||!has(m)) return '<td class="num mini">—</td>';
     var b=m[side][k], v=fx(k)?ferUsd(b.amt):ferKrw(b.amt);
-    var chk=(side==="erp"&&k==="spend"&&m.erp.parts["확인필요"].n)?' <span class="chip ar-warnchip" title="재무팀 작성 전표">확인필요 '+m.erp.parts["확인필요"].n+'</span>':'';
+    var chk=(side==="erp"&&k==="spend"&&m.erp.parts["확인필요"].n)?' <span class="chip ar-warnchip" title="재무팀 작성 전표 또는 규칙에 걸리지 않은 보통예금 대변 — 행을 눌러 확인">확인필요 '+m.erp.parts["확인필요"].n+'</span>':'';
     var feeN=(side==="cms"&&(k==="move"||k==="spend")&&m.fee.total)?'<div class="mini">수수료 '+(k==="move"?"−":"+")+fmt(m.fee.total)+'</div>':'';
     return '<td class="num">'+v+chk+'<div class="mini">'+b.n+'건</div>'+feeN+'</td>'; };
   var sum=function(k){ var t=0,n=0; FER_COS.forEach(function(co){ var m=M.cos[co]; if(!m.gone&&has(m)){ t+=m[side][k].amt; n+=m[side][k].n; } }); return {amt:fx(k)?Math.round(t*100)/100:t, n:n}; };
@@ -9422,6 +9459,9 @@ function ferRowsTable(side){
     '<tr class="total"><td>원화 합계</td>'+FER_COS.map(function(co){ return totCell(co,false); }).join("")+'<td class="num"><b>'+ferKrw(tk)+'</b></td></tr>'+
     '<tr class="total"><td>외화 합계 (USD)</td>'+FER_COS.map(function(co){ return totCell(co,true); }).join("")+'<td class="num"><b>'+ferUsd(Math.round(tf*100)/100)+'</b></td></tr></tbody></table>';
 }
+function ferBasisChip(t){ var b=t.fer&&t.fer.basis;
+  var s=b==="name"?"자사명 · 입금 확인 → 자금이동":b==="acct"?"자사 계좌번호 → 자금이동":b==="notown"?"자사명 아님(앞뒤 글자) → 지출":b==="nopair"?"자사명 · 자사 입금 없음 → 지출(가상계좌 추정)":"";
+  return (s?' <span class="chip nv">'+s+'</span>':'')+(t.fer&&t.fer.fee>0?' <span class="chip nv">수수료 '+fmt(t.fer.fee)+'</span>':'')+(t.fer&&t.fer.amtMatch?' <span class="chip nv">자사 계좌 입금과 금액 일치(참고)</span>':''); }
 function ferDetail(){
   var M=FERS.model; if(!M||!FERS.open) return "";
   var sp=FERS.open.split(":"), side=sp[0], k=sp[1], list=[];
@@ -9429,8 +9469,8 @@ function ferDetail(){
     if(side==="cms"&&m.hasCms) m.cms[k].list.forEach(function(t){ list.push({co:co, t:t}); }); });
   var fx=k==="fxMove"||k==="fxXfer";
   var head=side==="erp"?'<tr><th>법인</th><th>전표번호</th><th>계정</th><th>적요</th><th>작성부서</th><th>출금계좌</th><th>구분 / 최종</th><th class="num">금액</th></tr>':'<tr><th>법인</th><th>계좌</th><th>적요</th><th>의뢰인/수취인</th><th>거래구분</th><th>구분 / 최종</th><th class="num">출금액</th><th class="num">입금액</th></tr>';
-  var rows=list.map(function(x){ if(x.L){ var L=x.L; return '<tr><td>'+ferChip(x.co)+'</td><td class="mono mini">'+esc(L.voucher)+'</td><td>'+esc(L.acctName)+'</td><td class="mini">'+esc(L.memo)+(L.fer.feeSusp?' <span class="chip ar-warnchip">⚠ 수수료 의심</span>':'')+'</td><td class="mini">'+esc(L.dept)+'</td><td class="mini">'+esc(L.bank)+' '+esc(L.acctNum)+'</td><td class="mini">'+esc(L.fer.g)+' / '+esc(L.fer.f)+'</td><td class="num">'+(L.isFx?"$"+fmtFx(L.amount):fmt(L.amount))+'</td></tr>'; }
-    var t=x.t; return '<tr><td>'+ferChip(x.co)+'</td><td class="mini">'+esc(t.fer.label)+'</td><td class="mini">'+esc(t.summary)+(t.fer.vaSusp?' <span class="chip ar-warnchip">⚠ 가상계좌 의심</span>':'')+'</td><td class="mini">'+esc(t.client)+'</td><td class="mini">'+esc(t.txType)+'</td><td class="mini">'+esc(t.fer.g)+' / '+esc(t.fer.f)+'</td><td class="num">'+(fx?fmtFx(t.withdraw):fmt(t.withdraw))+'</td><td class="num mini">'+(t.deposit?(fx?fmtFx(t.deposit):fmt(t.deposit)):"")+'</td></tr>'; }).join("");
+  var rows=list.map(function(x){ if(x.L){ var L=x.L; return '<tr><td>'+ferChip(x.co)+'</td><td class="mono mini">'+esc(L.voucher)+'</td><td>'+esc(L.acctName)+'</td><td class="mini">'+esc(L.memo)+(L.fer.feeSusp?' <span class="chip ar-warnchip">⚠ 수수료 의심</span>':'')+(L.fer.chk?' <span class="chip ar-warnchip">확인필요 · '+esc(L.fer.chk)+'</span>':'')+'</td><td class="mini">'+esc(L.dept)+'</td><td class="mini">'+esc(L.bank)+' '+esc(L.acctNum)+'</td><td class="mini">'+esc(L.fer.g)+' / '+esc(L.fer.f)+'</td><td class="num">'+(L.isFx?"$"+fmtFx(L.amount):fmt(L.amount))+'</td></tr>'; }
+    var t=x.t; return '<tr><td>'+ferChip(x.co)+'</td><td class="mini">'+esc(t.fer.label)+'</td><td class="mini">'+esc(t.summary)+ferBasisChip(t)+'</td><td class="mini">'+esc(t.client)+'</td><td class="mini">'+esc(t.txType)+'</td><td class="mini">'+esc(t.fer.g)+' / '+esc(t.fer.f)+'</td><td class="num">'+(fx?fmtFx(t.withdraw):fmt(t.withdraw))+'</td><td class="num mini">'+(t.deposit?(fx?fmtFx(t.deposit):fmt(t.deposit)):"")+'</td></tr>'; }).join("");
   return '<div class="fer-detail"><div class="fer-dhead"><b>'+(side==="erp"?"ERP":"CMS")+' · '+esc(k)+' 내역 '+list.length+'건</b><button class="btn sm" data-close="1">닫기</button></div><div class="scroll" style="max-height:46vh"><table class="tbl fer-tbl">'+head+rows+'</table></div></div>';
 }
 function ferExclTable(){
@@ -9439,6 +9479,24 @@ function ferExclTable(){
   return '<details class="fxdetails" id="ferExcl"'+(FERS.showExcl?' open':'')+'><summary>제외로 빠진 건 '+list.length+'건 (ERP 구분 제외 · CMS 출금 0 등)</summary><div class="scroll" style="max-height:40vh"><table class="tbl fer-tbl"><thead><tr><th>법인</th><th>원천</th><th>계좌</th><th>적요</th><th class="num">출금(대변)</th><th class="num">입금(차변)</th></tr></thead><tbody>'+
     list.map(function(x){ return x.L?'<tr><td>'+ferChip(x.co)+'</td><td>ERP</td><td class="mini">'+esc(x.L.acctNum)+'</td><td class="mini">'+esc(x.L.memo)+' <span class="mini">('+esc(x.L.dept)+')</span></td><td class="num">'+fmt(x.L.cr)+'</td><td class="num mini">'+fmt(x.L.dr)+'</td></tr>'
       :'<tr><td>'+ferChip(x.co)+'</td><td>CMS</td><td class="mini">'+esc(x.t.fer.label)+'</td><td class="mini">'+esc(x.t.summary||x.t.client)+'</td><td class="num">'+fmt(x.t.withdraw)+'</td><td class="num mini">'+fmt(x.t.deposit)+'</td></tr>'; }).join("")+'</tbody></table></div></details>';
+}
+/* [v43] ⑤ 판정 근거 칩 — 자금이동 행: 자사명·입금 확인(접힘 요약) · 계좌번호 적요 · 수수료 / 지출 행: 자사명 아님 · 가상계좌 추정 · 금액만 일치(참고) */
+function ferBasisHtml(co, m, k){
+  var B=m.basis; if(!B) return "";
+  var amt=function(t){ return fmt(+t.withdraw||0); }, nm=function(t){ return esc(t.summary||t.client||""); }, out=[];
+  if(k==="move"){
+    if(B.pair.length){ var key=co+":pairs", op=!!(FERS.basisOpen&&FERS.basisOpen[key]);
+      out.push('<div class="mini"><span class="chip nv fer-bchip" data-basis="'+key+'" role="button" tabindex="0">자사명 · 입금 확인 → 자금이동 '+B.pair.length+'건 '+(op?'▾':'▸')+'</span></div>'+
+        (op?B.pair.map(function(t){ return '<div class="mini fer-bsub">'+esc(t.fer.label)+' '+nm(t)+' '+amt(t)+' → '+esc(t.fer.pair.fer.label)+' 입금 '+fmt(+t.fer.pair.deposit||0)+'</div>'; }).join(""):'')); }
+    if(B.acct.length) out.push('<div class="mini"><span class="chip nv">자사 계좌번호 적요 → 자금이동 '+B.acct.length+'건</span></div>');
+    m.fee.items.forEach(function(it){ out.push('<div class="mini"><span class="chip '+(it.warn?'ar-warnchip':'nv')+'" title="'+(it.std==null?'기준표에 없는 은행':'기준표 '+fmt(it.std)+'원/건')+'">타행이체 수수료 · '+esc(it.bank)+' '+fmt(it.amount)+' ('+fmt(it.out)+' → '+fmt(it.inn)+')</span>'+(it.warn?' <span class="mini">기준표('+(it.std==null?'없음':fmt(it.std))+')와 다름</span>':'')+'</div>'); });
+  } else {
+    B.notown.forEach(function(t){ out.push('<div class="mini"><span class="chip nv">자사명 아님(앞뒤 글자) → 지출</span> '+esc(t.fer.label)+' '+nm(t)+' '+amt(t)+'</div>'); });
+    B.nopair.forEach(function(t){ out.push('<div class="mini"><span class="chip nv">자사명 · 자사 입금 없음 → 지출(가상계좌 추정)</span> '+esc(t.fer.label)+' '+nm(t)+' '+amt(t)+'</div>'); });
+    B.amtMatch.forEach(function(t){ out.push('<div class="mini"><span class="chip nv">자사 계좌 입금과 금액 일치(참고)</span> '+esc(t.fer.label)+' '+nm(t)+' '+amt(t)+'</div>'); });
+    if(m.fee.total) out.push('<div class="mini"><span class="chip nv">타행이체 수수료 +'+fmt(m.fee.total)+' (지출에 더함)</span></div>');
+  }
+  return out.join("");
 }
 function ferRenderResult(){
   var M=FERS.model, host=$("#ferRes");
@@ -9450,11 +9508,13 @@ function ferRenderResult(){
     FER_COS.map(function(co){ var m=M.cos[co]; if(m.gone||!m.rec.length) return '';
       return m.rec.map(function(r,i){ var red=r.fx?Math.abs(r.diff)>=0.005:!!r.diff; if(red&&!r.soft) anyRed=true;
         var miss=(!m.hasErp||!m.hasCms)?'<span class="mini">'+(!m.hasErp?'ERP 전표 없음':'CMS 없음')+'</span>':'';
-        var cand=r.cand.slice(0,6).map(function(x){ if(x.src==="VA") return '<div class="mini">⚠ 가상계좌 의심 · '+esc(x.t.fer.label)+' '+esc(x.t.summary||x.t.client)+' '+fmt(x.t.withdraw)+'</div>';
+        var cand=r.cand.slice(0,6).map(function(x){
           if(x.src==="FEE") return '<div class="mini">⚠ 수수료 의심 · '+esc(x.L.memo)+' '+fmt(x.L.amount)+'</div>';
           if(x.t) return '<div class="mini">CMS · '+esc(x.t.fer.label)+' '+esc(x.t.summary||x.t.client)+' '+(r.fx?fmtFx(x.t.withdraw):fmt(x.t.withdraw))+'</div>';
           return '<div class="mini">ERP · '+esc(x.L.memo)+' '+(r.fx?fmtFx(x.L.amount):fmt(x.L.amount))+'</div>'; }).join("")+(r.cand.length>6?'<div class="mini">외 '+(r.cand.length-6)+'건</div>':'');
-        return '<tr>'+(i===0?'<td rowspan="4">'+ferChip(co)+'</td>':'')+'<td>'+esc(r.label)+'</td><td class="num">'+(r.fx?ferUsd(r.erp):ferKrw(r.erp))+'</td><td class="num">'+(r.fx?ferUsd(r.cms):ferKrw(r.cms))+'</td>'+ferDiffCell(r.diff,r.fx,r.soft)+'<td>'+(red?cand||miss:miss)+'</td></tr>'; }).join(""); }).join("")+'</tbody></table>';
+        var bas=(r.k==="move"||r.k==="spend")?ferBasisHtml(co,m,r.k):"", bkey=co+":"+r.k, bopen=!!(FERS.basisOpen&&FERS.basisOpen[bkey]);
+        var basCell=!bas?"":(red?bas:'<button class="btn xs fer-basisbtn" data-basis="'+bkey+'">'+(bopen?'근거 닫기':'근거 보기')+'</button>'+(bopen?'<div class="fer-basis">'+bas+'</div>':''));
+        return '<tr>'+(i===0?'<td rowspan="4">'+ferChip(co)+'</td>':'')+'<td>'+esc(r.label)+'</td><td class="num">'+(r.fx?ferUsd(r.erp):ferKrw(r.erp))+'</td><td class="num">'+(r.fx?ferUsd(r.cms):ferKrw(r.cms))+'</td>'+ferDiffCell(r.diff,r.fx,r.soft)+'<td>'+(red?(cand||miss):miss)+basCell+'</td></tr>'; }).join(""); }).join("")+'</tbody></table>';
   FERS.anyRed=anyRed;
   /* ⑥ 계획 ↔ 결과 */
   var d=FERS.date, N=(ferCfg().notes[d])||{}, T={pk:0,rk:0,pf:0,rf:0};
@@ -9476,12 +9536,10 @@ function ferRenderResult(){
       m.att.map(function(a){ return '<tr'+(a.need?'':' class="fer-mute"')+'><td>'+esc(a.bank)+'</td><td><b>'+esc(a.label)+'</b> <span class="mini mono">'+esc(a.num)+'</span>'+(a.mmt?' <span class="chip nv">MMT</span>':'')+'</td><td>'+(a.need?'<span class="chip in">필요</span>':'<span class="chip nv">제외</span>')+'</td><td class="mini">'+esc(a.reason||"")+'</td><td class="num">'+a.n+'</td></tr>'; }).join("")+'</tbody></table></div>'; }).join("")||'<div class="empty" style="padding:16px">CMS 거래내역을 올리면 첨부 계좌를 판정합니다.</div>';
 }
 function ferRenderCfg(){
-  var cfg=ferCfg(), regOf=function(f){ var c=ferCo(f.co); var d=digitsOnly(f.num); return !d || (c.accounts||[]).some(function(a){ return digitsOnly(a.num)===d; }); };
-  $("#ferFeeTbl").innerHTML='<thead><tr><th>법인</th><th>은행</th><th>계좌번호</th><th>방식</th><th class="num">금액</th><th class="num">구간 단위</th><th></th></tr></thead><tbody>'+
-    cfg.fees.map(function(f,i){ return '<tr><td><select data-fi="'+i+'" data-ff="co">'+FER_COS.map(function(k){ return '<option'+(f.co===k?' selected':'')+'>'+k+'</option>'; }).join("")+'</select></td>'+
-      '<td><input data-fi="'+i+'" data-ff="bank" value="'+esc(f.bank)+'" style="width:70px"></td><td><input data-fi="'+i+'" data-ff="num" value="'+esc(f.num)+'" class="mono" style="width:150px">'+(regOf(f)?'':' <span class="chip ar-warnchip">미등록 계좌</span>')+'</td>'+
-      '<td><select data-fi="'+i+'" data-ff="mode"><option value="flat"'+(f.mode!=="tier"?' selected':'')+'>정액(출금 있으면)</option><option value="tier"'+(f.mode==="tier"?' selected':'')+'>금액구간(올림)</option></select></td>'+
-      '<td class="num"><input data-fi="'+i+'" data-ff="amount" value="'+(+f.amount||0)+'" inputmode="numeric" style="width:70px;text-align:right"></td><td class="num"><input data-fi="'+i+'" data-ff="unit" value="'+(f.mode==="tier"?(+f.unit||0):"")+'" inputmode="numeric" style="width:110px;text-align:right"'+(f.mode==="tier"?'':' disabled')+'></td>'+
+  var cfg=ferCfg();
+  $("#ferFeeTbl").innerHTML='<thead><tr><th>은행</th><th class="num">타행이체 수수료 (원/건)</th><th></th></tr></thead><tbody>'+
+    cfg.feeStd.map(function(f,i){ return '<tr><td><input data-fi="'+i+'" data-ff="bank" value="'+esc(f.bank)+'" style="width:90px"></td>'+
+      '<td class="num"><input data-fi="'+i+'" data-ff="amount" value="'+(+f.amount||0)+'" inputmode="numeric" style="width:90px;text-align:right"></td>'+
       '<td><button class="btn sm" data-fdel="'+i+'">삭제</button></td></tr>'; }).join("")+'</tbody>';
   $("#ferExc").innerHTML=FER_COS.map(function(k){ return '<label class="fer-exc"><span>'+ferChip(k)+'</span><textarea data-exc="'+k+'" rows="2" placeholder="한 줄에 하나">'+esc((cfg.exc[k]||[]).join("\n"))+'</textarea></label>'; }).join("");
 }
@@ -9495,7 +9553,6 @@ function renderExecResult(){
   var M=FERS.model;
   $("#btnFerXlsx").disabled=$("#btnFerPdf").disabled=!M||!FERS.date;
   $("#ferDlWarn").textContent=!M?"④ 결과 조회 후 내려받을 수 있습니다.":FERS.anyRed?"⚠ ⑤ ERP↔CMS 대사에 차이가 남아 있습니다. 확인 후 내려받으세요.":"";
-  $("#ferAttPrint").checked=FERS.attPrint;
 }
 
 /* ---------- 7. 보고서: 엑셀(내장 양식 + ExcelJS) · PDF(인쇄) ---------- */
@@ -9506,28 +9563,42 @@ function ferReportVals(){
       nk:live?((N[co]||{}).krw||""):"", nf:live?((N[co]||{}).fx||""):""}; });
 }
 function ferB64(b64){ var s=atob(b64), u=new Uint8Array(s.length); for(var i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u.buffer; }
+/* [v43] R7 엑셀 복구 경고 수정 — ExcelJS로 양식을 다시 저장하면 인쇄 영역이 '결과보고서'!$A1:$J28 로 깨지고(원본 $A$1:$J$28)
+   pageSetup DPI 4294967295 등이 새로 써진다. 내장 양식 xlsx(zip)를 그대로 열어 sheet1.xml 의 대상 셀 <v>만 바꾸고 나머지 파트는 원본 바이트 그대로 둔다. */
+function ferXmlEsc(s){ return String(s==null?"":s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").slice(0,32767); }
+function ferSerial(iso){ var p=iso.split("-"); return Math.round(Date.UTC(+p[0],+p[1]-1,+p[2])/86400000)+25569; }   // 1900 체계 일련번호(KST 날짜 그대로)
+function ferNum(v, fx){ var n=+v; if(!isFinite(n)) n=0; return fx?Math.round(n*100)/100:Math.round(n); }
+/* cells: {ref:{n:숫자} | {s:문자열} | {keep:true}} — 수식 셀은 <f> 그대로 두고 캐시 <v>만 바꾼다 */
+function ferPatchSheetXml(xml, cells){
+  Object.keys(cells).forEach(function(ref){ var c=cells[ref];
+    var re=new RegExp('<c r="'+ref+'"((?:\\s+[a-zA-Z:]+="[^"]*")*)\\s*(?:/>|>([\\s\\S]*?)</c>)');
+    var m=xml.match(re); if(!m) throw new Error("양식에 "+ref+" 셀이 없습니다");
+    var attrs=m[1].replace(/\s+t="[^"]*"/,""), inner=m[2]||"", fm=inner.match(/<f[^>]*>[\s\S]*?<\/f>|<f[^>]*\/>/), f=fm?fm[0]:"", out;
+    if(c.s!=null){ if(c.s==="") out='<c r="'+ref+'"'+attrs+'/>'; else out='<c r="'+ref+'"'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+ferXmlEsc(c.s)+'</t></is></c>'; }
+    else { var n=+c.n; if(!isFinite(n)) throw new Error(ref+" 값이 숫자가 아닙니다"); out='<c r="'+ref+'"'+attrs+'>'+f+'<v>'+String(n)+'</v></c>'; }
+    xml=xml.replace(re,out); });
+  return xml;
+}
+function ferBuildXlsx(V, d){
+  var CFB=XLSX.CFB, z=CFB.read(new Uint8Array(ferB64(FER_TPL_B64)),{type:"array"});
+  var path=z.FullPaths.filter(function(p){ return /xl\/worksheets\/sheet1\.xml$/.test(p); })[0], ent=path?CFB.find(z,path):null;
+  if(!ent) throw new Error("양식에서 시트를 찾지 못했습니다");
+  var xml=new TextDecoder("utf-8").decode(ent.content instanceof Uint8Array?ent.content:new Uint8Array(ent.content));
+  var dt=ferSerial(d), T={pk:0,rk:0,pf:0,rf:0}, C={C2:{n:dt}, H3:{n:dt}, C5:{n:dt}};
+  V.forEach(function(v,i){ var r=10+i, f=18+i, pk=ferNum(v.pk), rk=ferNum(v.rk), pf=ferNum(v.pf,true), rf=ferNum(v.rf,true);
+    C["E"+r]={n:pk}; C["F"+r]={n:rk}; C["G"+r]={n:rk-pk}; C["H"+r]={s:v.nk||""};
+    C["E"+f]={n:pf}; C["F"+f]={n:rf}; C["G"+f]={n:Math.round((rf-pf)*100)/100}; C["H"+f]={s:v.nf||""};
+    T.pk+=pk; T.rk+=rk; T.pf+=pf; T.rf+=rf; });
+  C.E14={n:T.pk}; C.F14={n:T.rk}; C.G14={n:T.rk-T.pk};
+  C.E22={n:Math.round(T.pf*100)/100}; C.F22={n:Math.round(T.rf*100)/100}; C.G22={n:Math.round((T.rf-T.pf)*100)/100};
+  ent.content=new TextEncoder().encode(ferPatchSheetXml(xml, C)); ent.size=ent.content.length;
+  return CFB.write(z,{type:"array", fileType:"zip", compression:true});
+}
 function ferXlsx(){
   if(!FERS.model||!FERS.date){ toast("먼저 결과를 조회하세요"); return; }
-  var V=ferReportVals(), d=FERS.date, name="자금집행결과보고서_"+d+".xlsx";
-  loadExcelJS().then(function(EX){
-    var wb=new EX.Workbook();
-    return wb.xlsx.load(ferB64(FER_TPL_B64)).then(function(){
-      var ws=wb.getWorksheet("결과보고서")||wb.worksheets[0], p=d.split("-");
-      var dt=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));                       // ExcelJS는 UTC 기준 일련번호 — KST에서도 날짜가 밀리지 않게
-      ws.getCell("C2").value=dt;
-      ws.getCell("H3").value={formula:"C2", result:dt}; ws.getCell("C5").value={formula:"C2", result:dt};
-      var T={pk:0,rk:0,pf:0,rf:0};
-      V.forEach(function(v,i){ var r=10+i, f=18+i;
-        ws.getCell("E"+r).value=v.pk; ws.getCell("F"+r).value=v.rk; ws.getCell("G"+r).value={formula:"F"+r+"-E"+r, result:v.rk-v.pk}; ws.getCell("H"+r).value=v.nk||null;
-        ws.getCell("E"+f).value=v.pf; ws.getCell("F"+f).value=v.rf; ws.getCell("G"+f).value={formula:"F"+f+"-E"+f, result:Math.round((v.rf-v.pf)*100)/100}; ws.getCell("H"+f).value=v.nf||null;
-        T.pk+=v.pk; T.rk+=v.rk; T.pf+=v.pf; T.rf+=v.rf; });
-      [["E14","SUM(E10:E13)",T.pk],["F14","SUM(F10:F13)",T.rk],["G14","SUM(G10:G13)",T.rk-T.pk],
-       ["E22","SUM(E18:E21)",Math.round(T.pf*100)/100],["F22","SUM(F18:F21)",Math.round(T.rf*100)/100],["G22","SUM(G18:G21)",Math.round((T.rf-T.pf)*100)/100]].forEach(function(x){ ws.getCell(x[0]).value={formula:x[1], result:x[2]}; });
-      wb.calcProperties.fullCalcOnLoad=true;
-      return wb.xlsx.writeBuffer();
-    });
-  }).then(function(buf){ return offerDownload(name, new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); })
-    .catch(function(e){ console.error(e); toast("엑셀을 만들지 못했습니다: "+(e&&e.message||"엑셀 엔진 로드 실패")); });
+  var V=ferReportVals(), d=FERS.date, name="자금집행결과보고서_"+d+".xlsx", bytes;
+  try{ bytes=ferBuildXlsx(V, d); }catch(e){ console.error(e); toast("엑셀을 만들지 못했습니다: "+e.message); return; }
+  offerDownload(name, new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
 }
 function ferPrint(){
   if(!FERS.model||!FERS.date){ toast("먼저 결과를 조회하세요"); return; }
@@ -9542,12 +9613,7 @@ function ferPrint(){
     '<p class="fer-rlead">'+p[0]+'/'+p[1]+'/'+p[2]+' 그룹사 자금집행결과를 아래와 같이 보고하오니, 검토 후 재가하여 주시기 바랍니다.</p>'+
     '<div class="fer-rh"><b>1. 집행결과 상세내용</b><span>(단위: 원)</span></div><div class="fer-rsub">&lt;원화&gt;</div>'+tbl(false)+'<div class="fer-rsub">&lt;외화&gt;</div>'+tbl(true)+
     '<div class="fer-rh" style="margin-top:18px"><b>2. 첨부자료</b></div><p class="fer-rlead">&nbsp;&nbsp;&nbsp;- 각사 은행 거래내역 &amp; 이체결과 첨부.</p><p class="fer-rend">- 끝 -</p></div>';
-  var page2=!FERS.attPrint?'':'<div class="rpt-page fer-p2"><div class="fer-rtitle" style="font-size:16px">결과보고서 첨부 계좌 ('+d+')</div>'+FER_COS.map(function(co){ var m=M.cos[co]; if(m.gone||!m.hasCms) return '';
-    var need=m.att.filter(function(a){ return a.need; }), ex=m.att.filter(function(a){ return !a.need; });
-    return '<div class="fer-rsub">'+co+' · 첨부 필요 '+need.length+'개 계좌</div><table class="fer-rt"><thead><tr><th>은행</th><th>계좌</th><th>사유</th><th>건수</th></tr></thead><tbody>'+
-      (need.map(function(a){ return '<tr><td class="c">'+esc(a.bank)+'</td><td>'+esc(a.label)+' ('+esc(a.num)+')</td><td>'+esc(a.reason)+'</td><td class="n">'+a.n+'</td></tr>'; }).join("")||'<tr><td colspan="4" class="c">첨부할 계좌 없음</td></tr>')+'</tbody></table>'+
-      (ex.length?'<div class="fer-rnote">제외: '+ex.map(function(a){ return esc(a.label); }).join(", ")+'</div>':''); }).join("")+'</div>';
-  $("#printReport").innerHTML=page1+page2+'<div class="rpt-actions no-print"><button class="btn primary" id="btnRptPrint">인쇄 · PDF로 저장</button><button class="btn" id="btnRptClose">닫기</button></div>';
+  $("#printReport").innerHTML=page1+'<div class="rpt-actions no-print"><button class="btn primary" id="btnRptPrint">인쇄 · PDF로 저장</button><button class="btn" id="btnRptClose">닫기</button></div>';
   $("#printReport").hidden=false; document.body.classList.add("reporting","fer-print");
   $("#btnRptPrint").onclick=function(){ window.print(); };
   $("#btnRptClose").onclick=function(){ $("#printReport").hidden=true; document.body.classList.remove("reporting","fer-print"); };
@@ -9588,16 +9654,18 @@ function bindExecResult(){
     n[t.dataset.f]=t.value; n[t.dataset.f+"User"]=true; t.rows=Math.max(1,t.value.split("\n").length); };
   $("#ferPR").onchange=function(e){ if(e.target.classList.contains("fer-note")) ferPersist(); };
   /* 설정: 수수료 규칙 · 지출 예외 */
-  $("#ferFeeTbl").onchange=function(e){ var t=e.target, i=t.dataset.fi; if(i==null) return; var f=ferCfg().fees[+i], k=t.dataset.ff;
-    f[k]=(k==="amount"||k==="unit")?(+String(t.value).replace(/[,\s]/g,"")||0):t.value; ferPersist(); renderExecResult(); };
-  $("#ferFeeTbl").onclick=function(e){ var b=e.target.closest("[data-fdel]"); if(!b) return; ferCfg().fees.splice(+b.dataset.fdel,1); ferPersist(); renderExecResult(); };
-  $("#btnFerFeeAdd").onclick=function(){ ferCfg().fees.push({co:"SN",bank:"",num:"",mode:"flat",amount:500,unit:0}); ferPersist(); renderExecResult(); };
-  $("#btnFerCfgReset").onclick=function(){ var c=ferCfg(); c.fees=JSON.parse(JSON.stringify(FER_DEFAULTS.fees)); c.exc=JSON.parse(JSON.stringify(FER_DEFAULTS.exc)); ferPersist(); renderExecResult(); toast("양식 기본값으로 되돌렸습니다"); };
+  $("#ferFeeTbl").onchange=function(e){ var t=e.target, i=t.dataset.fi; if(i==null) return; var f=ferCfg().feeStd[+i], k=t.dataset.ff;
+    f[k]=(k==="amount")?(+String(t.value).replace(/[,\s]/g,"")||0):String(t.value).trim(); ferPersist(); renderExecResult(); };
+  $("#ferFeeTbl").onclick=function(e){ var b=e.target.closest("[data-fdel]"); if(!b) return; ferCfg().feeStd.splice(+b.dataset.fdel,1); ferPersist(); renderExecResult(); };
+  $("#btnFerFeeAdd").onclick=function(){ ferCfg().feeStd.push({bank:"",amount:500}); ferPersist(); renderExecResult(); };
+  $("#btnFerCfgReset").onclick=function(){ var c=ferCfg(); c.feeStd=JSON.parse(JSON.stringify(FER_DEFAULTS.feeStd)); c.exc=JSON.parse(JSON.stringify(FER_DEFAULTS.exc)); ferPersist(); renderExecResult(); toast("기본값(부산·신한 500원/건)으로 되돌렸습니다"); };
   $("#ferExc").onchange=function(e){ var t=e.target; if(!t.dataset.exc) return; ferCfg().exc[t.dataset.exc]=t.value.split("\n").map(function(s){ return s.trim(); }).filter(Boolean); ferPersist(); renderExecResult(); };
   /* 다운로드 */
   $("#btnFerXlsx").onclick=ferXlsx; $("#btnFerPdf").onclick=ferPrint;
-  $("#ferAttPrint").onchange=function(){ FERS.attPrint=this.checked; };
-  $("#btnFerClear").onclick=function(){ FERS.pdf=null; FERS.pdfName=""; FERS.pdfErr=""; FERS.erp={}; FERS.cms={}; FERS.model=null; FERS.ran=false; FERS.open=null; FERS.date=""; FERS.warn=[]; renderExecResult(); };
+  /* [v43] ⑤ 근거 보기/닫기 */
+  $("#ferRec").onclick=function(e){ var b=e.target.closest("[data-basis]"); if(!b) return; FERS.basisOpen=FERS.basisOpen||{}; FERS.basisOpen[b.dataset.basis]=!FERS.basisOpen[b.dataset.basis]; renderExecResult(); };
+  $("#ferRec").onkeydown=function(e){ var b=e.target.closest&&e.target.closest(".fer-bchip"); if(b&&(e.key==="Enter"||e.key===" ")){ e.preventDefault(); b.click(); } };
+  $("#btnFerClear").onclick=function(){ FERS.pdf=null; FERS.pdfName=""; FERS.pdfErr=""; FERS.erp={}; FERS.cms={}; FERS.model=null; FERS.ran=false; FERS.open=null; FERS.date=""; FERS.warn=[]; FERS.basisOpen={}; renderExecResult(); };
 }
 
 /* ---- 법인카드 등록 [v28 → v39 → v40 → v41 → v42]: 법인 선택 → 발급일자 → 삼성카드 발급내역 → 신규/재발급 구분 → ① 가공 발급내역 ② ERP 등록 ③ CMS 등록 파일을 단계마다 따로 저장 ----
@@ -10336,9 +10404,17 @@ tr.tc-appr td{background:var(--move-soft)}
 #printReport .fer-rt .neg{color:#C00000}
 #printReport .fer-rend{text-align:center;margin-top:28px;font-size:13px}
 #printReport .fer-rnote{font-size:11px;color:#555;margin-top:4px}
+/* [v43] ⑤ 판정 근거 */
+.fer-basisbtn{margin-top:2px}
+.fer-basis{margin-top:4px;display:flex;flex-direction:column;gap:3px}
+.fer-bchip{cursor:pointer}
+.fer-bsub{padding-left:14px;color:var(--muted)}
 @media print{
   body.fer-print #printReport .rpt-page{max-width:none;color:#000}
-  body.fer-print #printReport .rpt-page.fer-p1{break-after:page;page-break-after:always}
+  body.fer-print #printReport .rpt-page.fer-p1{break-after:auto;page-break-after:auto;break-inside:avoid}   /* [v43] 1페이지에서 끝 */
+  html:has(body.fer-print),body.fer-print{height:auto!important;min-height:0!important;background:#fff!important}
+  body.fer-print #printReport{background:#fff!important}
+  body.fer-print #printReport .rpt-actions{display:none!important}
   body.fer-print #printReport .fer-rt th,body.fer-print #printReport .fer-rt tr.tot td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 .fep-sum td.fep-ok{color:var(--in);font-weight:700;background:var(--in-soft)}
