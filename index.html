@@ -253,7 +253,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v51 · 2026-10-12</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v52 · 2026-10-12</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -2018,7 +2018,7 @@ function parseCMS(ab){
     var date=toISO(pick(o,["거래일자","거래일","일자"])); if(!date) return;
     var dep=toNum(pick(o,["입금액","입금"])), wd=toNum(pick(o,["출금액","출금"]));
     if(!dep&&!wd) return;
-    var rawAfter=String(pick(o,["거래후잔액","잔액"])||"").trim();
+    var afterV=pick(o,["거래후잔액","잔액"]), rawAfter=(afterV==null?"":String(afterV)).trim();   // [v52] 숫자 0은 빈칸이 아니다(종전 `||""`가 0을 빈칸으로 바꿔 hasAfter=false)
     out.push({date:date, company:String(pick(o,["기업명"])||"").trim(),
       bank:String(pick(o,["은행"])||"").trim(), acctNum:String(pick(o,["계좌","계좌번호"])||"").trim(),
       alias:String(pick(o,["계좌별칭"])||"").trim(), group:String(pick(o,["그룹명"])||"").trim(),
@@ -2681,6 +2681,7 @@ function dayAgg(c,iso){
     a.inBy["차입"]+=(m2.borrow||0); a.outBy["상환"]+=(m2.repay||0);
     a.inTotal+=(m2.borrow||0); a.outTotal+=(m2.repay||0);
   } else {
+    var aSeq={n:0};
     txnsOf(c,iso).forEach(function(t){
       var k=a.byAcct[t.acct]||(a.byAcct[t.acct]={in:0,out:0,mvIn:0,mvOut:0,fxIn:0,fxOut:0,after:null,afterSet:false,afterAt:""});
       if(t.kind==="자금이동(입금)"){ a.mvIn+=t.deposit; k.mvIn+=t.deposit; }
@@ -2706,12 +2707,18 @@ function dayAgg(c,iso){
       }
       else if(t.kind==="수입"){ a.inBy[t.cat]=(a.inBy[t.cat]||0)+t.deposit; a.inTotal+=t.deposit; k.in+=t.deposit; }
       else if(t.kind==="지출"){ a.outBy[t.cat]=(a.outBy[t.cat]||0)+t.withdraw; a.outTotal+=t.withdraw; k.out+=t.withdraw; }
-      if(t.hasAfter){
-        var ord=t.at||"";                                  // 거래일시 기준 최종 거래의 잔액만 채택
-        if(!k.afterSet || ord>=(k.afterAt||"")){ k.after=t.after; k.afterAt=ord; k.afterSet=true; }
-      }
+      (aSeq[t.acct]||(aSeq[t.acct]=[])).push({t:t, i:aSeq.n++});   // [v52] 잔액 앵커는 아래에서 거래일시 순으로 계산
       if(t.auto) a.autoCount++;
     });
+    /* [v52] 그날 계좌별 최종 잔액(CMS 앵커) — 거래일시 순(같은 시각은 파일 순서)으로 훑으며
+       거래후잔액이 있으면 그 값, 없으면 직전 잔액 + 입금 − 출금. 종전에는 '잔액 있는 마지막 행'만 써서,
+       잔액 0으로 비운 자금이동(예: 수금용 계좌 스윕) 뒤에도 그 전 잔액이 마감 잔액으로 잡혔다(v51 이전 저장분은 0이 빈칸으로 저장됨). */
+    Object.keys(aSeq).forEach(function(lab){ if(lab==="n") return; var k=a.byAcct[lab]; if(!k) return;
+      var L=aSeq[lab].sort(function(x,y){ var p=String(x.t.at||""), q=String(y.t.at||""); return p<q?-1:p>q?1:x.i-y.i; }), run=null, at="";
+      L.forEach(function(e){ var t=e.t;
+        if(t.hasAfter){ run=+t.after||0; at=String(t.at||""); }
+        else if(run!==null){ run=run+(+t.deposit||0)-(+t.withdraw||0); at=String(t.at||""); } });
+      if(run!==null){ k.after=run; k.afterAt=at; k.afterSet=true; } });
     var m=manualOf(c,iso);
     a.inBy["차입"]+= (m.borrow||0); a.outBy["상환"]+= (m.repay||0);
     a.inTotal += (m.borrow||0)+(m.cashIn||0);
