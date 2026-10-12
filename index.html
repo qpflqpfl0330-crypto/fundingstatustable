@@ -189,7 +189,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 #drop{border:1.5px dashed var(--rule-strong);border-radius:var(--r-lg);background:var(--surface-2);padding:34px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
 #drop.over{border-color:var(--navy);background:var(--navy-soft)}
-#drop b{display:block;font-size:14px;margin-bottom:4px}
+#drop>b{display:block;font-size:14px;margin-bottom:4px}   /* [v45] 직계만 — 안내문 속 <b>는 글자만 굵게 */
 .filerow{display:flex;align-items:center;gap:10px;padding:9px 13px;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--surface-2);font-size:12.5px;flex-wrap:wrap}
 .banner{padding:11px 15px;border-left:3px solid var(--warn);border-radius:var(--r-md);background:var(--move-soft);font-size:13px;color:var(--ink-2)}
 .banner.good{border-left-color:var(--in);background:var(--in-soft)}
@@ -338,7 +338,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
           </div>
           <input type="file" id="ilboCmsIn" accept=".xls,.xlsx" multiple hidden>
           <input type="file" id="ilboSlipIn" accept=".xls,.xlsx" multiple hidden>
-          <div class="hint" style="margin-top:8px">두 파일을 한 번에 어느 칸에 놓아도 내용으로 자동 판별합니다. 반영 즉시 일자별 보고·대시보드·거래원장과 같은 데이터로 저장됩니다.</div>
+          <div class="hint" style="margin-top:8px">두 파일을 한 번에 어느 칸에 놓아도 내용으로 자동 판별합니다. 반영 즉시 일자별 보고·대시보드·거래원장과 같은 데이터로 저장됩니다. 전표자료조회는 [데이터 업로드]에 올려도 여기에 그대로 반영됩니다(월 통합본은 날짜별로 나눠 저장).</div>
           <div id="ilboLog" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
         </div>
       </div>
@@ -400,7 +400,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
     <section class="view" id="v-fep" hidden>
       <div id="autoHub">
         <div class="auto-hero"><div><div class="auto-hero-t">에스넷그룹 자금파트 · 업무 모듈</div><div class="mini">필요한 업무를 선택하세요. 모든 파일은 이 브라우저 안에서만 처리됩니다.</div></div>
-          <div class="auto-pills"><span>운영 모듈 6개</span><span class="acc">엑셀 자동 생성</span><span>법인별 일괄 처리</span></div></div>
+          <div class="auto-pills"><span>운영 모듈 7개</span><span class="acc">엑셀 자동 생성</span><span>법인별 일괄 처리</span></div></div>
         <div class="auto-grid" id="autoGrid"></div>
       </div>
       <div class="auto-back" id="autoBack" hidden><button class="btn sm" id="btnAutoBack">← 자금업무자동화 목록</button><b id="autoToolTitle"></b></div>
@@ -877,6 +877,56 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 </div></div>
 </div>
       </div>
+
+      <!-- [v46] 법인카드 결제전표 — 명세서·승인내역·ERP 전표 → 계정대체전표 · 지급전표 (프로젝트 문서 `법인카드결제전표_자동화_프롬프트.md`) -->
+      <div class="auto-screen" data-tool="cardpay" hidden>
+        <div class="panel fer-panel card-head">
+          <header><h2>법인카드 결제전표</h2><span class="sub">월 1회 · 명세서 발급(매월 8일 이후) 후 작성</span>
+            <div class="sp"><button class="btn sm" id="btnCpNew" type="button">새로 시작</button></div></header>
+          <div class="pad card-headpad">
+            <ol class="fer-steps card-steps" id="cpSteps"><li data-s="1">파일 올리기</li><li data-s="2">금액 확인</li><li data-s="3">명세서 검증</li><li data-s="4">엑셀 생성</li></ol>
+            <div class="card-ctl">
+              <div class="grp"><span class="lbl">대상 법인</span><div class="card-cos" id="cpCos" role="group" aria-label="대상 법인"></div></div>
+              <div class="grp"><span class="lbl">결제월</span><input type="month" id="cpMonth" class="card-date" aria-label="결제월"></div>
+              <div class="grp"><span class="lbl">이용월</span><div class="card-val" id="cpUse"></div></div>
+              <div class="grp"><span class="lbl">카드 목록</span><div class="card-val" id="cpMasterInfo"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>1. 파일 올리기</h2><span class="sub">통합이용청구명세서 · 승인내역 · 해외매입내역 · 하나카드 이용내역 · ERP 전표 엑셀출력 · 명세서 PDF — 한꺼번에</span></header>
+          <div class="pad">
+            <div id="cpNoMaster"></div>
+            <div class="ilbo-drop card-drop" id="cpDrop" tabindex="0" role="button" aria-label="파일 선택"><b>파일을 끌어다 놓거나 눌러서 선택</b><span class="hint">여러 개 동시 가능 · 파일 이름이 깨져도 내용(머리글)으로 구분 · 브라우저 안에서만 처리하고 카드 목록 밖 카드 행은 바로 버립니다</span></div>
+            <input type="file" id="cpIn" accept=".xls,.xlsx,.pdf" multiple hidden>
+            <div class="cp-check" id="cpCheck"></div>
+            <div id="cpFiles" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>2. 금액 확인</h2><span class="sub">노란 칸은 수기 입력 · 카드번호는 화면에서만 가림(엑셀에는 전체 번호)</span>
+            <div class="sp"><div class="seg" id="cpTabs"><button data-t="rc" aria-pressed="true" type="button">계정대체</button><button data-t="pay" type="button">지급</button><button data-t="match" type="button">매칭 상세</button></div></div></header>
+          <div id="cpWarn" class="pad" style="padding-bottom:0"></div>
+          <div id="cpBody"></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>3. 명세서 검증</h2><span class="sub">카드 명세서 PDF(선택) · 삼성·하나·롯데 — PDF 총액 vs 청구금액</span></header>
+          <div id="cpPdf"></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>4. 엑셀 생성</h2><span class="sub">계정대체전표 · 지급전표 2시트 · 정본 양식 서식</span></header>
+          <div class="pad">
+            <div id="cpSum"></div>
+            <div class="cp-memo"><span class="lbl">계정대체전표 메모 (B26)</span><textarea id="cpMemo" rows="4"></textarea><button class="btn sm" id="btnCpMemoReset" type="button">기본 문구</button></div>
+            <div class="card-acts" style="margin-top:10px"><button class="btn primary" id="btnCpXlsx" type="button">엑셀 생성</button><button class="btn" id="btnCpSave" type="button">저장</button></div>
+            <div id="cpSaved" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="view" id="v-trend" hidden>
@@ -925,11 +975,11 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
     <section class="view" id="v-import" hidden>
       <div class="panel">
-        <header><h2>파일 업로드</h2><span class="sub">CMS 거래내역 · 월별 자금현황보고</span></header>
+        <header><h2>파일 업로드</h2><span class="sub">CMS 거래내역 · 월별 자금현황보고 · 전표자료조회</span></header>
         <div class="pad" style="display:flex;flex-direction:column;gap:12px">
           <div id="drop" tabindex="0" role="button" aria-label="파일 선택">
             <b>파일을 여기에 놓으세요</b>
-            <span class="hint">CMS 거래내역 · 월별 자금현황보고(.xlsm) · <b>현금출납장</b> · 금융권 거래정보(.html) — 모두 여기에 올리시면 됩니다<br>여러 개 동시 가능 · 법인은 파일 내용으로 자동 판별(현금출납장은 선택된 법인 탭 기준)</span>
+            <span class="hint">CMS 거래내역 · 월별 자금현황보고(.xlsm) · <b>현금출납장</b> · <b>전표자료조회</b>(하루치·월 통합본 → 자금일보 당일계획) · 금융권 거래정보(.html) — 모두 여기에 올리시면 됩니다<br>여러 개 동시 가능 · 법인은 파일 내용으로 자동 판별(현금출납장은 선택된 법인 탭 기준)</span>
           </div>
           <input type="file" id="fileIn" accept=".xls,.xlsx,.xlsm,.html,.htm" multiple hidden>
           <div id="importLog" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -1003,6 +1053,15 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
         </header>
         <div class="pad hint" style="padding-bottom:0">계좌 잔액은 <b>기초잔액 + 일별 증감</b>으로 누적됩니다. 첫 데이터 투입 후 한 번만 맞춰 두시면 이후는 자동입니다.</div>
         <div class="scroll" style="max-height:44vh"><table class="tbl" id="openTbl"></table></div>
+      </div>
+      <!-- [v46] 법인카드 결제전표 · 카드 목록 (공용 저장소 app/cardpay/<법인>/master) -->
+      <div class="panel" id="cpmPanel">
+        <header><h2>법인카드 결제전표 · 카드 목록</h2><span class="sub" id="cpmMeta"></span>
+          <div class="sp"><button class="btn sm" id="btnCpmAdd" type="button">행 추가</button><button class="btn sm" id="btnCpmDefault" type="button">기본값 복원</button></div></header>
+        <div class="pad" style="padding-bottom:0"><div class="card-cos" id="cpmCos" role="group" aria-label="법인"></div>
+          <div class="hint" style="margin-top:6px">id는 고정이고 라벨만 바뀝니다. 계정대체 규칙: chair 회장님 분리(E=ERP 매칭, F=가지급금 전표) · stmt 명세서(F) · erpMatch ERP 매칭(F) · stmtMinusE 명세서−E · verifyOnly 확인만 · none 계정대체 없음. 확인금액 출처: manual · none · erp:담당자명.</div></div>
+        <div class="cp-bar" id="cpmBar" hidden><span>저장하지 않은 변경이 있습니다</span><button class="btn sm primary" id="btnCpmSave" type="button">저장</button><button class="btn sm" id="btnCpmCancel" type="button">취소</button></div>
+        <div class="scroll" id="cpmBody"></div>
       </div>
     </section>
   </main>
@@ -3253,7 +3312,7 @@ function render(){
   else if(view==="trend") renderTrend();
   else if(view==="fin") renderFin();
   else if(view==="import") renderRules();
-  else if(view==="settings") renderSettings();
+  else if(view==="settings"){ renderSettings(); cpmOnSettings(); }
 }
 function setView(v){
   view=v;
@@ -5309,7 +5368,29 @@ function handleFiles(files){
           log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip mv">금융권 거래정보</span><span class="mini">'+esc(bits.join(" · "))+'</span></div>');
         }).catch(function(){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(f.name)+'</span><span class="mini">읽기 실패</span></div>'); });
       }
+      /* [v45] 큰 파일(전표 월 통합본 등)은 읽는 데 수 초 걸린다 — 결과가 나올 때까지 '읽는 중' 표시 */
+      var rd=document.createElement("div"); rd.className="filerow"; rd.innerHTML='<span>'+esc(f.name)+'</span><span class="mini">읽는 중… 큰 파일은 몇 초 걸립니다</span>'; log.appendChild(rd);
       return readFile(f).then(function(ab){
+        /* [v23] 전표자료조회(단일일자·기간 통합 모두) — 데이터 업로드 탭에서도 바로 인식해 날짜별 집행계획으로 저장.
+           저장(commitImport → saveSlipDays)하면 자금일보 작성 ② 칸에 올린 것과 같은 c.slips[날짜]가 된다.
+           [v45] 처리 결과가 나면 true(성공·법인 미판별·날짜 없음 모두 '처리됨'), 전표 형식이 아니면 false. */
+        var trySlip=function(){
+          var sp=null;
+          try{ sp=parseSlip(ab); }catch(e){ sp=null; }
+          if(!sp) return false;
+          var c5=detectCompany((sp.lines[0]||{}).unit)||guessCoFromName(f.name)||(curCo!=="ALL"?co(curCo):null);
+          if(!c5){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--warn)"><span>'+esc(f.name)+'</span><span class="chip auto">법인 미판별</span><span class="mini">파일명에 SN/굿어스/데이터/솔루션을 포함시켜 주세요</span></div>'); return true; }
+          var b5=buildSlip(c5, sp.lines), days5=slipDaysOf(c5, b5, f.name), dl5=Object.keys(days5).sort();
+          if(!dl5.length){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(f.name)+'</span><span class="mini">전표에서 회계일자를 찾지 못했습니다</span></div>'); return true; }
+          result.slips[c5.id]=result.slips[c5.id]||{};
+          Object.keys(days5).forEach(function(d){ result.slips[c5.id][d]=days5[d]; });
+          var nOut5=b5.lines.filter(function(x){return x.kind==="out"}).length, nMv5=b5.lines.filter(function(x){return x.kind.indexOf("move")===0}).length;
+          var nOld5=dl5.filter(function(d){ return !!(c5.slips||{})[d]; }).length;
+          log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip out">전표자료조회</span><span class="mini">'+esc(c5.name)+' · '+dl5[0]+' ~ '+dl5[dl5.length-1]+' · '+dl5.length+'일 · 전표 '+b5.vouchers+'건 → 출금계획 '+nOut5+'건 · 자금이동 '+nMv5+'건'+(b5.skipped?' · 현금·예금 계정 없는 전표 '+b5.skipped+'건 제외':'')+
+            ' · [저장]하면 자금일보 작성 ② 당일계획에 날짜별로 반영'+(nOld5?' · 이미 저장된 '+nOld5+'일은 이 파일로 교체(직접 고친 구분은 유지)':'')+'</span></div>');
+          return true;
+        };
+        if(sniffSlip(ab) && trySlip()) return;      // [v45] 전표 머리글이면 바로 처리
         var rows=[];
         try{ rows=parseCMS(ab); }catch(e){ rows=[]; }
         if(rows.length){
@@ -5374,24 +5455,11 @@ function handleFiles(files){
           log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip in">매출채권 · '+esc(arp.kind)+'</span><span class="mini">'+esc(c6.name)+' · 전체 '+arp.all+'건 중 미결 '+arp.rows.length+'건 · 잔액 '+fmt(arp.sumBal)+'원 · '+arp.asOf+' 기준</span></div>');
           return;
         }
-        /* [v23] 전표자료조회(단일일자·기간 통합 모두) — 데이터 업로드 탭에서도 바로 인식해 날짜별 집행계획으로 저장 */
-        var sp=null;
-        try{ sp=parseSlip(ab); }catch(e){ sp=null; }
-        if(sp){
-          var c5=detectCompany((sp.lines[0]||{}).unit)||guessCoFromName(f.name)||(curCo!=="ALL"?co(curCo):null);
-          if(!c5){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--warn)"><span>'+esc(f.name)+'</span><span class="chip auto">법인 미판별</span><span class="mini">파일명에 SN/굿어스/데이터/솔루션을 포함시켜 주세요</span></div>'); return; }
-          var b5=buildSlip(c5, sp.lines), days5=slipDaysOf(c5, b5, f.name), dl5=Object.keys(days5).sort();
-          if(!dl5.length){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(f.name)+'</span><span class="mini">전표에서 회계일자를 찾지 못했습니다</span></div>'); return; }
-          result.slips[c5.id]=result.slips[c5.id]||{};
-          Object.keys(days5).forEach(function(d){ result.slips[c5.id][d]=days5[d]; });
-          var nOut5=b5.lines.filter(function(x){return x.kind==="out"}).length, nMv5=b5.lines.filter(function(x){return x.kind.indexOf("move")===0}).length;
-          log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip out">전표자료조회</span><span class="mini">'+esc(c5.name)+' · '+dl5[0]+' ~ '+dl5[dl5.length-1]+' · '+dl5.length+'일 · 전표 '+b5.vouchers+'건 → 출금계획 '+nOut5+'건 · 자금이동 '+nMv5+'건'+(b5.skipped?' · 현금·예금 계정 없는 전표 '+b5.skipped+'건 제외':'')+'</span></div>');
-          return;
-        }
+        if(trySlip()) return;                        // [v23] 전표자료조회 — 종전 순서(마지막)에서도 한 번 더 시도
         log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(f.name)+'</span><span class="mini">거래내역·일별현황·전표자료조회를 찾지 못했습니다</span></div>');
       }).catch(function(){
         log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(f.name)+'</span><span class="mini">읽기 실패</span></div>');
-      });
+      }).then(function(){ rd.remove(); });
     });
   }, Promise.resolve());
   seq.then(function(){
@@ -6082,6 +6150,22 @@ function calPrevBiz(iso){ var d=isoAdd(iso,-1), g=0; while(!isBizDay(d) && g++<1
 function calNextBiz(iso){ var d=isoAdd(iso,1), g=0; while(!isBizDay(d) && g++<15) d=isoAdd(d,1); return d; }
 
 /* ---------- 전표자료조회 파서 ---------- */
+/* [v45] 전표자료조회 빠른 판별 — 첫 시트 머리 12행만 읽는다(6MB 월 통합본 기준 전체 읽기 1회 ≈ 2초 → 0.6초).
+   전표 머리글(전표번호·계정코드·차변금액·대변금액·회계일자)이 있고, 다른 양식의 머리글
+   (CMS 거래일자 · 외화원장 예적금명/환종 · 현금출납장 입금+출금 · 매출채권 전표금액/반제금액 · 보고서 MM.DD 시트)이 없을 때만 true.
+   true면 데이터 업로드에서 다른 파서 5개를 건너뛰고 바로 parseSlip 으로 간다. false면 종전 순서 그대로. */
+function sniffSlip(ab){
+  var wb; try{ wb=XLSX.read(ab,{type:"array",sheetRows:12}); }catch(e){ return false; }
+  if(!wb.SheetNames.length || wb.SheetNames.some(function(n){ return /^\d{1,2}[.\-]\d{1,2}$/.test(String(n).trim()); })) return false;
+  var aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:"",raw:true});
+  for(var r=0;r<Math.min(aoa.length,10);r++){
+    var h=(aoa[r]||[]).map(function(v){ return String(v).replace(/\s/g,""); });
+    var has=function(n){ return h.indexOf(n)>=0; };
+    if(!(has("전표번호")&&has("계정코드")&&has("차변금액")&&has("대변금액")&&has("회계일자"))) continue;
+    return !(has("거래일자")||has("예적금명")||has("환종")||(has("입금")&&has("출금"))||has("전표금액")||has("반제금액"));
+  }
+  return false;
+}
 function parseSlip(ab){
   var wb=XLSX.read(ab,{type:"array",cellDates:true}), out=null;
   wb.SheetNames.some(function(sn){
@@ -6395,7 +6479,7 @@ function ilboModel(c, iso){
   /* 검증 */
   chk(!!(prec && prec.source==="cms"), prev+" CMS 거래내역 "+(prec&&prec.source==="cms"?"반영됨":"미반영 — ① CMS 파일을 올려주세요"));
   if(prevEnd>prev) chk(true, "전일 실적 기간 "+ilboRangeText(m,"iso")+" — 비영업일 거래 "+rdays.filter(function(d){return d>prev}).length+"일분 합산");
-  chk(!!sl, iso+" 전표 "+(sl?"반영됨 ("+L.length+"건)":"미반영 — ② 전표자료조회 파일을 올려주세요"));
+  chk(!!sl, iso+" 전표 "+(sl?"반영됨 ("+L.length+"건)":"미반영 — ② 칸 또는 [데이터 업로드]에 전표자료조회 파일을 올려주세요(월 통합본 가능)"));
   chk(!bad.length, bad.length ? "시재표 1원 검증 불일치: "+bad.join(", ") : "시재표 계좌별 전일시재+입금−출금±자금이동 = 금일시재 (1원 단위 일치)");
   var dd=Math.round(m.D.close-ps.close);
   chk(Math.abs(dd)<1, Math.abs(dd)<1 ? "예적금 현황표 합계 = 일자별 보고·대시보드 시재 "+fmt(ps.close)+"원" : "현황표 합계와 대시보드 시재 차이 "+fmt(dd)+"원"+(m.unalloc?" (보고서 총액 기준 미배분 "+fmt(m.unalloc)+"원)":""));
@@ -6713,7 +6797,7 @@ function ilboDropState(c, m){
   if(!c||!m){ cs.textContent=""; ss.textContent=""; $("#ilboDropCms").classList.remove("done"); $("#ilboDropSlip").classList.remove("done"); return; }
   var pr=dayRec(c,m.prev), okC=!!(pr&&pr.source==="cms"), okS=!!m.slip;
   cs.innerHTML=okC ? '✓ '+m.prev+' '+txnsOf(c,m.prev).length+'건 반영' : m.prev+' 미반영';
-  ss.innerHTML=okS ? '✓ '+m.iso+' '+m.slip.lines.length+'건 · '+esc(m.slip.file||"") : m.iso+' 미반영';
+  ss.innerHTML=okS ? '✓ '+m.iso+' '+m.slip.lines.length+'건 · '+esc(m.slip.file||"") : m.iso+' 미반영 · 여기 또는 [데이터 업로드]에 올리세요';
   $("#ilboDropCms").classList.toggle("done",okC); $("#ilboDropSlip").classList.toggle("done",okS);
 }
 function ilboLog(html, bad){ $("#ilboLog").insertAdjacentHTML("beforeend",'<div class="filerow"'+(bad?' style="border-color:var(--out);color:var(--out)"':'')+'>'+html+'</div>'); }
@@ -6722,8 +6806,10 @@ function ilboFiles(files){
   var arr=Array.prototype.slice.call(files||[]); if(!arr.length) return;
   $("#ilboLog").innerHTML="";
   var res={cms:{}, xlsm:{}, sheet:{}, cashbook:{}, fxLedger:{}, loans:null, contacts:null, holidays:null, guarantees:null, notes:[]}, hasCms=false, slipDates=[], lastCms=null;
-  arr.reduce(function(p,f){ return p.then(function(){ return readFile(f).then(function(ab){
-    var rows=[]; try{ rows=parseCMS(ab); }catch(e){ rows=[]; }
+  arr.reduce(function(p,f){ return p.then(function(){
+    var rd=document.createElement("div"); rd.className="filerow"; rd.innerHTML='<span>'+esc(f.name)+'</span><span class="mini">읽는 중… 큰 파일은 몇 초 걸립니다</span>'; $("#ilboLog").appendChild(rd);   // [v45]
+    return readFile(f).then(function(ab){
+    var rows=[]; try{ rows=sniffSlip(ab)?[]:parseCMS(ab); }catch(e){ rows=[]; }      // [v45] 전표 머리글이면 CMS 파서 생략
     if(rows.length){
       var groups={};
       rows.forEach(function(r){ var cc=detectCompany(r.company)||guessCoFromName(f.name); if(cc) (groups[cc.id]=groups[cc.id]||[]).push(r); });
@@ -6749,7 +6835,7 @@ function ilboFiles(files){
       return;
     }
     ilboLog('<span>'+esc(f.name)+'</span><span class="mini">CMS 거래내역·전표자료조회 형식이 아닙니다</span>',true);
-  }).catch(function(){ ilboLog('<span>'+esc(f.name)+'</span><span class="mini">읽기 실패</span>',true); }); }); }, Promise.resolve()).then(function(){
+  }).catch(function(){ ilboLog('<span>'+esc(f.name)+'</span><span class="mini">읽기 실패</span>',true); }).then(function(){ rd.remove(); }); }); }, Promise.resolve()).then(function(){
     var n=0;
     if(hasCms){
       var out=commitImport(res); n=out.slipMatched;
@@ -8721,6 +8807,8 @@ var AUTO_TOOLS=[
   {k:"expense",t:"사원경비 대량이체",   d:"사원경비 전표 및 계좌 매핑, 인별 집계 및 대량이체 파일 생성", tags:["계좌 매핑","성명=예금주 검증","대량이체 생성"], ico:'<circle cx="9" cy="7.5" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 9.4-3.9"/><circle cx="17" cy="16.5" r="4.5"/>'},
   {k:"card",   t:"법인카드 등록",       d:"삼성카드 발급내역 → ERP 업로드 파일 · CMS 등록 파일", tags:["발급내역 업로드","ERP·CMS 파일"], ico:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6 15h4"/>'},
   {k:"mmt",    t:"MMT 이자수익전표",   d:"하나 MMT 원천징수영수증 PDF 업로드 → 이자수익·법인세·지방세 4라인 전표 생성", tags:["PDF 업로드","글리프 자동판독","ERP KO 엑셀 다운로드"], ico:'<rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M7 9h4M7 13h6M7 17h3"/><circle cx="16.5" cy="15.5" r="3.2"/><path d="M15 17l3-3"/>'}
+,
+  {k:"cardpay",t:"법인카드 결제전표",   d:"명세서·승인내역·ERP 전표 → 계정대체전표 · 지급전표", tags:["회장님 카드 분리","ERP 승인번호 매칭","작업파일 생성"], ico:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M7 15h3M14 13.5l2 2 3.5-3.5"/>'}
 ];
 function renderAutoHub(){
   var t=AUTO.tool;
@@ -8737,6 +8825,7 @@ function renderAutoHub(){
   }
   $("#autoToolTitle").textContent=AUTO_TOOLS.filter(function(x){ return x.k===t; })[0].t;
   if(t==="plan") renderFep(); else if(t==="result") renderExecResult(); else if(t==="check") renderTc(); else if(t==="expense") renderEx(); else if(t==="card") renderCards();
+  else if(t==="cardpay"){ renderCardpay(); cpMasterLoad(CPS.co).then(function(){ renderCardpay(); cpLoadSaved(); }); }   // [v46]
   else if(t==="mmt"){ /* [v31] #mmt-app · window.MMTSlipApp이 자체 초기화·렌더링을 전담 — 대시보드 쪽 추가 호출 불필요 */ }
 }
 $("#btnAutoBack").onclick=function(){ AUTO.tool=null; renderAutoHub(); };
@@ -10220,7 +10309,733 @@ function bindCards(){
 
 bindTc(); bindEx(); bindExecResult(); bindCards();
 
-window.__tr={get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
+/* ===================== [v46] 법인카드 결제전표 엔진 (CP) — DOM 비의존 =====================
+   프로젝트 문서 `법인카드결제전표_자동화_프롬프트.md`.
+   입력: 통합이용청구명세서(Ez-Work) · 승인내역 · 해외매입내역 · 하나카드 이용내역 · ERP 전표 엑셀출력(카드전표·가지급금 전표) · 명세서 PDF
+   출력: 계정대체전표 · 지급전표 2시트 xlsx (내장 양식 CARDPAY_TPL_SN 의 서식을 쓰고 sheetData 만 새로 그린다)
+   개인정보: 카드 목록(MASTER)에 있는 카드 행만 남기고 나머지는 파싱 직후 버린다. 승인내역의 가맹점주소·대표자명·전화번호 열은 읽지 않는다.
+   금액은 원화 정수. 합계·차액 계산에 반올림을 끼워 넣지 않는다. */
+var CP=(function(){
+  function S(v){ return v==null?"":String(v).trim(); }
+  function H(v){ return S(v).replace(/[\s ]+/g,""); }                 // 머리글 비교(줄바꿈·공백 제거)
+  function dg(v){ return S(v).replace(/\D/g,""); }
+  function num(v){ if(typeof v==="number") return isFinite(v)?v:0; var s=S(v).replace(/,/g,""); if(!s||s==="-") return 0; var n=+s; return isFinite(n)?n:0; }
+  function apprKey(v){ var s=S(v).replace(/\s/g,""); if(!s||s==="-"||!/^\d+$/.test(s)) return ""; return s.replace(/^0+/,"")||"0"; }
+  function fmtCardNo(v){ var d=dg(v); if(d.length===16) return d.slice(0,4)+"-"+d.slice(4,8)+"-"+d.slice(8,12)+"-"+d.slice(12); if(d.length===15) return d.slice(0,4)+"-"+d.slice(4,10)+"-"+d.slice(10); return S(v); }
+  function maskCardNo(v){ var p=fmtCardNo(v).split("-"); if(p.length===4) return p[0]+"-"+p[1]+"-****-"+p[3]; if(p.length===3) return p[0]+"-******-"+p[2]; return S(v); }
+  function isoOf(v){ var s=S(v), m=s.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/); return m?m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2):""; }
+
+  /* ---------- 카드 목록 기본값 (§2) — id 고정, 라벨만 바뀐다 ----------
+     order: 검증표 순서 · vgroup: 지급전표 검증표 묶음(합계 행 단위) · payOrder: 결제 블록 안 순서 · rcRow: 계정대체전표 요약·검증표에 행 표시
+     rcLabel: 계정대체·결제 블록 표기(없으면 label) · rcNote: 계정대체 검증표 M·N 비고 */
+  var HANA_ACCT="28791002783804";
+  var MASTER_DEFAULT={ SN:[
+    {id:"sn01", issuer:"삼성", cardNo:"5589-5300-0452-6749", label:"박효대 회장님", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"chair",      billSrc:"ezwork",  checkSrc:"erp:박효대", order:1,  vgroup:1, payOrder:1,  rcRow:true},
+    {id:"sn02", issuer:"하나", cardNo:"5589-6100-0046-1438", label:"박효대 회장님", payDay:23, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"chair",      billSrc:"hanaXls", checkSrc:"erp:박효대", order:2,  vgroup:1, payOrder:30, rcRow:true},
+    {id:"sn03", issuer:"삼성", cardNo:"4009-0702-1057-3354", label:"지완구 사외이사님", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true, reclass:"stmt", billSrc:"ezwork",  checkSrc:"manual", order:3,  vgroup:1, payOrder:2,  rcRow:true},
+    {id:"sn04", issuer:"삼성", cardNo:"4009-0702-1156-2414", label:"윤상화 부회장님", payDay:0, payBank:"", payAcct:"", pay:false, reclass:"verifyOnly", billSrc:"ezwork", checkSrc:"manual", order:4, vgroup:1, payOrder:90, rcRow:true},
+    {id:"sn05", issuer:"롯데", cardNo:"3792-205041-75925", label:"윤상화 부회장님", payDay:27, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"stmt",       billSrc:"manual",  checkSrc:"manual", order:5,  vgroup:1, payOrder:42, rcRow:true},
+    {id:"sn06", issuer:"삼성", cardNo:"9410-8547-1335-8000", label:"김기철 사장님 (주유카드)", rcLabel:"김기철 사장님", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true, reclass:"erpMatch", billSrc:"ezwork", checkSrc:"erp:김기철", order:6, vgroup:1, payOrder:3, rcRow:true},
+    {id:"sn07", issuer:"삼성", cardNo:"4009-0702-1789-1072", label:"김기철 사장님 (개인사용)", payDay:0, payBank:"", payAcct:"", pay:false, reclass:"verifyOnly", billSrc:"ezwork", checkSrc:"erp:김기철", order:7, vgroup:1, payOrder:91, rcRow:false},
+    {id:"sn08", issuer:"삼성", cardNo:"4009-0702-1044-5140", label:"이남작대표님", payDay:0, payBank:"", payAcct:"", pay:false, reclass:"verifyOnly", billSrc:"ezwork", checkSrc:"erp:이남작", order:8, vgroup:1, payOrder:92, rcRow:false},
+    {id:"sn09", issuer:"삼성", cardNo:"4009-0702-1223-8857", label:"구매공용카드", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"stmtMinusE", billSrc:"ezwork",  checkSrc:"manual", order:9,  vgroup:2, payOrder:4,  rcRow:true},
+    {id:"sn10", issuer:"삼성", cardNo:"3791-841079-04554", label:"항공권전용", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"ezwork",  checkSrc:"none",   order:10, vgroup:2, payOrder:5,  rcRow:false},
+    {id:"sn11", issuer:"삼성", cardNo:"9410-8528-1119-2600", label:"통신료전용", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:false, reclass:"none",       billSrc:"ezwork",  checkSrc:"none",   order:11, vgroup:2, payOrder:93, rcRow:false, note:"별도 처리"},
+    {id:"sn12", issuer:"롯데", cardNo:"3762-600291-77223", label:"전사공용카드", payDay:27, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"manual", order:12, vgroup:3, payOrder:40, rcRow:false},
+    {id:"sn13", issuer:"롯데", cardNo:"3762-600291-77215", label:"항공권전용", payDay:27, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"manual", order:13, vgroup:3, payOrder:41, rcRow:false},
+    {id:"sn14", issuer:"신한", cardNo:"5525-7642-1293-0842", label:"재무팀 인지세", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"none",   order:14, vgroup:4, payOrder:20, rcRow:false},
+    {id:"sn15", issuer:"신한", cardNo:"5525-7642-1389-6620", label:"경영관리팀", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"none",   order:15, vgroup:4, payOrder:21, rcRow:false},
+    {id:"sn16", issuer:"농협", cardNo:"4079-1677-0566-5516", label:"에스넷시스템(공통)", payDay:15, payBank:"농협은행", payAcct:"301-0372-9001-91", pay:true, reclass:"none", billSrc:"manual", checkSrc:"manual", order:16, vgroup:5, payOrder:10, rcRow:true, rcNote:"계정대체x · 연회비전표"}
+  ], GU:[], GD:[], GS:[] };
+  MASTER_DEFAULT.SN.forEach(function(c){ c.co="SN"; });
+  var RECLASS={ chair:"회장님 분리(E+F)", stmt:"명세서(F)", erpMatch:"ERP 매칭(F)", stmtMinusE:"명세서−E(F)", verifyOnly:"확인만", none:"계정대체 없음" };
+  var ISSUER_NAME=function(i){ return S(i)+"카드"; };
+  function sortCards(list){ return list.slice().sort(function(a,b){ return (a.order||0)-(b.order||0); }); }
+
+  /* 카드 찾기 — 전체 번호(숫자) 또는 마스킹 번호(앞 4 + 뒤 4) */
+  function cardFinder(master){
+    var full={}; master.forEach(function(c){ full[dg(c.cardNo)]=c; });
+    return function(raw){
+      var s=S(raw), d=dg(s);
+      if(!/\*/.test(s) && full[d]) return {card:full[d]};
+      if(/\*/.test(s) || d.length<15){
+        var m=s.replace(/[^0-9*]/g,""); var a=m.slice(0,4), z=m.replace(/\*/g,"").slice(-4); if(a.length<4||z.length<4) return null;
+        var hit=master.filter(function(c){ var x=dg(c.cardNo); return x.slice(0,4)===a && x.slice(-4)===z; });
+        if(hit.length===1) return {card:hit[0], masked:true};
+        if(hit.length>1) return {ambiguous:hit, masked:true};
+      }
+      return null;
+    };
+  }
+
+  /* ---------- 3-1. 파일 판별 — 첫 시트 머리 15행의 머리글(파일명은 보지 않는다) ---------- */
+  function sniff(aoa){
+    for(var r=0;r<Math.min(aoa.length,15);r++){
+      var h=(aoa[r]||[]).map(H);
+      var has=function(list){ for(var i=0;i<list.length;i++) if(h.indexOf(list[i])<0) return false; return true; };
+      if(has(["조직명","카드번호","회원명","청구금액","어카운트"])) return {kind:"ezwork", hdr:r};
+      if(has(["카드번호","승인일자","승인시각","승인금액","승인번호","승인취소여부"])) return {kind:"approval", hdr:r};
+      if(has(["카드번호","매입일자","이용통화","접수금액(USD)","적용환율"])) return {kind:"foreign", hdr:r};
+      if(has(["순번","차대","계정코드","계정명","적요명","금액","CD_MNGD3","NM_MNGD3","CD_MNGD4"])) return {kind:"erp", hdr:r};
+      if(has(["승인번호","당월결제금액"]) && H((aoa[0]||[])[0])==="카드번호" && H((aoa[1]||[])[0])==="결제합계금액") return {kind:"hana", hdr:r};
+    }
+    return null;
+  }
+  function colIx(aoa, hdr){ var h=(aoa[hdr]||[]).map(H); return function(n){ return h.indexOf(n); }; }
+
+  /* ---------- 3-2. 파서 ---------- */
+  function parseEzwork(aoa, hdr, sheetName, master){
+    var ix=colIx(aoa,hdr), find=cardFinder(master), out={}, total=0, kept=0;
+    var cN=ix("카드번호"), cM=ix("회원명"), cB=ix("은행"), cA=ix("계좌번호"), cBill=ix("청구금액"), cP=ix("상품명");
+    for(var r=hdr+1;r<aoa.length;r++){ var row=aoa[r]||[]; if(!S(row[cN])) continue; total++;
+      var f=find(row[cN]); if(!f||!f.card) continue;                                    // 카드 목록 밖 행은 버린다
+      kept++; var o=out[f.card.id]||(out[f.card.id]={bill:0, member:S(row[cM]), bank:S(row[cB]), acct:S(row[cA]), product:S(row[cP]), n:0});
+      o.bill+=num(row[cBill]); o.n++;
+    }
+    return {kind:"ezwork", asOf:/^\d{4}-\d{2}-\d{2}$/.test(S(sheetName))?S(sheetName):"", byCard:out, rows:total, kept:kept};
+  }
+  function parseApproval(aoa, hdr, master){
+    var ix=colIx(aoa,hdr), find=cardFinder(master), rows=[], cancels=[], total=0;
+    var cN=ix("카드번호"), cD=ix("승인일자"), cAmt=ix("승인금액"), cAp=ix("승인번호"), cC=ix("승인취소여부"), cMer=ix("가맹점명"), cSup=ix("공급가액"), cV=ix("부가세");
+    for(var r=hdr+1;r<aoa.length;r++){ var row=aoa[r]||[]; if(!S(row[cN])) continue; total++;
+      var f=find(row[cN]); if(!f||!f.card) continue;
+      var o={cardId:f.card.id, appr:apprKey(row[cAp]), date:isoOf(row[cD]), amt:num(row[cAmt]), merchant:S(row[cMer]), supply:num(row[cSup]), vat:num(row[cV])};
+      if(H(row[cC]).toUpperCase()==="Y") cancels.push(o); else rows.push(o);
+    }
+    return {kind:"approval", rows:rows, cancels:cancels, total:total};
+  }
+  function parseForeign(aoa, hdr, master){
+    var ix=colIx(aoa,hdr), find=cardFinder(master), rows=[], total=0;
+    var cN=ix("카드번호"), cD=ix("매입일자"), cAmt=ix("매입금액"), cCcy=ix("이용통화"), cFx=ix("이용금액"), cAp=ix("승인번호"), cMer=ix("가맹점명");
+    for(var r=hdr+1;r<aoa.length;r++){ var row=aoa[r]||[]; if(!S(row[cN])) continue; total++;
+      var f=find(row[cN]); if(!f||!f.card) continue;
+      rows.push({cardId:f.card.id, date:isoOf(row[cD]), amt:num(row[cAmt]), ccy:S(row[cCcy]), fxAmt:Math.round(num(row[cFx])*100)/100, appr:apprKey(row[cAp]), merchant:S(row[cMer])});
+    }
+    return {kind:"foreign", rows:rows, total:total};
+  }
+  function firstVal(row){ for(var i=1;i<(row||[]).length;i++){ if(S(row[i])!=="") return row[i]; } return ""; }
+  function parseHana(aoa, hdr, master){
+    var ix=colIx(aoa,hdr), find=cardFinder(master), masked=S(firstVal(aoa[0])), total=num(firstVal(aoa[1])), f=find(masked);
+    var cNo=ix("NO"), cAp=ix("승인번호"), cD=ix("이용일"), cMer=ix("가맹점명"), cBase=ix("이용원금"), cPay=ix("당월결제금액"), cDis=ix("할인금액"), rows=[], sum=0;
+    for(var r=hdr+1;r<aoa.length;r++){ var row=aoa[r]||[]; if(!/^\d+$/.test(S(row[cNo]))) continue;
+      var o={appr:apprKey(row[cAp]), date:isoOf(row[cD]), merchant:S(row[cMer]), base:num(row[cBase]), pay:num(row[cPay]), disc:num(row[cDis])};
+      sum+=o.pay; rows.push(o);
+    }
+    return {kind:"hana", masked:masked, cardId:f&&f.card?f.card.id:"", ambiguous:f&&f.ambiguous?f.ambiguous.map(function(c){return c.id;}):null, total:total, rows:rows, sumPay:sum};
+  }
+  /* ERP 전표 엑셀출력 — 순번이 1로 다시 시작하는 지점에서 전표를 나눈다 */
+  function parseErp(aoa, hdr){
+    var ix=colIx(aoa,hdr), c={seq:ix("순번"), side:ix("차대"), code:ix("계정코드"), name:ix("계정명"), memo:ix("적요명"), amt:ix("금액"), m3c:ix("CD_MNGD3"), m3n:ix("NM_MNGD3"), m4c:ix("CD_MNGD4"), m4n:ix("NM_MNGD4")};
+    var slips=[], cur=null;
+    for(var r=hdr+1;r<aoa.length;r++){ var row=aoa[r]||[]; var seq=+S(row[c.seq]); if(!seq || !S(row[c.code])) continue;
+      if(seq===1 || !cur){ cur={lines:[]}; slips.push(cur); }
+      var sd=S(row[c.side]);
+      cur.lines.push({seq:seq, side:/대/.test(sd)?"C":"D", code:S(row[c.code]), name:S(row[c.name]), memo:S(row[c.memo]), amt:num(row[c.amt]), m3c:S(row[c.m3c]), m3n:S(row[c.m3n]), m4c:S(row[c.m4c]), m4n:S(row[c.m4n])});
+    }
+    return slips.map(classifySlip);
+  }
+  function classifySlip(sl){
+    var L=sl.lines, cr=L.filter(function(x){ return x.side==="C"; }), first=cr[0]||L[0]||{};
+    sl.manager=first.m3n||""; sl.managerCode=first.m3c||"";
+    if(cr.some(function(x){ return x.code==="2135160"; })){
+      sl.type="card";
+      sl.credit=cr.filter(function(x){ return x.code==="2135160"; }).reduce(function(a,x){ return a+x.amt; },0);
+      var deb=L.filter(function(x){ return x.side==="D"; }), groups={}, order=[], noAppr=[];
+      deb.forEach(function(x){ var m=x.memo.match(/\/\s*(\d+)\s*$/), k=m?apprKey(m[1]):"";
+        if(!k){ noAppr.push(x); return; }
+        if(!groups[k]){ groups[k]={appr:k, amt:0, lines:[]}; order.push(k); } groups[k].amt+=x.amt; groups[k].lines.push(x); });
+      sl.groups=order.map(function(k){ return groups[k]; }); sl.noAppr=noAppr;
+      sl.debit=deb.reduce(function(a,x){ return a+x.amt; },0); sl.balanced=(sl.debit===sl.credit);
+      var mm=(L[0]||{}).memo.match(/^(\d{4})년\s*(\d{1,2})월/); sl.useMonth=mm?mm[1]+"-"+("0"+mm[2]).slice(-2):"";
+    } else if(L.some(function(x){ return x.code==="1165220"; }) && cr.some(function(x){ return x.code==="2135150"; })){
+      sl.type="advance";
+      sl.mode=L.some(function(x){ return x.code==="1165220" && x.side==="C"; })?"settle":"prepay";   // 정산형(가지급금 대변) / 선지급형(가지급금 차변)
+      sl.cardLines=cr.filter(function(x){ return x.code==="2135150"; }).map(function(x){ return {amt:x.amt, m4c:dg(x.m4c), memo:x.memo, cardId:""}; });
+      sl.expense=cr.filter(function(x){ return x.code==="2135120"; }).reduce(function(a,x){ return a+x.amt; },0);   // 미지급금(사원경비) — 카드 금액 아님
+      var t=(L[0]||{}).memo.match(/([가-힣A-Za-z]+\s*[가-힣]*\s*해외출장비)\s*\(([\d.\s\-~]+)\)/); sl.trip=t?t[1]:""; sl.period=t?t[2]:"";
+      var items={}; L.filter(function(x){ return x.side==="D" && (x.code==="4316120"||x.code==="1165220"); }).forEach(function(x){ var k=(x.memo.split("-").pop()||"").trim()||x.name; items[k]=(items[k]||0)+x.amt; });
+      sl.items=Object.keys(items).map(function(k){ return {k:k, amt:items[k]}; });
+      sl.advanceCredit=cr.filter(function(x){ return x.code==="1165220"; }).reduce(function(a,x){ return a+x.amt; },0);
+    } else sl.type="other";
+    return sl;
+  }
+
+  /* 파일 1개(aoa)를 읽어 종류별 결과로 */
+  function readSheet(aoa, sheetName, master){
+    var k=sniff(aoa); if(!k) return {kind:"unknown"};
+    if(k.kind==="ezwork") return parseEzwork(aoa,k.hdr,sheetName,master);
+    if(k.kind==="approval") return parseApproval(aoa,k.hdr,master);
+    if(k.kind==="foreign") return parseForeign(aoa,k.hdr,master);
+    if(k.kind==="hana") return parseHana(aoa,k.hdr,master);
+    if(k.kind==="erp"){ var sl=parseErp(aoa,k.hdr); return {kind:"erp", slips:sl}; }
+    return {kind:"unknown"};
+  }
+
+  /* ---------- 3-3. ERP ↔ 카드 매칭 ---------- */
+  function matchErp(slip, master, src){
+    var cards=master.filter(function(c){ return c.checkSrc==="erp:"+slip.manager; }), ids=cards.map(function(c){ return c.id; });
+    var idx={};                                    // 승인번호 → [{cardId, amt}]
+    var add=function(cardId, appr, amt){ if(!appr || ids.indexOf(cardId)<0) return; var a=idx[appr]||(idx[appr]=[]); var e=a.filter(function(x){ return x.cardId===cardId; })[0]; if(e) e.amt+=amt; else a.push({cardId:cardId, amt:amt}); };
+    ((src.approval&&src.approval.rows)||[]).forEach(function(r){ var c=cards.filter(function(x){ return x.id===r.cardId; })[0]; if(c && c.issuer!=="하나") add(r.cardId, r.appr, r.amt); });
+    (src.hana||[]).forEach(function(h){ if(!h.cardId) return; h.rows.forEach(function(r){ add(h.cardId, r.appr, r.base); }); });
+    var byCard={}, unmatched=[], mismatch=[], rows=[];
+    ids.forEach(function(id){ byCard[id]=0; });
+    slip.groups.forEach(function(g){
+      var cand=idx[g.appr]||[], ex=cand.filter(function(x){ return x.amt===g.amt; })[0], hit=ex||cand[0];
+      var row={appr:g.appr, erp:g.amt, cardId:hit?hit.cardId:"", cardAmt:hit?hit.amt:null, status:ex?"ok":hit?"amount":"none", lines:g.lines.length};
+      if(hit){ byCard[hit.cardId]+=g.amt; if(!ex) mismatch.push(row); } else unmatched.push(row);
+      rows.push(row);
+    });
+    var matched=ids.reduce(function(a,id){ return a+byCard[id]; },0);
+    return {manager:slip.manager, total:slip.credit, byCard:byCard, matched:matched, unmatchedAmt:slip.credit-matched, unmatched:unmatched, mismatch:mismatch, rows:rows, noAppr:slip.noAppr, balanced:slip.balanced, useMonth:slip.useMonth};
+  }
+  /* 가지급금 전표의 미지급금(법인카드) 라인 → 카드 */
+  function assignAdvance(sl, master){
+    var cards=master.filter(function(c){ return c.checkSrc==="erp:"+sl.manager; });
+    sl.cardLines.forEach(function(x){
+      var c=x.m4c?master.filter(function(m){ return dg(m.cardNo)===x.m4c; })[0]:null;
+      if(!c){ var iss=/삼성카드/.test(x.memo)?"삼성":/하나카드/.test(x.memo)?"하나":/롯데카드/.test(x.memo)?"롯데":""; var cs=cards.filter(function(m){ return m.issuer===iss; }); if(cs.length===1) c=cs[0]; }
+      x.cardId=c?c.id:"";
+    });
+    return sl;
+  }
+
+  /* ---------- 3-4·3-5. 금액 계산 ---------- */
+  /* src = {ezwork, approval, foreign, hana:[...], erp:{slips:[...]}, pdf:{cardId:{total,...}}}
+     man = {cardId:{bill, check, E, G, H, ov, pre, can, stmtOk}} (수기 입력) */
+  function compute(master, src, man){
+    man=man||{}; master=sortCards(master);
+    var slips=(src.erpSlips||[]), cardSlips={}, advs=[], warn=[];
+    slips.forEach(function(sl){ if(sl.type==="card"){ if(cardSlips[sl.manager]) warn.push("ERP "+sl.manager+" 카드 전표가 두 번 들어왔습니다 — 마지막 파일을 씁니다"); cardSlips[sl.manager]=sl; } else if(sl.type==="advance") advs.push(assignAdvance(sl, master)); });
+    var match={}; Object.keys(cardSlips).forEach(function(k){ match[k]=matchErp(cardSlips[k], master, src); });
+    var adv={}; advs.forEach(function(sl){ sl.cardLines.forEach(function(x){ if(x.cardId) adv[x.cardId]=(adv[x.cardId]||0)+x.amt; else warn.push("가지급금 전표의 미지급금(법인카드) "+x.amt+"원 — 카드를 찾지 못했습니다"); }); });
+    var hanaBy={}; (src.hana||[]).forEach(function(h){ if(h.cardId) hanaBy[h.cardId]=h; });
+    var fx={}; ((src.foreign&&src.foreign.rows)||[]).forEach(function(r){ fx[r.cardId]=(fx[r.cardId]||0)+r.amt; });
+    var dom={}; ((src.approval&&src.approval.rows)||[]).forEach(function(r){ dom[r.cardId]=(dom[r.cardId]||0)+r.amt; });
+    var ez=src.ezwork?src.ezwork.byCard:null;
+    var rows=master.map(function(c){
+      var m=man[c.id]||{}, mgr=(c.checkSrc||"").indexOf("erp:")===0?c.checkSrc.slice(4):"";
+      var bill=null, billNote="";
+      if(c.billSrc==="ezwork"){ if(!src.ezwork) billNote="청구명세서 미업로드"; else if(ez[c.id]) bill=ez[c.id].bill; else billNote="내역없음"; }
+      else if(c.billSrc==="hanaXls"){ if(hanaBy[c.id]) bill=hanaBy[c.id].total; else billNote="하나 이용내역 미업로드"; }
+      else { if(m.bill!=null && m.bill!=="") bill=num(m.bill); else if(src.pdf&&src.pdf[c.id]&&m.pdfAccept) bill=src.pdf[c.id].total; }
+      var mt=mgr&&match[mgr]?match[mgr]:null, matched=mt?(mt.byCard[c.id]||0):0;
+      var G=num(m.G), Hh=num(m.H), E=0, F=0, rcVals=false;
+      var ov=num(m.ov), pre=num(m.pre), can=num(m.can);
+      if(c.reclass==="chair"){ E=matched; F=(adv[c.id]||0)+ov-pre-can; rcVals=true; }
+      else if(c.reclass==="stmt"){ F=bill||0; rcVals=true; }
+      else if(c.reclass==="erpMatch"){ F=matched; rcVals=true; }
+      else if(c.reclass==="stmtMinusE"){ E=num(m.E); F=(bill||0)-E; rcVals=true; }
+      else if(c.reclass==="verifyOnly"){ F=bill||0; }                         // 계정대체 검증표 확인용 — 요약·최종표에는 넣지 않는다
+      var I=E+F+G+Hh;
+      var check=null, checkNote="";
+      if(mgr){ if(!mt){ check=0; checkNote="ERP 전표 미업로드"; } else check=(c.reclass==="chair")?(matched+(adv[c.id]||0)+ov-pre-can):matched; }
+      else if(c.checkSrc==="manual"){ check=(m.check!=null&&m.check!=="")?num(m.check):bill; }
+      var diff=(bill!=null&&check!=null)?bill-check:null;
+      var notes=[]; if(checkNote) notes.push(checkNote); if(billNote && c.billSrc!=="manual") notes.push(billNote);
+      if(mt){ var mis=mt.mismatch.filter(function(x){ return x.cardId===c.id; }); if(mis.length) notes.push("승인번호 금액 불일치 "+mis.length+"건");
+        var firstId=master.filter(function(x){ return x.checkSrc===c.checkSrc; })[0];                 // 미매칭은 담당자의 첫 카드 행에 한 번만 적는다
+        if(mt.unmatched.length && firstId && firstId.id===c.id) notes.push("ERP 미매칭 "+mt.unmatched.length+"건 "+mt.unmatched.reduce(function(a,x){return a+x.erp;},0).toLocaleString("ko-KR")+"원"); }
+      if(m.note) notes.push(String(m.note));
+      var pdf=src.pdf&&src.pdf[c.id]?src.pdf[c.id]:null, stmtOk=m.stmtOk===true?true:(pdf&&bill!=null?pdf.total===bill:null);
+      var inFinal=c.reclass!=="verifyOnly" && c.reclass!=="none" && I!==0;
+      var stmtAmt=bill;                                                   // 명세서 금액(삼성=Ez-Work, 하나=이용내역, 그 외 수기/PDF)
+      var rcMatch=stmtAmt==null?null:(I===stmtAmt);
+      return {c:c, bill:bill, billNote:billNote, check:check, diff:diff, notes:notes, E:E, F:F, G:G, H:Hh, I:I, rcVals:rcVals, inFinal:inFinal, stmtAmt:stmtAmt, rcMatch:rcMatch,
+        matched:matched, adv:adv[c.id]||0, ov:ov, pre:pre, can:can, pdf:pdf, stmtOk:stmtOk, dom:dom[c.id]||0, fx:fx[c.id]||0};
+    });
+    var R={}; rows.forEach(function(r){ R[r.c.id]=r; });
+    /* 해외 교차검증(삼성): 국내 승인 + 해외매입 = 청구, chair 는 해외매입 = 가지급금 F */
+    var xcheck=[]; rows.forEach(function(r){ if(r.c.issuer!=="삼성" || r.bill==null || !src.approval) return; if(!r.fx && !(r.c.reclass==="chair" && r.adv)) return;
+      var ok1=(r.dom+r.fx===r.bill), ok2=r.c.reclass==="chair"?(r.fx===r.adv):null;
+      xcheck.push({id:r.c.id, dom:r.dom, fx:r.fx, bill:r.bill, ok:ok1, adv:r.adv, okAdv:ok2});
+      if(!ok1) warn.push(maskCardNo(r.c.cardNo)+" 국내 승인 "+r.dom+" + 해외 "+r.fx+" ≠ 청구 "+r.bill);
+      if(ok2===false) warn.push(maskCardNo(r.c.cardNo)+" 해외매입 "+r.fx+" ≠ 가지급금 전표 "+r.adv); });
+    /* 회장님 총액 검증 */
+    var chairChk=[]; Object.keys(match).forEach(function(k){ var cs=rows.filter(function(r){ return r.c.reclass==="chair" && r.c.checkSrc==="erp:"+k; }); if(!cs.length) return;
+      var e=cs.reduce(function(a,r){ return a+r.E; },0), f=cs.reduce(function(a,r){ return a+r.adv; },0), at=advs.filter(function(s){ return s.manager===k; }).reduce(function(a,s){ return a+s.cardLines.reduce(function(b,x){ return b+x.amt; },0); },0);
+      chairChk.push({manager:k, erp:match[k].total, e:e, okE:e===match[k].total, advTotal:at, f:f, okF:f===at, cards:cs.map(function(r){ return {id:r.c.id, issuer:r.c.issuer, E:r.E, F:r.F}; })}); });
+    var final=rows.filter(function(r){ return r.inFinal; });
+    var sum=function(a,k){ return a.reduce(function(s,r){ return s+r[k]; },0); };
+    /* 지급전표 결제 블록 — 카드사+결제일, payOrder 순 */
+    var blocks=[], bk={}; rows.filter(function(r){ return r.c.pay; }).slice().sort(function(a,b){ return (a.c.payOrder||0)-(b.c.payOrder||0); }).forEach(function(r){
+      var k=r.c.issuer+"|"+r.c.payDay; if(!bk[k]){ bk[k]={issuer:r.c.issuer, payDay:r.c.payDay, rows:[]}; blocks.push(bk[k]); } bk[k].rows.push(r); });
+    blocks.forEach(function(b){ b.total=b.rows.reduce(function(s,r){ return s+(r.bill||0); },0); b.hidden=b.total===0; b.label=ISSUER_NAME(b.issuer)+" "+b.payDay+"일"; });
+    var payTotal=blocks.reduce(function(s,b){ return s+b.total; },0);
+    var diffN=rows.filter(function(r){ return r.diff!=null && r.diff!==0; }).length;
+    return {rows:rows, R:R, final:final, finalTot:{E:sum(final,"E"),F:sum(final,"F"),G:sum(final,"G"),H:sum(final,"H"),I:sum(final,"I")},
+      match:match, advs:advs, adv:adv, blocks:blocks, payTotal:payTotal, diffN:diffN, xcheck:xcheck, chairChk:chairChk, warn:warn};
+  }
+
+  /* ---------- 3-6. PDF 명세서 (첫 페이지 텍스트) ---------- */
+  function parseStatementText(text, fileName, master){
+    var t=String(text||""), flat=t.replace(/\s+/g,""), fn=S(fileName), out={issuer:"", total:null, payDate:"", hint:"", cardId:"", cands:[]};
+    var m;
+    if(/삼성카드/.test(flat) || /총이용금액은/.test(flat)){ out.issuer="삼성";
+      m=flat.match(/총이용금액은([\d,]+)원/); if(m) out.total=num(m[1]);
+      m=flat.match(/결제일(\d{4})\.(\d{1,2})\.(\d{1,2})/); if(m) out.payDate=m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2);
+      var h3=(flat.match(/법인(\d{3})(?!\d)/)||[])[1]||"", h4=((fn.match(/(\d{4})(?!.*\d{4})/)||[])[1])||"";
+      out.hint=h4||h3; out.cands=master.filter(function(c){ var d=dg(c.cardNo); return c.issuer==="삼성" && ((h4 && d.slice(-4)===h4) || (!h4 && h3 && d.slice(-3)===h3)); });
+    } else if(/하나카드/.test(flat) || /결제하실총금액/.test(flat)){ out.issuer="하나";
+      m=flat.match(/결제하실총금액([\d,]+)/); if(m) out.total=num(m[1]);
+      m=flat.match(/결제일(\d{4})\.(\d{1,2})\.(\d{1,2})/); if(m) out.payDate=m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2);
+      m=flat.match(/(\d{4})-?\*{4}-?\*{4}-?(\d{4})/); out.hint=m?m[1]+"-****-****-"+m[2]:"";
+      out.cands=m?master.filter(function(c){ var d=dg(c.cardNo); return d.slice(0,4)===m[1] && d.slice(-4)===m[2]; }):[];
+    } else if(/롯데카드/.test(flat) || /이번달입금하실금액/.test(flat)){ out.issuer="롯데";
+      m=flat.match(/이번달입금하실금액총?([\d,]+)원/); if(m) out.total=num(m[1]);
+      m=flat.match(/결제일:?(\d{4})년(\d{1,2})월(\d{1,2})일/); if(m) out.payDate=m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2);
+      var h=((fn.match(/(\d{3,5})(?!.*\d)/)||[])[1])||""; out.hint=h;
+      out.cands=h?master.filter(function(c){ return c.issuer==="롯데" && dg(c.cardNo).slice(-h.length)===h; }):[];
+    }
+    if(out.cands.length===1) out.cardId=out.cands[0].id;
+    out.cands=out.cands.map(function(c){ return c.id; });
+    return out;
+  }
+
+  /* ---------- 3-7. 엑셀 (내장 양식의 서식 + 새 sheetData) ---------- */
+  function X(s){ return String(s==null?"":s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function cellXml(ref, st, v){
+    var s=st!=null?' s="'+st+'"':'';
+    if(v==null) return '<c r="'+ref+'"'+s+'/>';
+    if(v.f!=null){ var fv=v.v; var t=typeof fv==="boolean"?' t="b"':typeof fv==="string"?' t="str"':'';
+      return '<c r="'+ref+'"'+s+t+'><f>'+X(v.f)+'</f>'+(fv==null?'':'<v>'+(typeof fv==="boolean"?(fv?1:0):X(fv))+'</v>')+'</c>'; }
+    if(typeof v==="number") return '<c r="'+ref+'"'+s+'><v>'+(isFinite(v)?v:0)+'</v></c>';
+    if(typeof v==="boolean") return '<c r="'+ref+'"'+s+' t="b"><v>'+(v?1:0)+'</v></c>';
+    var str=String(v); if(str==="") return '<c r="'+ref+'"'+s+'/>';
+    return '<c r="'+ref+'"'+s+' t="inlineStr"><is><t xml:space="preserve">'+X(str)+'</t></is></c>';
+  }
+  function Sheet(){ this.rows={}; this.merges=[]; this.hidden={}; this.ht={}; this.maxR=1; }
+  Sheet.prototype.set=function(ref, st, v){ var m=ref.match(/^([A-Z]+)(\d+)$/), r=+m[2]; (this.rows[r]=this.rows[r]||{})[m[1]]={st:st, v:v}; if(r>this.maxR) this.maxR=r; };
+  Sheet.prototype.xml=function(){ var me=this, out=[];
+    Object.keys(this.rows).map(Number).sort(function(a,b){ return a-b; }).forEach(function(r){
+      var cs=me.rows[r], cols=Object.keys(cs).sort(function(a,b){ return a.length-b.length || (a<b?-1:a>b?1:0); });
+      out.push('<row r="'+r+'"'+(me.ht[r]?' ht="'+me.ht[r]+'" customHeight="1"':' ht="13.95" customHeight="1"')+(me.hidden[r]?' hidden="1"':'')+'>'+cols.map(function(c){ return cellXml(c+r, cs[c].st, cs[c].v); }).join("")+'</row>'); });
+    return out.join(""); };
+  var ST={ hd:240, hdW:273, lbl:6, sum:{B:7,C:7,D:7,E:8,F:8,G:8,H:8,I:9}, tot:276, totN:12, v:{B:11,C:11,D:11,E:8,F:8,G:8,H:10,I:8,J:15,K:14,Kin:16,L:5,M:17},
+    memo:277, pay:{B:11,C:11,D:11,E:11,F:28,G:9}, payTot:278, vh:{K:242,L:242,M:243},
+    vr:{B:11,C:11,D:11,E:11,F:28,G:8,H:8,Hin:10,I:8,J:30,K:30,L:7}, vo:{B:32,C:32,D:32,E:33,F:34,G:35,H:35,I:35,J:30,K:30,L:7}, vtot:{G:12,H:12,I:12,J:37,K:33,L:33} };
+
+  function buildSheets(model, memo){
+    var A=new Sheet(), P=new Sheet(), rows=model.rows, rc=rows.filter(function(r){ return r.c.rcRow; });
+    var lbl=function(c){ return c.rcLabel||c.label; };
+    /* ===== 계정대체전표 ===== */
+    var hdr=["카드사","카드번호","구분","미지급금(법인카드)","미지급금(법인개인카드&사원경비)","가지급금","연회비","청구금액"], hc="BCDEFGHI".split("");
+    var head=function(r){ hc.forEach(function(c,i){ A.set(c+r, (c==="F"||c==="G")?ST.hdW:ST.hd, hdr[i]); }); A.ht[r]=13.2; };
+    var n=rc.length, sumStart=3, sumTot=sumStart+n, vHead=sumTot+3, vStart=vHead+1, vTot=vStart+n, memoR=vTot+3, fHead=memoR+11, fStart=fHead+1, fTot=fStart+model.final.length;
+    head(2);
+    rc.forEach(function(r,i){ var R=sumStart+i, V=vStart+i, show=r.c.reclass!=="verifyOnly" && r.c.reclass!=="none";
+      A.set("B"+R,ST.sum.B,ISSUER_NAME(r.c.issuer)); A.set("C"+R,ST.sum.C,fmtCardNo(r.c.cardNo)); A.set("D"+R,ST.sum.D,lbl(r.c));
+      var e=show?r.E:0, f=show?r.F:0, g=show?r.G:0, h=show?r.H:0;
+      A.set("E"+R,ST.sum.E,{f:"$E"+V, v:r.c.reclass==="none"?0:r.E});
+      A.set("F"+R,ST.sum.F,r.c.reclass==="verifyOnly"?null:{f:"$F"+V, v:f});
+      A.set("G"+R,ST.sum.G,{f:"G"+V, v:g}); A.set("H"+R,ST.sum.H,{f:"H"+V, v:h});
+      A.set("I"+R,ST.sum.I,{f:"SUM(E"+R+":H"+R+")", v:(r.c.reclass==="none"?0:r.E)+f+g+h}); A.ht[R]=13.2; });
+    var sumV=function(col){ return rc.reduce(function(s,r){ var show=r.c.reclass!=="verifyOnly" && r.c.reclass!=="none"; return s+(col==="E"?(r.c.reclass==="none"?0:r.E):show?r[col]:0); },0); };
+    A.set("B"+sumTot,ST.tot,"합계"); A.set("C"+sumTot,ST.tot,null); A.set("D"+sumTot,ST.tot,null); A.merges.push("B"+sumTot+":D"+sumTot); A.ht[sumTot]=13.2;
+    var sI=0; "EFGH".split("").forEach(function(c){ var v=sumV(c); sI+=v; A.set(c+sumTot,ST.totN,{f:"SUM("+c+sumStart+":"+c+(sumTot-1)+")", v:v}); });
+    A.set("I"+sumTot,ST.totN,{f:"SUM(I"+sumStart+":I"+(sumTot-1)+")", v:sI});
+    A.set("J"+(vHead-1),274,"삼성카드 명세서"); A.set("K"+(vHead-1),275,"명세서 수기 확인");
+    head(vHead); A.set("J"+vHead,13,null); A.set("K"+vHead,14,null);
+    var vt={E:0,F:0,G:0,H:0,I:0};
+    rc.forEach(function(r,i){ var R=vStart+i, c=r.c, sam=c.issuer==="삼성";
+      A.set("B"+R,ST.v.B,ISSUER_NAME(c.issuer)); A.set("C"+R,ST.v.C,fmtCardNo(c.cardNo)); A.set("D"+R,ST.v.D,lbl(c));
+      var E=c.reclass==="chair"||(c.reclass==="stmtMinusE"&&r.E)?r.E:null, F=(c.reclass==="none")?null:r.F;
+      A.set("E"+R,ST.v.E,E); A.set("F"+R,ST.v.F,F); A.set("G"+R,ST.v.G,r.G||null); A.set("H"+R,ST.v.H,r.H||null);
+      var I=(E||0)+(F||0)+(r.G||0)+(r.H||0); vt.E+=E||0; vt.F+=F||0; vt.G+=r.G||0; vt.H+=r.H||0; vt.I+=I;
+      A.set("I"+R,ST.v.I,{f:"SUM(E"+R+":H"+R+")", v:I});
+      var J=sam?(r.bill==null?0:r.bill):"수기확인"; A.set("J"+R,ST.v.J,J);
+      var K=sam?null:(r.stmtAmt==null?null:r.stmtAmt); A.set("K"+R,sam?ST.v.K:ST.v.Kin,K);
+      A.set("L"+R,ST.v.L,sam?{f:"I"+R+"=J"+R+"+K"+R, v:I===(+J||0)+(K||0)}:{f:"I"+R+"=K"+R, v:I===(K||0)});
+      if(c.rcNote){ var nn=String(c.rcNote).split(/\s*·\s*/); A.set("M"+R,6,nn[0]||""); if(nn[1]) A.set("N"+R,6,nn[1]); }
+      A.ht[R]=13.2; });
+    A.set("B"+vTot,ST.tot,"합계"); A.set("C"+vTot,ST.tot,null); A.set("D"+vTot,ST.tot,null); A.merges.push("B"+vTot+":D"+vTot); A.ht[vTot]=13.2;
+    "EFGHI".split("").forEach(function(c){ A.set(c+vTot,ST.totN,{f:"SUM("+c+vStart+":"+c+(vTot-1)+")", v:vt[c]}); });
+    var memoTxt=memo!=null?memo:MEMO_DEFAULT;
+    "BCDE".split("").forEach(function(c){ A.set(c+memoR,ST.memo,c==="B"?memoTxt:null); }); A.merges.push("B"+memoR+":E"+memoR); A.ht[memoR]=52.95;
+    head(fHead);
+    model.final.forEach(function(r,i){ var R=fStart+i;
+      A.set("B"+R,ST.sum.B,ISSUER_NAME(r.c.issuer)); A.set("C"+R,ST.sum.C,fmtCardNo(r.c.cardNo)); A.set("D"+R,ST.sum.D,lbl(r.c));
+      A.set("E"+R,ST.sum.E,r.E); A.set("F"+R,ST.sum.F,r.F); A.set("G"+R,ST.sum.G,r.G); A.set("H"+R,ST.sum.H,r.H); A.set("I"+R,ST.sum.I,r.I); A.ht[R]=13.2; });
+    A.set("B"+fTot,ST.tot,"합계"); A.set("C"+fTot,ST.tot,null); A.set("D"+fTot,ST.tot,null); A.merges.push("B"+fTot+":D"+fTot); A.ht[fTot]=13.2;
+    "EFGHI".split("").forEach(function(c){ A.set(c+fTot,ST.totN,{f:"SUM("+c+fStart+":"+c+(fTot-1)+")", v:model.finalTot[c]}); });
+    A.set("J"+memoR,5,{f:"I"+fTot+"=I"+sumTot, v:model.finalTot.I===sI});
+    var hideGH=rows.every(function(r){ return !r.G && !r.H; });
+
+    /* ===== 지급전표 ===== */
+    var phd=["카드사","카드번호","회원명","은행","계좌번호","청구금액"], pc="BCDEFG".split("");
+    var vRows=rows.slice(), groups=[], gk={}; vRows.forEach(function(r){ var g=r.c.vgroup||99; if(!gk[g]){ gk[g]=[]; groups.push({g:g, rows:gk[g]}); } gk[g].push(r); });
+    groups.sort(function(a,b){ return a.g-b.g; });
+    /* 블록 행 수를 먼저 정해 검증표 행 번호를 안다 */
+    var r0=2; model.blocks.forEach(function(b){ b.r=r0; r0+=b.rows.length+3; });
+    var vh=r0, vr=vh+1, vpos={}; groups.forEach(function(g){ g.start=vr; g.rows.forEach(function(r){ vpos[r.c.id]=vr++; }); g.tot=vr++; });
+    model.blocks.forEach(function(b){ var R=b.r;
+      pc.forEach(function(c,i){ P.set(c+R,ST.hd,phd[i]); }); P.set("H"+R,ST.lbl,b.label); if(b.hidden) P.hidden[R]=1;
+      b.rows.forEach(function(r,i){ var x=R+1+i, c=r.c, v=vpos[c.id];
+        P.set("B"+x,ST.pay.B,ISSUER_NAME(c.issuer)); P.set("C"+x,ST.pay.C,fmtCardNo(c.cardNo)); P.set("D"+x,ST.pay.D,c.rcLabel||c.label);
+        P.set("E"+x,ST.pay.E,c.payBank); P.set("F"+x,ST.pay.F,String(c.payAcct||"")); P.set("G"+x,ST.pay.G,{f:"$G$"+v, v:r.bill||0});
+        if(!(r.bill)) P.hidden[x]=1; });
+      var t=R+1+b.rows.length; "BCDEF".split("").forEach(function(c){ P.set(c+t,ST.payTot,c==="B"?"합계":null); }); P.merges.push("B"+t+":F"+t);
+      P.set("G"+t,ST.totN,{f:"SUM(G"+(R+1)+":G"+(t-1)+")", v:b.total});
+      if(b.hidden){ for(var k=R;k<=t+1;k++) P.hidden[k]=1; }
+    });
+    var vhdr=["카드사","카드번호","회원명","은행","계좌번호","청구금액","확인금액","차이금액","명세서확인","계정대체","비고","별도기입"], vc="BCDEFGHIJKLM".split("");
+    vc.forEach(function(c,i){ P.set(c+vh, ST.vh[c]||ST.hd, vhdr[i]); });
+    groups.forEach(function(g){
+      var gt={G:0,H:0,I:0};
+      g.rows.forEach(function(r){ var x=vpos[r.c.id], c=r.c, sty=c.reclass==="verifyOnly"?ST.vo:ST.vr;
+        P.set("B"+x,sty.B,ISSUER_NAME(c.issuer)); P.set("C"+x,sty.C,fmtCardNo(c.cardNo)); P.set("D"+x,sty.D,c.label);
+        P.set("E"+x,sty.E,c.payBank||null); P.set("F"+x,sty.F,c.payAcct?String(c.payAcct):null);
+        var G=r.bill!=null?r.bill:(c.billSrc==="ezwork"&&r.billNote==="내역없음"?(c.pay?0:"내역없음"):null), Hc=r.check;   // 지급 카드는 0(정본 IFERROR 0), 확인용 카드는 "내역없음"
+        P.set("G"+x,sty.G,G); P.set("H"+x,(c.checkSrc==="manual"&&ST.vr===sty)?ST.vr.Hin:sty.H,Hc);
+        if(typeof G==="number"&&Hc!=null) P.set("I"+x,sty.I,{f:"G"+x+"-H"+x, v:G-Hc}); else P.set("I"+x,sty.I,null);
+        P.set("J"+x,sty.J,r.stmtOk===true?"O":r.stmtOk===false?"X":"");
+        P.set("K"+x,sty.K,r.inFinal?"O":c.reclass==="none"?"-":"");
+        P.set("L"+x,sty.L,r.notes.join(" · "));
+        if(typeof G==="number") gt.G+=G; if(Hc!=null) gt.H+=Hc; if(typeof G==="number"&&Hc!=null) gt.I+=G-Hc; });
+      "BCDEF".split("").forEach(function(c){ P.set(c+g.tot,ST.payTot,c==="B"?"합계":null); }); P.merges.push("B"+g.tot+":F"+g.tot);
+      P.set("G"+g.tot,ST.vtot.G,{f:"SUM(G"+g.start+":G"+(g.tot-1)+")", v:gt.G}); P.set("H"+g.tot,ST.vtot.H,{f:"SUM(H"+g.start+":H"+(g.tot-1)+")", v:gt.H});
+      P.set("I"+g.tot,ST.vtot.I,null); P.set("J"+g.tot,ST.vtot.J,null); P.set("K"+g.tot,ST.vtot.K,null); P.set("L"+g.tot,ST.vtot.L,null);
+    });
+    return {A:A, P:P, hideGH:hideGH, layout:{sumStart:sumStart, sumTot:sumTot, vStart:vStart, vTot:vTot, memoR:memoR, fHead:fHead, fStart:fStart, fTot:fTot, payHead:vh, vpos:vpos, blocks:model.blocks.map(function(b){ return {label:b.label, r:b.r, hidden:b.hidden}; })}};
+  }
+  var MEMO_DEFAULT="*에스넷시스템 법인계좌 출금분으로, 미지급금(법인카드)로 계정 대체합니다.\n 미지급금(법인개인카드) -> 미지급금(법인카드)\n\n 박효대 회장님 사용분을 각 카드로 분리하여 처리하고자 합니다.";
+  function b64bytes(b64){ var bin=atob(b64), u=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+  function patchSheet(xml, sh, hideCols){
+    var out=xml.replace("<sheetData/>","<sheetData>"+sh.xml()+"</sheetData>");
+    if(sh.merges.length) out=out.replace(/(<\/sheetData>)/,'$1<mergeCells count="'+sh.merges.length+'">'+sh.merges.map(function(m){ return '<mergeCell ref="'+m+'"/>'; }).join("")+'</mergeCells>');
+    out=out.replace(/<dimension ref="[^"]*"\/>/,'<dimension ref="B2:N'+sh.maxR+'"/>');
+    if(hideCols!=null) out=out.replace(/(<col min="(7|8)" max="\2"[^>]*?)( hidden="1")?( customWidth="1"\/>)/g, function(_,a,n,h,z){ return a+(hideCols?' hidden="1"':'')+z; });
+    return out;
+  }
+  function buildXlsx(model, tplB64, memo){
+    var sh=buildSheets(model, memo), CFB=XLSX.CFB, z=CFB.read(b64bytes(tplB64),{type:"array"});
+    var put=function(re, fn){ var p=z.FullPaths.filter(function(x){ return re.test(x); })[0], e=p?CFB.find(z,p):null; if(!e) throw new Error("양식 시트를 찾지 못했습니다");
+      var xml=new TextDecoder("utf-8").decode(e.content instanceof Uint8Array?e.content:new Uint8Array(e.content)); e.content=new TextEncoder().encode(fn(xml)); e.size=e.content.length; };
+    put(/xl\/worksheets\/sheet1\.xml$/, function(x){ return patchSheet(x, sh.A, sh.hideGH); });
+    put(/xl\/worksheets\/sheet2\.xml$/, function(x){ return patchSheet(x, sh.P, null); });
+    return {bytes:CFB.write(z,{type:"array", fileType:"zip", compression:true}), layout:sh.layout};
+  }
+
+  return {S:S, H:H, dg:dg, num:num, apprKey:apprKey, fmtCardNo:fmtCardNo, maskCardNo:maskCardNo, MASTER_DEFAULT:MASTER_DEFAULT, RECLASS:RECLASS, ISSUER_NAME:ISSUER_NAME,
+    sortCards:sortCards, sniff:sniff, readSheet:readSheet, parseErp:parseErp, matchErp:matchErp, compute:compute, parseStatementText:parseStatementText,
+    buildSheets:buildSheets, buildXlsx:buildXlsx, MEMO_DEFAULT:MEMO_DEFAULT};
+})();
+
+/* ===================== [v46] 법인카드 결제전표 — 화면 (자금업무 자동화 7번째 카드) =====================
+   상태 CPS · 카드 목록 CPM(공용 저장소 app/cardpay/<법인>/master) · 월 요약 co/<법인>/cardpay/<결제월 YYYY-MM>
+   원자료(승인내역·ERP 라인)는 저장하지 않는다. 저장되는 것은 카드별 금액 요약 · 수기 입력값 · 메모뿐(카드번호·회원명 없음, 카드 id만). */
+var CARDPAY_TPL={SN:"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"};
+var CPS={co:"SN", month:"", monthTouched:false, files:[], src:{hana:[], erpSlips:[]}, pdfs:[], man:{}, memo:null, tab:"rc", onlyBad:false, busy:0, model:null, saved:null, advNone:false, gen:null, loadedKey:""};
+var CPM={}, CPM_META={}, CPMS={co:"SN", draft:null, dirty:false, msg:""};
+function cpMaster(co){ if(!CPM[co]) CPM[co]=JSON.parse(JSON.stringify(CP.MASTER_DEFAULT[co]||[])); return CPM[co]; }
+function cpMasterLoad(co){
+  return fepDocGet("app/cardpay/"+co+"/master").then(function(d){
+    CPM[co]=(d&&Array.isArray(d.cards))?d.cards:JSON.parse(JSON.stringify(CP.MASTER_DEFAULT[co]||[])); CPM_META[co]=d?{at:d.at||"", by:d.by||""}:null; return CPM[co];
+  }).catch(function(){ return cpMaster(co); });
+}
+function cpUseMonth(ym){ if(!/^\d{4}-\d{2}$/.test(ym||"")) return ""; var y=+ym.slice(0,4), m=+ym.slice(5,7)-1; if(m<1){ m=12; y--; } return y+"-"+("0"+m).slice(-2); }
+function cpKey(){ return CPS.co+"|"+CPS.month; }
+function cpReset(){ CPS.files=[]; CPS.src={hana:[], erpSlips:[]}; CPS.pdfs=[]; CPS.man={}; CPS.memo=null; CPS.model=null; CPS.saved=null; CPS.advNone=false; CPS.gen=null; CPS.loadedKey=""; CPS.monthTouched=false; }
+function cpN(v){ return v==null||v===""?"":fmt(v); }
+function cpMoney(v){ return v==null?'<span class="mini">—</span>':fmt(v); }
+
+/* 공용 저장소에서 이 법인·결제월의 지난 저장값(수기 입력·메모)을 불러온다 */
+function cpLoadSaved(){
+  var key=cpKey(); if(!CPS.month || CPS.loadedKey===key) return Promise.resolve();
+  CPS.loadedKey=key;
+  return fepDocGet("co/"+CPS.co+"/cardpay/"+CPS.month).then(function(d){
+    if(cpKey()!==key) return;
+    CPS.saved=d||null;
+    if(d){ if(!Object.keys(CPS.man).length && d.man) CPS.man=JSON.parse(JSON.stringify(d.man)); if(CPS.memo==null && d.memo!=null) CPS.memo=d.memo; if(d.advNone) CPS.advNone=true; }
+    cpRecalc(); renderCardpay();
+  }).catch(function(){});
+}
+
+/* ---------- 파일 읽기 ---------- */
+function cpPdfText(ab){
+  var lib=window.pdfjsLib; if(!lib) return Promise.reject(new Error("pdf.js를 불러오지 못했습니다(네트워크 확인)"));
+  return lib.getDocument({data:new Uint8Array(ab)}).promise.then(function(doc){ return doc.getPage(1).then(function(pg){ return pg.getTextContent(); }).then(function(tc){ return tc.items.map(function(it){ return it.str; }).join(" "); }); });
+}
+function cpAddFiles(files){
+  var arr=Array.prototype.slice.call(files||[]); if(!arr.length) return;
+  var master=cpMaster(CPS.co);
+  if(!master.length){ toast(CPS.co+" 카드 목록이 비어 있습니다 — 설정에서 카드 목록을 먼저 등록하세요"); return; }
+  CPS.busy++; CPS.gen=null;
+  arr.reduce(function(p,f){ return p.then(function(){ return cpReadOne(f, master); }); }, Promise.resolve()).then(function(){
+    CPS.busy--; cpRecalc(); renderCardpay(); return cpLoadSaved(); });
+}
+function cpReadOne(f, master){
+  var ent={name:f.name, kind:"reading", info:"읽는 중…", bad:false}; CPS.files=CPS.files.filter(function(x){ return x.name!==f.name; }); CPS.files.push(ent); renderCardpay();
+  var done=function(kind, info, bad){ ent.kind=kind; ent.info=info; ent.bad=!!bad; };
+  return new Promise(function(r){ setTimeout(r,30); }).then(function(){ return readFile(f); }).then(function(ab){
+    if(/\.pdf$/i.test(f.name)){
+      return cpPdfText(ab).then(function(text){
+        var r=CP.parseStatementText(text, f.name, master);
+        if(!r.issuer || r.total==null){ done("unknown","PDF에서 카드사·총액을 찾지 못했습니다 (삼성·하나·롯데만 지원)",true); return; }
+        CPS.pdfs=CPS.pdfs.filter(function(x){ return x.name!==f.name; }).concat([{name:f.name, issuer:r.issuer, total:r.total, payDate:r.payDate, hint:r.hint, cardId:r.cardId, cands:r.cands}]);
+        done("pdf", r.issuer+"카드 · 총액 "+fmt(r.total)+(r.cardId?"":" · 카드 선택 필요"));
+      });
+    }
+    var wb=XLSX.read(ab,{type:"array"}), sn=wb.SheetNames[0];
+    var aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:""});
+    var r=CP.readSheet(aoa, sn, master); aoa=null; wb=null;                                     // 원본 행은 여기서 버린다(카드 목록 밖 행 미보관)
+    var S=CPS.src;
+    if(r.kind==="ezwork"){ S.ezwork=r; done("ezwork","통합이용청구명세서 · "+(r.asOf||"기준일 미상")+" · "+r.rows+"행 중 카드 목록 "+r.kept+"행");
+      if(r.asOf && !CPS.monthTouched && CPS.month!==r.asOf.slice(0,7)){ CPS.month=r.asOf.slice(0,7); CPS.loadedKey=""; } }
+    else if(r.kind==="approval"){ S.approval=r; done("approval","승인내역 · "+fmt(r.total)+"행 중 카드 목록 "+r.rows.length+"행"+(r.cancels.length?" · 취소 "+r.cancels.length+"건":"")); }
+    else if(r.kind==="foreign"){ S.foreign=r; done("foreign","해외매입내역 · "+fmt(r.total)+"행 중 카드 목록 "+r.rows.length+"행"); }
+    else if(r.kind==="hana"){
+      if(!r.cardId){ done("hana","하나카드 이용내역 · "+r.masked+" — 카드 목록에서 카드를 찾지 못했습니다",true); return; }
+      S.hana=S.hana.filter(function(h){ return h.cardId!==r.cardId; }).concat([r]);
+      done("hana","하나카드 이용내역 · "+r.masked+" · 결제합계 "+fmt(r.total)+" · "+r.rows.length+"건"+(r.sumPay!==r.total?" · ⚠ 행 합계 "+fmt(r.sumPay):"")); }
+    else if(r.kind==="erp"){
+      var info=[];
+      r.slips.forEach(function(sl){ sl.file=f.name;
+        if(sl.type==="card"){ S.erpSlips=S.erpSlips.filter(function(x){ return !(x.type==="card" && x.manager===sl.manager); }).concat([sl]);
+          info.push("ERP "+sl.manager+" 카드전표 · 대변 "+fmt(sl.credit)+" · 승인번호 "+sl.groups.length+"개"+(sl.balanced?"":" · ⚠ 차변 "+fmt(sl.debit))); }
+        else if(sl.type==="advance"){ S.erpSlips=S.erpSlips.filter(function(x){ return !(x.type==="advance" && x.file===f.name); }).concat([sl]);
+          info.push("가지급금 전표("+(sl.mode==="settle"?"정산형":"선지급형")+") · 미지급금(법인카드) "+fmt(sl.cardLines.reduce(function(a,x){ return a+x.amt; },0))); }
+        else info.push("ERP 전표(카드·가지급금 전표 아님)"); });
+      done("erp", info.join(" / "), !r.slips.some(function(s){ return s.type!=="other"; })); }
+    else done("unknown","알 수 없는 파일 — 머리글로 종류를 찾지 못했습니다",true);
+  }).catch(function(e){ done("unknown","읽기 실패: "+(e&&e.message||e),true); });
+}
+function cpRecalc(){
+  var master=cpMaster(CPS.co);
+  var pdf={}; CPS.pdfs.forEach(function(p){ if(p.cardId) pdf[p.cardId]={total:p.total, payDate:p.payDate, name:p.name}; });
+  var src={ezwork:CPS.src.ezwork, approval:CPS.src.approval, foreign:CPS.src.foreign, hana:CPS.src.hana, erpSlips:CPS.src.erpSlips, pdf:pdf};
+  var any=CPS.files.some(function(f){ return f.kind!=="unknown" && f.kind!=="reading"; });
+  CPS.model=any&&master.length?CP.compute(master, src, CPS.man):null;
+}
+
+/* 필수 파일 체크리스트 — 카드 목록의 출처 설정에서 만든다 */
+function cpChecklist(){
+  var m=cpMaster(CPS.co), S=CPS.src, L=[], add=function(k,t,need,have){ L.push({k:k,t:t,need:need,have:have}); };
+  if(m.some(function(c){ return c.billSrc==="ezwork"; })) add("ezwork","통합이용청구명세서",true,!!S.ezwork);
+  if(m.some(function(c){ return c.issuer!=="하나" && /^erp:/.test(c.checkSrc||""); })) add("approval","승인내역",true,!!S.approval);
+  if(m.some(function(c){ return c.billSrc==="hanaXls"; })) add("hana","하나카드 이용내역",true,S.hana.length>0);
+  var mg=[]; m.forEach(function(c){ var x=(c.checkSrc||"").indexOf("erp:")===0?c.checkSrc.slice(4):""; if(x && mg.indexOf(x)<0) mg.push(x); });
+  mg.forEach(function(x){ var need=m.some(function(c){ return c.checkSrc==="erp:"+x && c.reclass!=="verifyOnly"; });
+    add("erp:"+x,"ERP "+x,need,S.erpSlips.some(function(s){ return s.type==="card" && s.manager===x; })); });
+  if(m.some(function(c){ return c.reclass==="chair"; })) add("adv","가지급금 전표",true,S.erpSlips.some(function(s){ return s.type==="advance"; })||CPS.advNone);
+  add("foreign","해외매입내역",false,!!S.foreign);
+  var pdfN=CPS.pdfs.filter(function(p){ return p.cardId; }).length;
+  add("pdf","명세서 PDF "+pdfN+"/"+m.length,false,pdfN>0);
+  return L;
+}
+
+/* ---------- 렌더 ---------- */
+function renderCardpay(){
+  if(!$("#cpCos")) return;
+  if(!CPS.month){ CPS.month=todayISO().slice(0,7); }
+  var master=cpMaster(CPS.co), M=CPS.model, chk=cpChecklist(), anyFile=CPS.files.length>0;
+  var reqOk=chk.filter(function(x){ return x.need; }).every(function(x){ return x.have; });
+  var on={1:reqOk, 2:!!M, 3:CPS.pdfs.length>0, 4:!!CPS.gen}, cur=[1,2,3,4].filter(function(n){ return !on[n]; })[0]||5;
+  $$("#cpSteps li").forEach(function(li){ var n=+li.dataset.s; li.className=on[n]?"on":n===cur?"cur":""; });
+  $("#cpCos").innerHTML=["SN","GU","GD","GS"].map(function(k){ var c=co(k), on1=CPS.co===k;
+    return '<button type="button" class="card-co" data-c="'+k+'" aria-pressed="'+on1+'" title="'+esc((c&&c.name)||k)+'"><span class="chip co" style="color:var(--c-'+k.toLowerCase()+')">'+k+'</span></button>'; }).join("");
+  $("#cpMonth").value=CPS.month;
+  $("#cpUse").innerHTML='<b>'+esc(cpUseMonth(CPS.month)||"-")+'</b> <span class="mini">이용분 → '+esc(CPS.month)+' 결제</span>';
+  var tplNote=!CARDPAY_TPL[CPS.co]?' <span class="chip auto" title="SN 양식 구조로 출력합니다">법인 양식 미등록</span>':'';
+  $("#cpMasterInfo").innerHTML='<b>'+master.length+'장</b>'+tplNote+' <button class="btn sm" id="btnCpMaster" type="button">카드 목록 설정</button>';
+  /* 1. 파일 */
+  $("#cpNoMaster").innerHTML=master.length?"":'<div class="banner warn">'+esc(CPS.co)+' 카드 목록 설정 필요 — 설정 화면의 [법인카드 결제전표 · 카드 목록]에서 카드를 등록하면 이 화면을 쓸 수 있습니다.</div>';
+  $("#cpCheck").innerHTML=chk.map(function(x){ var cls=x.have?"in":(x.need?(anyFile?"out":"nv"):"nv");
+    return '<span class="chip '+cls+' cp-ck" title="'+(x.need?"필수":"선택")+'">'+(x.have?"✓ ":"")+esc(x.t)+(x.need?"":" (선택)")+
+      (x.k==="adv"&&!x.have?' <button type="button" class="cp-none" id="btnCpAdvNone">이번 달 없음</button>':'')+(x.k==="adv"&&CPS.advNone?' <button type="button" class="cp-none" id="btnCpAdvUndo">되돌리기</button>':'')+'</span>'; }).join("");
+  $("#cpFiles").innerHTML=CPS.files.map(function(f){ var lab={ezwork:"청구명세서",approval:"승인내역",foreign:"해외매입",hana:"하나 이용내역",erp:"ERP 전표",pdf:"PDF",unknown:"알 수 없음",reading:"읽는 중"}[f.kind]||f.kind;
+    return '<div class="filerow"'+(f.bad?' style="border-color:var(--out);color:var(--out)"':'')+'><span>'+esc(f.name)+'</span><span class="chip '+(f.bad?"out":f.kind==="reading"?"nv":"in")+'">'+esc(lab)+'</span><span class="mini">'+esc(f.info)+'</span></div>'; }).join("");
+  /* 2. 금액 확인 */
+  $$("#cpTabs button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.t===CPS.tab?"true":"false"); });
+  $("#cpWarn").innerHTML=M&&M.warn.length?'<div class="banner warn">'+M.warn.map(esc).join("<br>")+'</div>':'';
+  $("#cpBody").innerHTML=!M?'<div class="pad"><div class="empty">파일을 올리면 카드별 금액이 계산됩니다.</div></div>':CPS.tab==="pay"?cpPayHtml(M):CPS.tab==="match"?cpMatchHtml(M):cpRcHtml(M);
+  /* 3. 명세서 검증 */
+  $("#cpPdf").innerHTML=cpPdfHtml(master);
+  /* 4. 엑셀 생성 */
+  $("#cpSum").innerHTML=cpSumHtml(M);
+  var memo=$("#cpMemo"); if(document.activeElement!==memo) memo.value=CPS.memo!=null?CPS.memo:CP.MEMO_DEFAULT;
+  $("#btnCpXlsx").disabled=!M; $("#btnCpSave").disabled=!M||!fepCanSave();
+  $("#cpSaved").innerHTML=CPS.saved?'<span class="mini cp-old">지난 저장값 · '+esc(String(CPS.saved.at||"").slice(0,16).replace("T"," "))+' · '+esc(String(CPS.saved.by||"").split("@")[0]||"-")+
+    ' · 계정대체 '+fmt(CPS.saved.rcTotal||0)+' · 지급 '+fmt(CPS.saved.payTotal||0)+' (금액은 파일을 다시 올려야 계산됩니다)</span>':'';
+  cpBind();
+}
+function cpIn(id,k,v,cls){ return '<input class="fer-in cp-in'+(cls?" "+cls:"")+'" inputmode="numeric" data-id="'+id+'" data-k="'+k+'" value="'+esc(v==null||v===""?"":fmt(v))+'"'+(readOnly?" disabled":"")+'>'; }
+function cpOk(b){ return b==null?'<span class="mini">—</span>':b?'<span class="chip in">✓</span>':'<span class="chip out">✕</span>'; }
+function cpRcHtml(M){
+  var man=CPS.man, rows=M.rows.filter(function(r){ return r.c.rcRow; });
+  var h='<div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th class="ctr">카드사</th><th class="ctr">카드번호</th><th>구분</th><th>규칙</th><th class="num">E 미지급금(법인카드)</th><th class="num">F 미지급금(법인개인카드&amp;사원경비)</th><th class="num">G 가지급금</th><th class="num">H 연회비</th><th class="num">I 청구금액</th><th class="num">명세서 금액</th><th class="ctr">일치</th><th class="ctr">최종표</th></tr></thead><tbody>';
+  rows.forEach(function(r){ var c=r.c, m=man[c.id]||{}, v=c.reclass!=="none";
+    var stmt=c.billSrc==="manual"?cpIn(c.id,"bill",m.bill):cpMoney(r.stmtAmt);
+    var dif=r.rcMatch===false&&r.stmtAmt!=null?' <span class="mini cp-neg">차액 '+fmt(r.I-r.stmtAmt)+'</span>':'';
+    h+='<tr class="'+(r.inFinal?"":"cp-dim")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(c.cardNo))+'</td><td>'+esc(c.rcLabel||c.label)+'</td><td><span class="chip nv">'+esc(CP.RECLASS[c.reclass]||c.reclass)+'</span></td>'+
+      '<td class="num">'+(c.reclass==="stmtMinusE"?cpIn(c.id,"E",m.E):v?fmt(r.E):'')+'</td><td class="num">'+(v||c.reclass==="verifyOnly"?fmt(r.F):'')+'</td>'+
+      '<td class="num">'+cpIn(c.id,"G",m.G,"sm")+'</td><td class="num">'+cpIn(c.id,"H",m.H,"sm")+'</td><td class="num"><b>'+fmt(r.I)+'</b></td><td class="num">'+stmt+'</td><td class="ctr">'+cpOk(r.rcMatch)+dif+'</td><td class="ctr">'+(r.inFinal?'<span class="chip in">O</span>':'')+'</td></tr>';
+    if(c.reclass==="chair") h+='<tr class="cp-sub"><td></td><td colspan="3" class="mini">F 조정 — 해외내역(사원경비) + · 선지급 − · 취소분 −</td><td></td><td class="num" colspan="3"><span class="mini">해외</span> '+cpIn(c.id,"ov",m.ov,"sm")+' <span class="mini">선지급</span> '+cpIn(c.id,"pre",m.pre,"sm")+' <span class="mini">취소</span> '+cpIn(c.id,"can",m.can,"sm")+'</td><td colspan="4" class="mini">가지급금 전표 '+fmt(r.adv)+(r.ov||r.pre||r.can?' · 조정 '+fmt(r.ov-r.pre-r.can):'')+'</td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td colspan="4" class="ctr"><b>최종표 합계 ('+M.final.length+'건)</b></td><td class="num"><b>'+fmt(M.finalTot.E)+'</b></td><td class="num"><b>'+fmt(M.finalTot.F)+'</b></td><td class="num">'+fmt(M.finalTot.G)+'</td><td class="num">'+fmt(M.finalTot.H)+'</td><td class="num"><b>'+fmt(M.finalTot.I)+'</b></td><td colspan="3"></td></tr></tfoot></table></div>';
+  /* 회장님 분리 요약 */
+  var lines=M.chairChk.map(function(k){ var ex=k.cards.map(function(x){ return CP.ISSUER_NAME(x.issuer).replace("카드","")+" "+fmt(x.E); }).join(" + ");
+    var fx=k.cards.filter(function(x){ return M.R[x.id].adv; }).map(function(x){ return CP.ISSUER_NAME(x.issuer).replace("카드","")+" "+fmt(M.R[x.id].adv); }).join(" + ")||"0";
+    return '<div>ERP '+esc(k.manager)+' '+fmt(k.erp)+' = '+esc(ex)+' '+cpOk(k.okE)+'</div>'+(k.advTotal||k.f?'<div>가지급금 전표 미지급금(법인카드) '+fmt(k.advTotal)+' = '+esc(fx)+' '+cpOk(k.okF)+'</div>':''); }).join("");
+  var adv=M.advs.map(function(s){ return '<details class="cp-adv"><summary>가지급금 전표 · '+esc(s.mode==="settle"?"정산형":"선지급형")+' · '+esc(s.trip||"출장")+(s.period?' ('+esc(s.period)+')':'')+' · '+esc(s.file||"")+'</summary><div class="mini" style="padding:6px 2px">'+
+    s.cardLines.map(function(x){ var c=M.R[x.cardId]; return '미지급금(법인카드) '+(c?esc(CP.ISSUER_NAME(c.c.issuer)+" "+CP.maskCardNo(c.c.cardNo)):'<b class="cp-neg">카드 미확인</b>')+' '+fmt(x.amt); }).join("<br>")+
+    (s.items.length?'<br>항목: '+s.items.map(function(i){ return esc(i.k)+' '+fmt(i.amt); }).join(" · "):'')+(s.expense?'<br>미지급금(사원경비) '+fmt(s.expense)+' — 카드 금액 아님(참고)':'')+'</div></details>'; }).join("");
+  var xc=M.xcheck.map(function(x){ var c=M.R[x.id].c; return '<div>'+esc(CP.maskCardNo(c.cardNo))+' 국내 승인 '+fmt(x.dom)+' + 해외 '+fmt(x.fx)+' = 청구 '+fmt(x.bill)+' '+cpOk(x.ok)+(x.okAdv!=null?' · 해외 = 가지급금 '+fmt(x.adv)+' '+cpOk(x.okAdv):'')+'</div>'; }).join("");
+  return h+'<div class="pad cp-notes">'+lines+adv+(xc?'<div class="mini" style="margin-top:6px"><b>해외 교차검증</b></div>'+xc:'')+'</div>';
+}
+function cpPayHtml(M){
+  var man=CPS.man, h='<div class="cp-blocks">';
+  M.blocks.forEach(function(b){
+    h+='<details class="cp-block"'+(b.hidden?'':' open')+'><summary><b>'+esc(b.label)+'</b><span class="cp-btot">'+fmt(b.total)+'</span>'+(b.hidden?' <span class="chip nv">0원 · 엑셀에서 숨김</span>':'')+'</summary><div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th class="ctr">카드사</th><th class="ctr">카드번호</th><th>회원명</th><th class="ctr">은행</th><th class="ctr">계좌번호</th><th class="num">청구금액</th></tr></thead><tbody>'+
+      b.rows.map(function(r){ var c=r.c, m=man[c.id]||{}; return '<tr class="'+(r.bill?"":"cp-dim")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(c.cardNo))+'</td><td>'+esc(c.rcLabel||c.label)+'</td><td class="ctr">'+esc(c.payBank||"")+'</td><td class="ctr">'+esc(c.payAcct||"")+'</td><td class="num">'+(c.billSrc==="manual"?cpIn(c.id,"bill",m.bill):cpMoney(r.bill))+(r.bill?'':' <span class="mini">숨김</span>')+'</td></tr>'; }).join("")+
+      '</tbody></table></div></details>';
+  });
+  h+='</div><div class="pad" style="padding-bottom:4px"><b>검증표</b> <span class="mini">청구금액 vs 확인금액 · 카드 목록 전체</span></div>';
+  h+='<div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th class="ctr">카드사</th><th class="ctr">카드번호</th><th>회원명</th><th class="num">청구금액</th><th class="num">확인금액</th><th class="num">차이금액</th><th class="ctr">명세서확인</th><th class="ctr">계정대체</th><th>비고</th></tr></thead><tbody>';
+  M.rows.forEach(function(r){ var c=r.c, m=man[c.id]||{};
+    var bill=r.bill!=null?fmt(r.bill):(r.billNote?'<span class="mini">'+esc(r.billNote)+'</span>':c.billSrc==="manual"?'<span class="mini">수기 입력</span>':'—');
+    var ck=c.checkSrc==="manual"?cpIn(c.id,"check",m.check!=null&&m.check!==""?m.check:r.check):cpMoney(r.check);
+    var st=r.stmtOk===true?"O":r.stmtOk===false?"X":"";
+    h+='<tr class="'+(c.reclass==="verifyOnly"?"cp-own":"")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(c.cardNo))+'</td><td>'+esc(c.label)+'</td><td class="num">'+bill+'</td><td class="num">'+ck+'</td>'+
+      '<td class="num'+(r.diff?' cp-neg':'')+'">'+(r.diff==null?'—':fmt(r.diff))+'</td><td class="ctr"><button type="button" class="cp-st" data-id="'+c.id+'" title="눌러서 O / X / 비움">'+(st||"·")+'</button>'+(r.pdf?' <span class="mini">PDF</span>':'')+'</td>'+
+      '<td class="ctr">'+(r.inFinal?"O":c.reclass==="none"?"-":"")+'</td><td><span class="mini">'+esc(r.notes.filter(function(n){ return n!==m.note; }).join(" · "))+'</span> <input class="cp-note" data-id="'+c.id+'" value="'+esc(m.note||"")+'" placeholder="비고"'+(readOnly?" disabled":"")+'></td></tr>'; });
+  return h+'</tbody></table></div>';
+}
+function cpMatchHtml(M){
+  var ks=Object.keys(M.match); if(!ks.length) return '<div class="pad"><div class="empty">ERP 카드 전표를 올리면 담당자별 승인번호 매칭이 보입니다.</div></div>';
+  var h='<div class="pad" style="padding-bottom:0"><label class="mini"><input type="checkbox" id="cpOnlyBad"'+(CPS.onlyBad?" checked":"")+'> 미매칭·금액 불일치만 보기</label></div>';
+  ks.forEach(function(k){ var x=M.match[k];
+    var by=Object.keys(x.byCard).map(function(id){ var c=M.R[id]&&M.R[id].c; return c?esc(CP.ISSUER_NAME(c.issuer)+" "+CP.maskCardNo(c.cardNo).slice(-4))+" "+fmt(x.byCard[id]):""; }).join(" + ");
+    h+='<div class="pad cp-mh"><b>ERP '+esc(k)+'</b> · 대변 '+fmt(x.total)+' = '+by+(x.unmatchedAmt?' + <span class="cp-neg">미매칭 '+fmt(x.unmatchedAmt)+'</span>':'')+' '+cpOk(x.unmatchedAmt===0&&!x.mismatch.length)+(x.balanced?'':' <span class="chip out">차변≠대변</span>')+(x.useMonth?' <span class="mini">귀속 '+esc(x.useMonth)+'</span>':'')+'</div>';
+    var rows=x.rows.filter(function(r){ return !CPS.onlyBad || r.status!=="ok"; });
+    h+='<div class="scroll" style="max-height:46vh"><table class="tbl card-tbl cp-tbl"><thead><tr><th class="ctr">승인번호</th><th class="num">ERP 금액</th><th class="ctr">매칭 카드</th><th class="num">카드사 금액</th><th class="ctr">상태</th></tr></thead><tbody>'+
+      (rows.length?rows.map(function(r){ var c=r.cardId&&M.R[r.cardId]?M.R[r.cardId].c:null; return '<tr><td class="ctr">'+esc(r.appr)+'</td><td class="num">'+fmt(r.erp)+'</td><td class="ctr">'+(c?esc(CP.ISSUER_NAME(c.issuer)+" "+CP.maskCardNo(c.cardNo)):'—')+'</td><td class="num">'+(r.cardAmt==null?'—':fmt(r.cardAmt))+'</td><td class="ctr">'+(r.status==="ok"?'<span class="chip in">일치</span>':r.status==="amount"?'<span class="chip auto">금액 불일치</span>':'<span class="chip out">미매칭</span>')+'</td></tr>'; }).join(""):'<tr><td colspan="5" class="empty">해당 건 없음</td></tr>')+
+      '</tbody></table></div>';
+  });
+  return h;
+}
+function cpPdfHtml(master){
+  if(!CPS.pdfs.length) return '<div class="pad"><div class="hint">카드 명세서 PDF를 1번 드롭존에 함께 올리면 카드별 총액을 청구금액과 맞춰 봅니다(선택). 삼성·하나·롯데 지원 · 신한·농협은 청구금액 수기 입력. <b>실제 명세서 PDF로는 아직 검증하지 못한 단계입니다.</b></div></div>';
+  var R=CPS.model?CPS.model.R:{};
+  return '<div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th>파일</th><th class="ctr">카드사</th><th class="ctr">카드</th><th class="ctr">결제일</th><th class="num">PDF 총액</th><th class="num">청구금액</th><th class="ctr">결과</th></tr></thead><tbody>'+
+    CPS.pdfs.map(function(p,i){ var opts=master.filter(function(c){ return c.issuer===p.issuer; });
+      var sel='<select class="cp-pdfcard" data-i="'+i+'"><option value="">카드 선택</option>'+opts.map(function(c){ return '<option value="'+c.id+'"'+(c.id===p.cardId?" selected":"")+'>'+esc(CP.maskCardNo(c.cardNo)+" "+c.label)+'</option>'; }).join("")+'</select>';
+      var r=p.cardId?R[p.cardId]:null, bill=r?r.bill:null, man=r&&r.c.billSrc==="manual";
+      var res=!r?'<span class="chip auto">카드 선택</span>':bill==null?(man?'<button class="btn sm cp-pdfuse" data-i="'+i+'" type="button">청구금액에 반영</button>':'<span class="mini">청구금액 없음</span>'):bill===p.total?'<span class="chip in">O 일치</span>':'<span class="chip out">✕ 차액 '+fmt(bill-p.total)+'</span>'+(man?' <button class="btn sm cp-pdfuse" data-i="'+i+'" type="button">PDF 값으로</button>':'');
+      return '<tr><td>'+esc(p.name)+'</td><td class="ctr">'+esc(p.issuer)+'</td><td class="ctr">'+sel+'</td><td class="ctr">'+esc(p.payDate||"")+'</td><td class="num">'+fmt(p.total)+'</td><td class="num">'+cpMoney(bill)+'</td><td class="ctr">'+res+'</td></tr>'; }).join("")+'</tbody></table></div>';
+}
+function cpSumHtml(M){
+  if(!M) return '<span class="mini">파일을 올리면 요약이 나옵니다.</span>';
+  var bl=M.blocks.filter(function(b){ return !b.hidden; }).map(function(b){ return b.issuer+" "+fmt(b.total); }).join(" · ");
+  var miss=cpChecklist().filter(function(x){ return x.need && !x.have; }).map(function(x){ return x.t; });
+  var noSt=M.rows.filter(function(r){ return r.c.pay && r.bill && r.stmtOk!==true; }).length;
+  var warn=[]; if(miss.length) warn.push("필수 파일 없음: "+miss.join(", ")); if(M.diffN) warn.push("검증표 차이 "+M.diffN+"건"); if(noSt) warn.push("명세서 미확인 "+noSt+"장");
+  var blank=M.rows.filter(function(r){ return r.c.pay && r.c.billSrc==="manual" && r.bill==null; }).map(function(r){ return r.c.issuer+" "+(r.c.rcLabel||r.c.label); });
+  if(blank.length) warn.push("수기 청구금액 빈칸(0원으로 처리): "+blank.join(" · "));
+  return '<div class="cp-sumline"><b>계정대체 '+M.final.length+'건 '+fmt(M.finalTot.I)+'</b> · <b>지급 '+fmt(M.payTotal)+'</b> ('+esc(bl)+') · 차이 '+M.diffN+'건</div>'+
+    (warn.length?'<div class="banner warn" style="margin-top:8px">'+warn.map(esc).join("<br>")+'<br><span class="mini">차이·미검증이 있어도 엑셀은 만들어집니다.</span></div>':'');
+}
+function cpSetMan(id,k,v){ var m=CPS.man[id]||(CPS.man[id]={}); if(v===""||v==null) delete m[k]; else m[k]=v; CPS.gen=null; cpRecalc(); }
+function cpBind(){
+  $$("#cpCos .card-co").forEach(function(b){ b.onclick=function(){ if(b.dataset.c===CPS.co) return; var keepMonth=CPS.month; CPS.co=b.dataset.c; cpReset(); CPS.month=keepMonth;
+    cpMasterLoad(CPS.co).then(function(){ renderCardpay(); cpLoadSaved(); }); }; });
+  $("#btnCpMaster").onclick=function(){ CPMS.co=CPS.co; CPMS.draft=null; setView("settings"); setTimeout(function(){ var p=$("#cpmPanel"); if(p) p.scrollIntoView({block:"start"}); },60); };
+  var a=$("#btnCpAdvNone"); if(a) a.onclick=function(e){ e.stopPropagation(); CPS.advNone=true; renderCardpay(); };
+  var u=$("#btnCpAdvUndo"); if(u) u.onclick=function(e){ e.stopPropagation(); CPS.advNone=false; renderCardpay(); };
+  $$("#cpTabs button").forEach(function(b){ b.onclick=function(){ CPS.tab=b.dataset.t; renderCardpay(); }; });
+  $$(".cp-in").forEach(function(inp){ inp.onchange=function(){ var s=inp.value.replace(/[,\s원]/g,""); if(s!==""&&!/^-?\d+$/.test(s)){ toast("숫자(원 단위 정수)만 입력하세요"); inp.value=""; return; }
+    cpSetMan(inp.dataset.id, inp.dataset.k, s===""?"":+s); renderCardpay(); }; });
+  $$(".cp-note").forEach(function(inp){ inp.onchange=function(){ cpSetMan(inp.dataset.id,"note",inp.value.trim()); renderCardpay(); }; });
+  $$(".cp-st").forEach(function(b){ b.onclick=function(){ var m=CPS.man[b.dataset.id]||{}, cur=m.stmtOk===true?"O":m.stmtOk===false?"X":"", nx=cur===""?true:cur==="O"?false:"";
+    cpSetMan(b.dataset.id,"stmtOk",nx); renderCardpay(); }; });
+  var ob=$("#cpOnlyBad"); if(ob) ob.onchange=function(){ CPS.onlyBad=ob.checked; renderCardpay(); };
+  $$(".cp-pdfcard").forEach(function(s){ s.onchange=function(){ CPS.pdfs[+s.dataset.i].cardId=s.value; cpRecalc(); renderCardpay(); }; });
+  $$(".cp-pdfuse").forEach(function(b){ b.onclick=function(){ var p=CPS.pdfs[+b.dataset.i]; if(!p||!p.cardId) return; cpSetMan(p.cardId,"bill",p.total); var m=CPS.man[p.cardId]; if(m.check==null) m.check=p.total; cpRecalc(); renderCardpay(); toast("PDF 총액 "+fmt(p.total)+"원을 청구금액으로 반영했습니다"); }; });
+}
+function cpXlsx(){
+  var M=CPS.model; if(!M){ toast("먼저 파일을 올리세요"); return; }
+  var tpl=CARDPAY_TPL[CPS.co]||CARDPAY_TPL.SN, ym=CPS.month||todayISO().slice(0,7), name=CPS.co+"_법인카드작업파일_"+ym.slice(0,4)+"."+ym.slice(5,7)+"월.xlsx", out;
+  try{ out=CP.buildXlsx(M, tpl, CPS.memo!=null?CPS.memo:CP.MEMO_DEFAULT); }catch(e){ console.error(e); toast("엑셀을 만들지 못했습니다: "+e.message); return; }
+  CPS.gen={name:name, at:new Date().toISOString()};
+  offerDownload(name, new Blob([out.bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+  renderCardpay();
+}
+function cpSave(){
+  var M=CPS.model; if(!M) return;
+  if(!fepCanSave()){ toast(readOnly?"보기 전용 계정 — 저장하지 않았습니다":"공용 저장소에 연결되지 않아 저장하지 않았습니다"); return; }
+  var doc={at:new Date().toISOString(), by:(AUTH.user&&AUTH.user.email)||"", co:CPS.co, month:CPS.month,
+    files:CPS.files.filter(function(f){ return f.kind!=="unknown"&&f.kind!=="reading"; }).map(function(f){ return {kind:f.kind}; }),
+    cards:M.rows.map(function(r){ return {id:r.c.id, bill:r.bill, check:r.check, E:r.E, F:r.F, G:r.G, H:r.H, I:r.I, diff:r.diff, stmtOk:r.stmtOk, inFinal:r.inFinal}; }),
+    rcTotal:M.finalTot.I, payTotal:M.payTotal, man:CPS.man, memo:CPS.memo, advNone:CPS.advNone};
+  fepDocSet("co/"+CPS.co+"/cardpay/"+CPS.month, JSON.parse(JSON.stringify(doc))).then(function(){ CPS.saved=doc; toast("저장했습니다 · "+CPS.co+" "+CPS.month); renderCardpay(); })
+    .catch(function(e){ $("#cpSaved").innerHTML='<div class="banner warn">저장하지 못했습니다: '+esc(e&&e.message||e)+' — 화면 작업은 그대로 계속할 수 있습니다.</div>'; });
+}
+function bindCardpay(){
+  var box=$("#cpDrop"), inp=$("#cpIn");
+  box.onclick=function(){ inp.click(); };
+  box.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); inp.click(); } };
+  box.ondragover=function(e){ e.preventDefault(); box.classList.add("over"); };
+  box.ondragleave=function(){ box.classList.remove("over"); };
+  box.ondrop=function(e){ e.preventDefault(); box.classList.remove("over"); cpAddFiles(e.dataTransfer.files); };
+  inp.onchange=function(){ cpAddFiles(inp.files); setTimeout(function(){ inp.value=""; },0); };
+  $("#cpMonth").onchange=function(){ var v=$("#cpMonth").value; if(!/^\d{4}-\d{2}$/.test(v)) return; CPS.month=v; CPS.monthTouched=true; CPS.loadedKey=""; CPS.saved=null; renderCardpay(); cpLoadSaved(); };
+  $("#btnCpNew").onclick=function(){ cpReset(); CPS.month=todayISO().slice(0,7); renderCardpay(); cpLoadSaved(); };
+  $("#cpMemo").onchange=function(){ CPS.memo=$("#cpMemo").value; };
+  $("#btnCpMemoReset").onclick=function(){ CPS.memo=null; renderCardpay(); };
+  $("#btnCpXlsx").onclick=cpXlsx; $("#btnCpSave").onclick=cpSave;
+}
+bindCardpay();
+
+/* ---------- 설정 → 법인카드 결제전표 카드 목록 ---------- */
+var CPM_COLS=[["issuer","카드사","sel:삼성,하나,롯데,신한,농협,현대,KB국민,BC,우리"],["cardNo","카드번호","text"],["label","구분(라벨)","text"],["rcLabel","계정대체 표기","text"],["payDay","결제일","num"],["payBank","결제은행","text"],["payAcct","결제계좌","acct"],
+  ["pay","지급전표","chk"],["reclass","계정대체 규칙","sel:chair,stmt,erpMatch,stmtMinusE,verifyOnly,none"],["billSrc","청구금액 출처","sel:ezwork,hanaXls,manual"],["checkSrc","확인금액 출처","text"],["rcRow","계정대체 표 행","chk"],["vgroup","검증 묶음","num"],["payOrder","결제 순서","num"],["rcNote","계정대체 비고","text"],["note","메모","text"]];
+function renderCpMaster(){
+  var box=$("#cpmBody"); if(!box) return;
+  var co1=CPMS.co, list=CPMS.draft||(CPMS.draft=JSON.parse(JSON.stringify(cpMaster(co1)))), ro=readOnly;
+  $("#cpmCos").innerHTML=["SN","GU","GD","GS"].map(function(k){ return '<button type="button" class="card-co" data-c="'+k+'" aria-pressed="'+(k===co1)+'"><span class="chip co" style="color:var(--c-'+k.toLowerCase()+')">'+k+'</span></button>'; }).join("");
+  var c=co(co1), accts=(c&&c.accounts||[]).map(function(a){ return '<option value="'+esc(digitsOnly(a.num))+'">'+esc(a.label||a.bank)+'</option>'; }).join("");
+  var meta=CPM_META[co1];
+  $("#cpmMeta").innerHTML=(meta?'저장됨 · '+esc(String(meta.at||"").slice(0,10))+' · '+esc(String(meta.by||"").split("@")[0]||"-"):'기본값(저장 안 됨)')+' · '+list.length+'장'+(ro?' · <b>보기 전용</b>':'')+(CPMS.msg?' · '+esc(CPMS.msg):'');
+  var opt=function(spec,v){ return spec.split(",").map(function(o){ return '<option value="'+o+'"'+(o===String(v)?" selected":"")+'>'+esc(CP.RECLASS[o]?o+" · "+CP.RECLASS[o]:o)+'</option>'; }).join(""); };
+  box.innerHTML='<datalist id="cpmAccts">'+accts+'</datalist><table class="tbl card-tbl cp-tbl cpm-tbl"><thead><tr><th class="ctr">순서</th>'+CPM_COLS.map(function(x){ return '<th>'+esc(x[1])+'</th>'; }).join("")+'<th></th></tr></thead><tbody>'+
+    (list.length?list.map(function(r,i){ return '<tr><td class="ctr" style="white-space:nowrap"><button class="btn sm cpm-mv" data-i="'+i+'" data-d="-1" type="button"'+(ro||!i?" disabled":"")+'>▲</button><button class="btn sm cpm-mv" data-i="'+i+'" data-d="1" type="button"'+(ro||i===list.length-1?" disabled":"")+'>▼</button></td>'+
+      CPM_COLS.map(function(x){ var k=x[0], t=x[2], v=r[k];
+        if(t==="chk") return '<td class="ctr"><input type="checkbox" class="cpm-f" data-i="'+i+'" data-k="'+k+'"'+(v?" checked":"")+(ro?" disabled":"")+'></td>';
+        if(t.indexOf("sel:")===0) return '<td><select class="cpm-f" data-i="'+i+'" data-k="'+k+'"'+(ro?" disabled":"")+'>'+opt(t.slice(4),v)+'</select></td>';
+        return '<td><input class="cpm-f'+(t==="num"?" cpm-num":"")+'" data-i="'+i+'" data-k="'+k+'" value="'+esc(v==null?"":v)+'"'+(t==="acct"?' list="cpmAccts"':'')+(ro?" disabled":"")+'></td>'; }).join("")+
+      '<td><button class="btn sm cpm-del" data-i="'+i+'" type="button"'+(ro?" disabled":"")+'>삭제</button></td></tr>'; }).join(""):'<tr><td colspan="'+(CPM_COLS.length+2)+'" class="empty">'+esc(co1)+' 카드 목록 설정 필요 — [행 추가]로 카드를 등록하세요.</td></tr>')+'</tbody></table>';
+  $("#cpmBar").hidden=!CPMS.dirty;
+  $("#btnCpmAdd").disabled=ro; $("#btnCpmDefault").disabled=ro;
+  $$("#cpmCos .card-co").forEach(function(b){ b.onclick=function(){ if(CPMS.dirty && !confirmLeave()) return; CPMS.co=b.dataset.c; CPMS.draft=null; CPMS.dirty=false; CPMS.msg=""; cpMasterLoad(CPMS.co).then(renderCpMaster); }; });
+  $$(".cpm-f").forEach(function(el){ el.onchange=function(){ var r=list[+el.dataset.i], k=el.dataset.k, x=CPM_COLS.filter(function(c){ return c[0]===k; })[0];
+    r[k]=x[2]==="chk"?el.checked:x[2]==="num"?(+el.value||0):el.value.trim(); if(k==="cardNo") r[k]=CP.fmtCardNo(r[k]); CPMS.dirty=true; renderCpMaster(); }; });
+  $$(".cpm-mv").forEach(function(b){ b.onclick=function(){ var i=+b.dataset.i, j=i+(+b.dataset.d); var t=list[i]; list[i]=list[j]; list[j]=t; list.forEach(function(r,k){ r.order=k+1; }); CPMS.dirty=true; renderCpMaster(); }; });
+  $$(".cpm-del").forEach(function(b){ b.onclick=function(){ list.splice(+b.dataset.i,1); list.forEach(function(r,k){ r.order=k+1; }); CPMS.dirty=true; renderCpMaster(); }; });
+}
+function confirmLeave(){ CPMS.msg="저장하지 않은 변경이 있습니다 — [저장] 또는 [취소]를 먼저 누르세요"; renderCpMaster(); return false; }
+function cpmNewId(list){ var n=0; list.forEach(function(r){ var m=String(r.id||"").match(/(\d+)$/); if(m) n=Math.max(n,+m[1]); }); return CPMS.co.toLowerCase()+("0"+(n+1)).slice(-2); }
+function bindCpMaster(){
+  if(!$("#cpmBody")) return;
+  $("#btnCpmAdd").onclick=function(){ var list=CPMS.draft||(CPMS.draft=JSON.parse(JSON.stringify(cpMaster(CPMS.co))));
+    list.push({id:cpmNewId(list), co:CPMS.co, issuer:"삼성", cardNo:"", label:"", payDay:15, payBank:"", payAcct:"", pay:true, reclass:"none", billSrc:"ezwork", checkSrc:"none", order:list.length+1, vgroup:9, payOrder:99, rcRow:false}); CPMS.dirty=true; renderCpMaster(); };
+  $("#btnCpmDefault").onclick=function(){ CPMS.draft=JSON.parse(JSON.stringify(CP.MASTER_DEFAULT[CPMS.co]||[])); CPMS.dirty=true; CPMS.msg="기본값을 불러왔습니다 — [저장]해야 반영됩니다"; renderCpMaster(); };
+  $("#btnCpmCancel").onclick=function(){ CPMS.draft=null; CPMS.dirty=false; CPMS.msg=""; renderCpMaster(); };
+  $("#btnCpmSave").onclick=function(){
+    var list=CPMS.draft||[], bad=[], seen={};
+    list.forEach(function(r,i){ var d=CP.dg(r.cardNo); if(d.length<15) bad.push((i+1)+"행 카드번호"); if(seen[d]) bad.push((i+1)+"행 카드번호 중복"); seen[d]=1; if(!r.label) bad.push((i+1)+"행 구분");
+      if(r.checkSrc && !/^(manual|none|erp:.+)$/.test(r.checkSrc)) bad.push((i+1)+"행 확인금액 출처(manual · none · erp:담당자명)"); });
+    if(bad.length){ CPMS.msg="저장 안 됨 — "+bad.join(", "); renderCpMaster(); return; }
+    var doc={v:1, at:new Date().toISOString(), by:(AUTH.user&&AUTH.user.email)||"", cards:JSON.parse(JSON.stringify(list))};
+    fepDocSet("app/cardpay/"+CPMS.co+"/master", doc).then(function(){ CPM[CPMS.co]=doc.cards; CPM_META[CPMS.co]={at:doc.at, by:doc.by}; CPMS.draft=null; CPMS.dirty=false; CPMS.msg="저장했습니다";
+      if(CPS.co===CPMS.co && CPS.files.length){ CPS.files.push({name:"(카드 목록 변경)", kind:"unknown", info:"카드 목록이 바뀌었습니다 — 파일을 다시 올려야 새 목록으로 계산됩니다", bad:true}); }
+      cpRecalc(); renderCpMaster(); })
+      .catch(function(e){ CPMS.msg="저장 실패: "+(e&&e.message||e); renderCpMaster(); });
+  };
+}
+bindCpMaster();
+
+function cpmOnSettings(){ if(CPMS.dirty){ renderCpMaster(); return; } cpMasterLoad(CPMS.co).then(function(){ CPMS.draft=null; renderCpMaster(); }); }
+window.__tr={CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
   daySummary:daySummary, dayAgg:dayAgg, rollup:rollup, scopeSummary:scopeSummary, allDates:allDates,
   parseCMS:parseCMS, parseFxLedger:parseFxLedger, fxTxnsOf:fxTxnsOf, parseDailySheet:parseDailySheet, guessCoFromName:guessCoFromName, loanAt:loanAt, parseCashBook:parseCashBook, parseLoanHtml:parseLoanHtml, processRows:processRows, coState:coState, periodBuckets:periodBuckets,
   loanScope:loanScope, isHoliday:isHoliday, setChart:function(x){chartKind=x}, autoGroups:autoGroups, openAutoFix:openAutoFix, toISO:toISO, accrueMonth:accrueMonth, setFinTab:function(x){finTab=x}, get finTab(){return finTab}, purgeFuture:purgeFuture,
@@ -10517,6 +11332,45 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
 :root[data-theme="dark"] .chip.card-k-new{color:#F5D25A;border-color:#B8961A}
 /* [v41] CMS 미리보기 — 필수 열 머리글(양식의 노란 머리글과 같은 뜻) */
 .card-tbl th.card-req{background:color-mix(in srgb,#F5C518 22%,transparent)}
+/* [v46] 법인카드 결제전표 — 결과보고서·법인카드 등록 화면 결(.fer-panel·.card-*)을 그대로 쓰고 필요한 것만 추가 */
+.cp-check{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.cp-ck{display:inline-flex;align-items:center;gap:4px}
+.cp-none{appearance:none;border:1px solid var(--rule-strong);background:var(--surface);color:var(--ink-2);border-radius:999px;font:inherit;font-size:10.5px;padding:0 6px;cursor:pointer}
+.cp-tbl td,.cp-tbl th{white-space:nowrap}
+.cp-tbl th.num,.cp-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+.cp-tbl th.ctr,.cp-tbl td.ctr{text-align:center}
+.cp-tbl .fer-in{width:118px;background:color-mix(in srgb,#F5C518 16%,var(--surface))}
+.cp-tbl .fer-in.sm{width:92px}
+.cp-tbl tfoot td{border-top:1.5px solid var(--rule-strong);background:var(--surface-2)}
+.cp-tbl tr.cp-dim td{color:var(--muted)}
+.cp-tbl tr.cp-sub td{background:var(--surface-2);font-size:12px}
+.cp-tbl tr.cp-own td{background:color-mix(in srgb,#FFCC00 12%,transparent)}
+.cp-neg{color:var(--out)}
+.cp-notes{display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+.cp-adv{margin-top:6px;border:1px solid var(--rule);border-radius:8px;padding:6px 10px}
+.cp-adv summary{cursor:pointer;font-size:12.5px}
+.cp-blocks{display:flex;flex-direction:column;gap:8px;padding:12px 16px}
+.cp-block{border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+.cp-block summary{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;background:var(--surface-2)}
+.cp-btot{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700}
+.cp-st{appearance:none;min-width:26px;border:1px solid var(--rule-strong);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;padding:1px 6px}
+.cp-note{width:120px;padding:3px 6px;border:1px solid var(--rule-strong);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;font-size:12px}
+.cp-mh{padding-bottom:6px;font-size:13px}
+.cp-sumline{font-size:13.5px;line-height:1.6}
+.cp-memo{display:flex;flex-direction:column;gap:5px;margin-top:12px;max-width:640px}
+.cp-memo .lbl{font-size:11.5px;color:var(--ink-2);font-weight:600}
+.cp-memo textarea{width:100%;padding:8px;border:1px solid var(--rule-strong);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit;font-size:12.5px;resize:vertical}
+.cp-memo .btn{align-self:flex-start}
+.cp-old{color:var(--muted)}
+.cp-bar{display:flex;align-items:center;gap:8px;margin:10px 16px 0;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,#F5C518 14%,transparent);font-size:12.5px}
+.cp-bar span{margin-right:auto}
+.cpm-tbl input,.cpm-tbl select{padding:3px 6px;border:1px solid var(--rule-strong);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;font-size:12px;width:120px}
+.cpm-tbl input.cpm-num{width:52px;text-align:right}
+.cpm-tbl input[type=checkbox]{width:auto}
+.cpm-tbl .btn.sm{padding:2px 7px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) #cpMonth{color-scheme:dark}}
+:root[data-theme="dark"] #cpMonth{color-scheme:dark}
+@media (max-width:600px){.cp-blocks{padding:10px}.cp-memo{max-width:100%}}
 /* [v26] 자금일보 3社 통합 자금수지(굿어스) */
 .ilbo-tbl.g3 th{background:#E8EEF7} .ilbo-tbl.g3 td.num:nth-child(2){font-weight:700}
 .ilbo-tbl .cellsel{font-size:11.5px;padding:1px 4px}
