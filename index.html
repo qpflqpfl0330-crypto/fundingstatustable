@@ -253,7 +253,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v50 · 2026-10-12</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -622,7 +622,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
             <div id="cardFileWarn"></div>
           </div>
           <div class="pad card-sumrow"><div class="card-sum" id="cardSum"></div>
-            <div class="card-acts"><button class="btn sm" id="btnCardIssueX" type="button" disabled>가공된 엑셀 다운로드</button><button class="btn sm" id="btnCardDone" type="button" disabled>처리 완료 (마지막 처리일 갱신)</button></div></div>
+            <div class="card-acts"><button class="btn sm" id="btnCardIssueX" type="button" disabled title="카드번호 · 회원명 · 카드발급일자 · 이전카드번호 4열 · 재발급 연두색 / 신규 노란색">가공된 엑셀 다운로드</button><button class="btn sm" id="btnCardDone" type="button" disabled>처리 완료 (마지막 처리일 갱신)</button></div></div>
           <div class="scroll"><table class="tbl card-tbl" id="cardRes"></table></div>
           <div class="pad card-out" id="cardIssueOut"></div>
         </div>
@@ -640,7 +640,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
           <div class="pad card-sumrow"><div class="card-sum" id="cardCmsInfo"></div>
             <div class="card-acts"><button class="btn sm primary" id="btnCardCms" type="button" disabled>엑셀 내보내기</button></div></div>
           <div class="scroll"><table class="tbl card-tbl" id="cardCmsTbl"></table></div>
-          <div class="pad card-out"><div class="hint">노란 머리글(카드사코드 · 카드번호 · 카드별칭) 3열만 채우고 나머지 열에는 데이터를 넣지 않습니다. 양식의 2~6행 예시값은 지우고 등록대상자로 채우며, '파일작성방법' 안내문은 그대로 두고 데이터가 5행을 넘으면 그만큼 아래로 내립니다. 카드번호는 화면에서만 가운데를 가리고 파일에는 발급내역 표기 그대로 들어갑니다.</div><div id="cardCmsOut" style="margin-top:6px"></div></div>
+          <div class="pad card-out"><div class="hint">노란 머리글(카드사코드 · 카드번호 · 카드별칭) 3열만 채우고 나머지 열에는 데이터를 넣지 않습니다. 파일에는 머리글 행이 없고 1행부터 바로 등록대상자가 들어갑니다(양식 예시값은 지움). '파일작성방법' 안내문은 그대로 두고 데이터가 6행을 넘으면 그만큼 아래로 내립니다. 카드번호는 화면에서만 가운데를 가리고 파일에는 발급내역 표기 그대로 들어갑니다.</div><div id="cardCmsOut" style="margin-top:6px"></div></div>
         </div>
 
         <div class="panel fer-panel">
@@ -9808,7 +9808,7 @@ var CARD_CMS_COLUMNS=[
   {h:"결제일",         c:11, get:CARD_CMS_EMPTY},
   {h:"카드회원구분",   c:12, get:CARD_CMS_EMPTY}
 ];
-var CARD_CMS_BOX_ROW=7, CARD_CMS_EX_ROWS=5;                                    // 글상자 원래 윗행(0부터) · 예시 데이터 행 수
+var CARD_CMS_BOX_ROW=7, CARD_CMS_EX_ROWS=5, CARD_CMS_FREE_ROWS=6;   // [v49] 머리글 없이 1행부터 쓰면 글상자(8행) 위에 6행까지 들어간다                                    // 글상자 원래 윗행(0부터) · 예시 데이터 행 수
 var CARDS={co:"SN", coAuto:false, issue:null, file:null, from:"", to:"", fromUser:false, toUser:false, ran:false, res:null, ex:{}, inc:{}, saved:{}, gen:null, done:null, warn:""};
 function cardDigits(v){ return String(v==null?"":v).replace(/\D/g,""); }
 function cardNameOnly(v){ return String(v==null?"":v).replace(/[0-9]/g,"").replace(/[_\-\s]+$/,"").replace(/\s{2,}/g," ").trim(); }   // 카드명 = 이름만
@@ -9950,7 +9950,7 @@ function biffPatchRows(XL, tplU8, rows, opt){
   sh.forEach(function(r,i){ if(r.t===0x208||CELL[r.t]||r.t===0xD7){ if(firstCT<0) firstCT=i; lastCT=i; } });
   var keptRow={}, keptCells={}, rowTpl=null, lastRowSeen=null;
   for(var i=firstCT;i<=lastCT;i++){ var r=sh[i];
-    if(r.t===0x208){ var rw=u16(r.d,0); if(rw<keep) keptRow[rw]=r.d; if(rw===keep||(!rowTpl&&rw>=keep)) rowTpl=rowTpl||r.d; }
+    if(r.t===0x208){ var rw=u16(r.d,0); if(rw<keep) keptRow[rw]=r.d; if(opt.rowTplRow!=null){ if(rw===opt.rowTplRow) rowTpl=r.d; } else if(rw===keep||(!rowTpl&&rw>=keep)) rowTpl=rowTpl||r.d; }   // [v49] rowTplRow: 새 행 ROW 서식을 가져올 원본 행
     else if(r.t===0xD7) continue;
     else if(CELL[r.t]){ if(r.t===0x207){ if(lastRowSeen!=null&&lastRowSeen<keep) (keptCells[lastRowSeen]=keptCells[lastRowSeen]||[]).push(r); continue; }
       var cr=u16(r.d,0); lastRowSeen=cr; if(cr<keep) (keptCells[cr]=keptCells[cr]||[]).push(r); }
@@ -10089,24 +10089,61 @@ function buildCardErpXls(list, coId, opt){
   var name="엑셀업로드양식_신용카드등록_"+coId+"_"+(opt.tag?opt.tag+"_":"")+cardYmd()+".xls";
   return {name:name, rows:rows.length, bytes:r.bytes, direct:r.direct, blob:new Blob([r.bytes],{type:"application/vnd.ms-excel"})};
 }
-/* [v42] CMS 등록 파일(.xls BIFF8) — `카드 등록.xls` 원본 바이트 + 2행부터 등록대상자(필수 3열만, 나머지 열은 셀 자체를 만들지 않음) */
+/* [v42→v49] CMS 등록 파일(.xls BIFF8) — `카드 등록.xls` 원본 바이트 + 머리글 없이 1행부터 등록대상자(필수 3열만, 나머지 열은 셀 자체를 만들지 않음) */
 function buildCardCmsFile(list, coId){
   var rows=list.filter(function(o){ return o.inc; });
   var data=rows.map(function(o){ return CARD_CMS_COLUMNS.filter(function(c){ return c.req; }).map(function(c){ var v=c.get(o); return (v==null||v==="")?null:{c:c.c, t:"s", v:String(v), xf:c.xf}; }).filter(Boolean); });
-  var r=biffPatchRows(XLSX, unb64(CARD_CMS_TPL_B64), data, {keepRows:1, sheet:0, anchorShift:{from:CARD_CMS_BOX_ROW, by:Math.max(0, rows.length-CARD_CMS_EX_ROWS)}});
+  /* [v49] 사용자 지시: 1행 머리글 없이 1행부터 바로 내용(사용자 파일 `카드 등록_SN_20261012.xls`와 같은 모양). 행 서식은 원본 2행(데이터 행) 것을 쓴다 */
+  var r=biffPatchRows(XLSX, unb64(CARD_CMS_TPL_B64), data, {keepRows:0, rowTplRow:1, sheet:0, anchorShift:{from:CARD_CMS_BOX_ROW, by:Math.max(0, rows.length-CARD_CMS_FREE_ROWS)}});
   var name="카드 등록_"+coId+"_"+cardYmd()+".xls";
   return {name:name, rows:rows.length, bytes:r.bytes, direct:r.direct, blob:new Blob([r.bytes],{type:"application/vnd.ms-excel"})};
 }
-/* [v40] 가공된 발급내역 — 등록대상자(포함 행)만, 맨 앞에 '구분'(신규/재발급), 나머지는 발급내역 원래 열(주민번호·주소 제외) */
+/* [v40→v50] 가공된 발급내역 — 등록대상자(포함 행)만 4열: 카드번호 · 회원명 · 카드발급일자 · 이전카드번호
+   사용자 지시(v50): 재발급 행 = 연두색(92D050), 신규 행 = 노란색(FFFF00), 머리글은 채우기 없이 테두리만. 모든 값은 텍스트(카드번호 앞자리 0·하이픈 보존).
+   주민번호·주소는 처음부터 이 파일에 들어갈 길이 없다(4열 고정). 서식이 필요해서 xlsx 내부 XML을 직접 만든다(XLSX.CFB zip, 외부 라이브러리 없음). */
+var CARD_ISSUE_FILL={"재발급":"FF92D050", "신규":"FFFFFF00"};
+function cardNoFmt(v){ var s=String(v==null?"":v).trim(), d=cardDigits(s);
+  return d.length===16?d.replace(/^(\d{4})(\d{4})(\d{4})(\d{4})$/,"$1-$2-$3-$4"):s; }
+function cardIssueRows(R){
+  return R.list.filter(function(o){ return o.inc; }).map(function(o){ var r=o.r;
+    return {kind:o.kind, v:[cardNoFmt(r.no), r.user||"", r.date||"", o.kind==="재발급"?cardNoFmt(r.prev):""]}; });
+}
 function buildCardIssueXlsx(R, coId){
-  var rows=R.list.filter(function(o){ return o.inc; }), cols=(CARDS.file&&CARDS.file.cols)||[];
-  var aoa=[["구분"].concat(cols)].concat(rows.map(function(o){ return [o.kind].concat(o.r.raw||[]); }));
-  var ws=XLSX.utils.aoa_to_sheet(aoa);
-  Object.keys(ws).forEach(function(a){ if(a[0]!=="!" && ws[a].t==="s") ws[a].z="@"; });
-  ws["!cols"]=[{wch:8}].concat(cols.map(function(h){ return {wch:/카드번호|계좌번호/.test(h)?22:Math.max(10,h.length*2+2)}; }));
-  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"발급내역(가공)");
+  var rows=cardIssueRows(R), HD=["카드번호","회원명","카드발급일자","이전카드번호"], W=[22,10,14,22];
+  var xe=function(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); };
+  var col=function(i){ return "ABCD"[i]; };
+  var cell=function(ref, v, s){ return v===""?'<c r="'+ref+'" s="'+s+'"/>':'<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t>'+xe(v)+'</t></is></c>'; };
+  var xfOf={"재발급":3, "신규":4};
+  var sd='<row r="1">'+HD.map(function(h,i){ return cell(col(i)+"1", h, 1); }).join("")+'</row>'+
+    rows.map(function(x,k){ var n=k+2, s=xfOf[x.kind]||2; return '<row r="'+n+'">'+x.v.map(function(v,i){ return cell(col(i)+n, v, s); }).join("")+'</row>'; }).join("");
+  var X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  var parts={
+    "[Content_Types].xml":X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+    "_rels/.rels":X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    "xl/workbook.xml":X+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="발급내역(가공)" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    "xl/_rels/workbook.xml.rels":X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    "xl/styles.xml":X+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+      '<fonts count="1"><font><sz val="10"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font></fonts>'+
+      '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+
+        '<fill><patternFill patternType="solid"><fgColor rgb="'+CARD_ISSUE_FILL["재발급"]+'"/><bgColor indexed="64"/></patternFill></fill>'+
+        '<fill><patternFill patternType="solid"><fgColor rgb="'+CARD_ISSUE_FILL["신규"]+'"/><bgColor indexed="64"/></patternFill></fill></fills>'+
+      '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>'+
+        '<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders>'+
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+      '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+        [0,0,2,3].map(function(fi){ return '<xf numFmtId="49" fontId="0" fillId="'+fi+'" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"'+(fi?' applyFill="1"':'')+' applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'; }).join("")+
+      '</cellXfs><cellStyles count="1"><cellStyle name="표준" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
+    "xl/worksheets/sheet1.xml":X+'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+      '<dimension ref="A1:D'+(rows.length+1)+'"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="16.5"/>'+
+      '<cols>'+W.map(function(w,i){ return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'; }).join("")+'</cols>'+
+      '<sheetData>'+sd+'</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>'
+  };
+  var CFB=XLSX.CFB, z=CFB.utils.cfb_new(), enc=new TextEncoder();
+  Object.keys(parts).forEach(function(p){ CFB.utils.cfb_add(z, p, enc.encode(parts[p])); });
+  var bytes=CFB.write(z,{type:"array", fileType:"zip", compression:true});
   var name=coId+"_발급내역_가공_"+R.from.replace(/-/g,"")+"-"+R.to.replace(/-/g,"")+".xlsx";
-  return {name:name, rows:rows.length, wb:wb, blob:new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})};
+  return {name:name, rows:rows.length, nRe:rows.filter(function(x){ return x.kind==="재발급"; }).length, nNew:rows.filter(function(x){ return x.kind==="신규"; }).length,
+    blob:new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})};
 }
 /* [v40] 단계별 내보내기 — kind: "issue" | "erp" | "cms" */
 function cardResReady(){ var R=CARDS.res; return !!(R&&R.list&&!R.need); }
@@ -10251,7 +10288,7 @@ function renderCards(){
   $("#btnCardErp").disabled=!can||!E.code;
   $("#cardErpOut").innerHTML=savedChip("erp");
   /* 3. CMS 등록(카드등록) */
-  $("#cardCmsInfo").innerHTML='<span class="mini">생성된 행</span> <b>'+inc.length+'명</b><span class="mini"> · 양식</span> <span class="chip fer-src">'+esc(CARD_CMS_TPL_NAME)+'</span><span class="mini"> 원본 그대로 · 2행부터 기록</span>';
+  $("#cardCmsInfo").innerHTML='<span class="mini">생성된 행</span> <b>'+inc.length+'명</b><span class="mini"> · 양식</span> <span class="chip fer-src">'+esc(CARD_CMS_TPL_NAME)+'</span><span class="mini"> 원본 서식 · 머리글 없이 1행부터 기록</span>';
   $("#cardCmsTbl").innerHTML='<thead><tr>'+CARD_CMS_COLUMNS.map(function(c){ return '<th class="ctr'+(c.req?' card-req':'')+'">'+esc(c.h)+'</th>'; }).join("")+'</tr></thead><tbody>'+
     (inc.length?inc.map(function(o){ var x=Object.assign({},o); x.co=E.id; return '<tr>'+CARD_CMS_COLUMNS.map(function(c){ var v=c.get(x);
       return '<td class="ctr'+(c.h==="카드번호"?' card-mono':'')+'">'+esc(c.h==="카드번호"?(v?cardMask(v):""):v)+'</td>'; }).join("")+'</tr>'; }).join("")
@@ -11036,7 +11073,7 @@ function bindCpMaster(){
 bindCpMaster();
 
 function cpmOnSettings(){ if(CPMS.dirty){ renderCpMaster(); return; } cpMasterLoad(CPMS.co).then(function(){ CPMS.draft=null; renderCpMaster(); }); }
-window.__tr={CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
+window.__tr={CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
   daySummary:daySummary, dayAgg:dayAgg, rollup:rollup, scopeSummary:scopeSummary, allDates:allDates,
   parseCMS:parseCMS, parseFxLedger:parseFxLedger, fxTxnsOf:fxTxnsOf, parseDailySheet:parseDailySheet, guessCoFromName:guessCoFromName, loanAt:loanAt, parseCashBook:parseCashBook, parseLoanHtml:parseLoanHtml, processRows:processRows, coState:coState, periodBuckets:periodBuckets,
   loanScope:loanScope, isHoliday:isHoliday, setChart:function(x){chartKind=x}, autoGroups:autoGroups, openAutoFix:openAutoFix, toISO:toISO, accrueMonth:accrueMonth, setFinTab:function(x){finTab=x}, get finTab(){return finTab}, purgeFuture:purgeFuture,
@@ -11333,6 +11370,7 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
 :root[data-theme="dark"] .chip.card-k-new{color:#F5D25A;border-color:#B8961A}
 /* [v41] CMS 미리보기 — 필수 열 머리글(양식의 노란 머리글과 같은 뜻) */
 .card-tbl th.card-req{background:color-mix(in srgb,#F5C518 22%,transparent)}
+.rail-ver{display:block;font-size:10px;color:var(--muted);letter-spacing:.02em;margin-top:2px}   /* [v49] 버전 표시 */
 /* [v46] 법인카드 계정대체 — 결과보고서·법인카드 등록 화면 결(.fer-panel·.card-*)을 그대로 쓰고 필요한 것만 추가 */
 .cp-check{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .cp-ck{display:inline-flex;align-items:center;gap:4px}
