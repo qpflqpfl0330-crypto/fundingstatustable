@@ -253,7 +253,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v50 · 2026-10-12</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v51 · 2026-10-12</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -622,7 +622,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
             <div id="cardFileWarn"></div>
           </div>
           <div class="pad card-sumrow"><div class="card-sum" id="cardSum"></div>
-            <div class="card-acts"><button class="btn sm" id="btnCardIssueX" type="button" disabled title="카드번호 · 회원명 · 카드발급일자 · 이전카드번호 4열 · 재발급 연두색 / 신규 노란색">가공된 엑셀 다운로드</button><button class="btn sm" id="btnCardDone" type="button" disabled>처리 완료 (마지막 처리일 갱신)</button></div></div>
+            <div class="card-acts"><button class="btn sm" id="btnCardIssueX" type="button" disabled title="구분 · 카드번호 · 회원명 · 카드발급일자 · 유효기간 · 이전카드번호 6열 · 재발급 연두색 / 신규 노란색">가공된 엑셀 다운로드</button><button class="btn sm" id="btnCardDone" type="button" disabled>처리 완료 (마지막 처리일 갱신)</button></div></div>
           <div class="scroll"><table class="tbl card-tbl" id="cardRes"></table></div>
           <div class="pad card-out" id="cardIssueOut"></div>
         </div>
@@ -10098,24 +10098,25 @@ function buildCardCmsFile(list, coId){
   var name="카드 등록_"+coId+"_"+cardYmd()+".xls";
   return {name:name, rows:rows.length, bytes:r.bytes, direct:r.direct, blob:new Blob([r.bytes],{type:"application/vnd.ms-excel"})};
 }
-/* [v40→v50] 가공된 발급내역 — 등록대상자(포함 행)만 4열: 카드번호 · 회원명 · 카드발급일자 · 이전카드번호
-   사용자 지시(v50): 재발급 행 = 연두색(92D050), 신규 행 = 노란색(FFFF00), 머리글은 채우기 없이 테두리만. 모든 값은 텍스트(카드번호 앞자리 0·하이픈 보존).
-   주민번호·주소는 처음부터 이 파일에 들어갈 길이 없다(4열 고정). 서식이 필요해서 xlsx 내부 XML을 직접 만든다(XLSX.CFB zip, 외부 라이브러리 없음). */
+/* [v40→v50→v51] 가공된 발급내역 — 등록대상자(포함 행)만 6열: 구분 · 카드번호 · 회원명 · 카드발급일자 · 유효기간 · 이전카드번호
+   사용자 원하는 파일(`SN_발급내역_가공_20260930-20261012 원하는방향.xlsx`) 그대로: 맑은 고딕 12pt · 테두리 없음 · 정렬 기본 · 모든 칸 텍스트(@),
+   재발급 행 = 연두(92D050), 신규 행 = 노랑(FFFF00) 6칸 모두, 머리글은 채우기 없음. 열 너비 8.82/22.82/10.82/14.82/10.82/22.82.
+   주민번호·주소는 처음부터 이 파일에 들어갈 길이 없다(6열 고정). 서식이 필요해서 xlsx 내부 XML을 직접 만든다(XLSX.CFB zip, 외부 라이브러리 없음). */
 var CARD_ISSUE_FILL={"재발급":"FF92D050", "신규":"FFFFFF00"};
 function cardNoFmt(v){ var s=String(v==null?"":v).trim(), d=cardDigits(s);
   return d.length===16?d.replace(/^(\d{4})(\d{4})(\d{4})(\d{4})$/,"$1-$2-$3-$4"):s; }
 function cardIssueRows(R){
   return R.list.filter(function(o){ return o.inc; }).map(function(o){ var r=o.r;
-    return {kind:o.kind, v:[cardNoFmt(r.no), r.user||"", r.date||"", o.kind==="재발급"?cardNoFmt(r.prev):""]}; });
+    return {kind:o.kind, v:[o.kind, cardNoFmt(r.no), r.user||"", r.date||"", r.exp||"", o.kind==="재발급"?cardNoFmt(r.prev):""]}; });
 }
 function buildCardIssueXlsx(R, coId){
-  var rows=cardIssueRows(R), HD=["카드번호","회원명","카드발급일자","이전카드번호"], W=[22,10,14,22];
+  var rows=cardIssueRows(R), HD=["구분","카드번호","회원명","카드발급일자","유효기간","이전카드번호"], W=[8.81640625,22.81640625,10.81640625,14.81640625,10.81640625,22.81640625];
   var xe=function(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); };
-  var col=function(i){ return "ABCD"[i]; };
+  var col=function(i){ return "ABCDEF"[i]; };
   var cell=function(ref, v, s){ return v===""?'<c r="'+ref+'" s="'+s+'"/>':'<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t>'+xe(v)+'</t></is></c>'; };
-  var xfOf={"재발급":3, "신규":4};
+  var xfOf={"재발급":3, "신규":2};
   var sd='<row r="1">'+HD.map(function(h,i){ return cell(col(i)+"1", h, 1); }).join("")+'</row>'+
-    rows.map(function(x,k){ var n=k+2, s=xfOf[x.kind]||2; return '<row r="'+n+'">'+x.v.map(function(v,i){ return cell(col(i)+n, v, s); }).join("")+'</row>'; }).join("");
+    rows.map(function(x,k){ var n=k+2, s=xfOf[x.kind]||1; return '<row r="'+n+'">'+x.v.map(function(v,i){ return cell(col(i)+n, v, s); }).join("")+'</row>'; }).join("");
   var X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
   var parts={
     "[Content_Types].xml":X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
@@ -10123,18 +10124,17 @@ function buildCardIssueXlsx(R, coId){
     "xl/workbook.xml":X+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="발급내역(가공)" sheetId="1" r:id="rId1"/></sheets></workbook>',
     "xl/_rels/workbook.xml.rels":X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
     "xl/styles.xml":X+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-      '<fonts count="1"><font><sz val="10"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font></fonts>'+
+      '<fonts count="1"><font><sz val="12"/><color theme="1"/><name val="맑은 고딕"/><family val="2"/><scheme val="minor"/></font></fonts>'+
       '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+
-        '<fill><patternFill patternType="solid"><fgColor rgb="'+CARD_ISSUE_FILL["재발급"]+'"/><bgColor indexed="64"/></patternFill></fill>'+
-        '<fill><patternFill patternType="solid"><fgColor rgb="'+CARD_ISSUE_FILL["신규"]+'"/><bgColor indexed="64"/></patternFill></fill></fills>'+
-      '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>'+
-        '<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders>'+
+        '<fill><patternFill patternType="solid"><fgColor rgb="'+CARD_ISSUE_FILL["신규"]+'"/><bgColor indexed="64"/></patternFill></fill>'+
+        '<fill><patternFill patternType="solid"><fgColor rgb="'+CARD_ISSUE_FILL["재발급"]+'"/><bgColor indexed="64"/></patternFill></fill></fills>'+
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'+
       '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-      '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
-        [0,0,2,3].map(function(fi){ return '<xf numFmtId="49" fontId="0" fillId="'+fi+'" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"'+(fi?' applyFill="1"':'')+' applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'; }).join("")+
+      '<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+        [0,2,3].map(function(fi){ return '<xf numFmtId="49" fontId="0" fillId="'+fi+'" borderId="0" xfId="0" applyNumberFormat="1"'+(fi?' applyFill="1"':'')+'/>'; }).join("")+
       '</cellXfs><cellStyles count="1"><cellStyle name="표준" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
     "xl/worksheets/sheet1.xml":X+'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
-      '<dimension ref="A1:D'+(rows.length+1)+'"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="16.5"/>'+
+      '<dimension ref="A1:F'+(rows.length+1)+'"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="19.2"/>'+
       '<cols>'+W.map(function(w,i){ return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'; }).join("")+'</cols>'+
       '<sheetData>'+sd+'</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>'
   };
