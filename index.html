@@ -6587,7 +6587,7 @@ function parseSlip(ab){
   return out && out.lines.length ? out : null;
 }
 function slipIsCash(code){ return code==="1110100"; }
-function slipIsDeposit(code){ return /^1110\d{3}$/.test(code) && code!=="1110100"; }
+function slipIsDeposit(code){ return /^1110\d{3}$/.test(code) && code!=="1110100" && code!=="1110700"; }   // [v56] 1110700 국고보조금(현금)은 차감 계정
 function slipMemo(m){ return txt(String(m||"").replace(/^[^)]*뱅킹\)\s*/,"").replace(/^자금이동\)\s*/,"")); }
 function slipBank(branch){ return txt(String(branch||"").split(/\s/)[0].replace(/은행$/,"")); }
 /* 출금 전표 구분 — 실제 2026-09-17 전표·자금일보로 확인한 규칙을 우선 적용하고, 그 외는 기존 CMS 분류 엔진(규칙·거래처 학습) */
@@ -6837,6 +6837,7 @@ function slipText(raw, parties, own){
   if(i>0 && i<=24){ var pre=s.slice(0,i+1); if(pre.indexOf("(")<=0 && /뱅킹|이체|입금|출금|자금이동|송금|지급/.test(pre) && txt(s.slice(i+1))) s=txt(s.slice(i+1)); }
   s=s.replace(/\s+\/\s.*$/,"");
   s=txt(s.replace(/\s*\([^()]*은행\s*[\d\-]+[^()]*\)\s*$/,""));
+  s=txt(s.replace(/_?\s*[가-힣A-Za-z]*은행\s*\(\s*[\d\-]{6,}\s*\)\s*$/,"").replace(/\(\d{2}\.\d{2}\.\d{2}\s*[-~]\s*\d{2}\.\d{2}\.\d{2}\)/g,""));   // [v56] 퇴직금 지급_기업은행(…) · (24.05.21-25.12.31)
   var m=s.match(/^(.+)_([^_]+)$/);
   if(m && parties && parties.length){
     var k=nameKey(m[2]);
@@ -6885,7 +6886,10 @@ function slipCpCat(cps, isIn, hay){
   var by={}, why={};
   (cps||[]).forEach(function(x){ if(!(x.amount>0)) return; var k=slipCpCatOf(x, isIn); if(!k) return;
     by[k]=(by[k]||0)+x.amount; if(!why[k] || x.amount>why[k].amt) why[k]={amt:x.amount, acct:x.account}; });
-  var ks=Object.keys(by); if(!ks.length) return null;
+  var ks=Object.keys(by);
+  if(!ks.length && !isIn && (cps||[]).some(function(x){ return /국고보조금/.test(String(x.account||"")); }))   // [v56]
+    return {cat:/개인지급|출장|여비|사원경비/.test(hay||"")?"사원경비":"운영경비", why:"상대계정 국고보조금(현금)", mixed:false};
+  if(!ks.length) return null;
   ks.sort(function(a,b){ return by[b]-by[a]; });
   var cat=ks[0];
   if(!isIn && cat==="하도급"){ if(/시스코|cisco/i.test(hay)) cat="시스코"; else if(/델인터내셔널|델테크|\bdell\b/i.test(hay)) cat="델"; else if(/오라클|oracle/i.test(hay)) cat="오라클"; }
@@ -7025,6 +7029,7 @@ function matchSlipCms(c, iso){
     var C=cand(L,"n").filter(function(i){ var nm=smName(T[i]);
       if(fk.length) return fk.some(function(k){ return nm.indexOf(k)>=0; });
       return nmL.some(function(n){ return score(i,[n])>=1; }); });
+    if(!C.length && fk.length) C=cand(L,"n").filter(function(i){ return nmL.some(function(n){ return score(i,[n])>=1; }); });   // [v56]
     var tryFam=function(C){
       if(C.length<2) return false;
       var tot=C.reduce(function(a,i){ return a+Math.round(smAmt(T[i])); },0);
@@ -7047,8 +7052,6 @@ function matchSlipCms(c, iso){
     if(tryFam(C)) return;
     /* [v56] 미지급금(급여) 지급(퇴직금·연차수당 등)은 CMS가 직원 이름별로 나뉜다 — 받는 사람이 사람 이름인 남은 CMS 출금(01-15 32건 = 10,685,852) */
     if(L.cat==="급여성" && /미지급금\(급여\)/.test(L.L.cpAccount||"") && tryFam(cand(L,"n").filter(function(i){ return looksPersonal(T[i].client)||looksPersonal(T[i].summary); }))) return;
-    /* [v56] 그 계좌·방향에 남은 CMS 전체 합이 줄 금액과 원 단위로 같을 때만(01-15 하나 31604 김건웅 314,000 + 안군헌 157,000 = 471,000) */
-    var rest2=cand(L,"n"); if(rest2.length>=2 && rest2.reduce(function(a,i){ return a+Math.round(smAmt(T[i])); },0)===Math.round(L.amt) && !rest().some(function(o){ return o!==L && o.acct===L.acct && o.dir===L.dir; })) add(L, rest2, "1:N합계");
   });
   // ⑦ 4대보험 묶음(N:M) — 부분합 먼저, 안 풀리면 그룹 합계가 원 단위로 같을 때 그룹 전체
   var INS_RE=/사회보험|산재보험|국민연금|건강보험|고용보험|장기요양/, grpN=0, byA={};
@@ -7072,6 +7075,12 @@ function matchSlipCms(c, iso){
   });
   // ③' 남은 보험 계열 줄 1:1
   pairUp(rest().filter(function(L){ return L.ins; }), "n", eqAmt, "1:1");
+  /* ⑧ [v56] 그 계좌·방향에 남은 줄이 하나뿐이고, 남은 CMS 전체 합이 그 줄 금액과 원 단위로 같을 때만
+     (01-15 하나 31604 FI…00006 471,000 = 김건웅 314,000 + 안군헌 157,000) */
+  rest().forEach(function(L){
+    if(usedL[L.key] || rest().some(function(o){ return o!==L && o.acct===L.acct && o.dir===L.dir; })) return;
+    var R2=cand(L,"n"); if(R2.length>=2 && R2.reduce(function(a,i){ return a+Math.round(smAmt(T[i])); },0)===Math.round(L.amt)) add(L, R2, "1:N합계");
+  });
   /* 증권 계좌 — CMS에 없는 계좌의 전표 입·출금은 전표값으로 실적 행을 만든다(파일 끝에 붙여 기존 행 번호 유지) */
   var SEC_RE=/증권|금융투자|미래에셋|선물/;
   lines.forEach(function(L){
