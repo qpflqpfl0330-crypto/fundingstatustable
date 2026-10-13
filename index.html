@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v56 · 2026-10-13</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v57 · 2026-10-13</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -1313,10 +1313,19 @@ function loanAt(l, iso){
 }
 /* 현재 스코프(법인탭) 기준 차입 집계 — 대시보드 KPI와 차입현황 표가 항상 같은 값을 쓰도록 단일화 */
 /* [v24] 조회일 이전 가장 가까운 보고서 [금융권 차입현황] 스냅샷(45일 이내) — 있으면 등록 차입보다 우선 */
+/* [v57] 보고서 차입현황 스냅샷 검증 — 금액이 1경 원 이상·음수이거나 은행명이 아닌 행(예: GU '(-)통장' · 한도 3,020,272,359,080,900)이 하나라도 있으면
+   그 스냅샷은 쓰지 않고 등록 약정(차입현황 편집표)으로 계산한다 */
+var LOAN_BANK_RE=/은행|하나|산업|신한|국민|농협|우리|기업|씨티|부산|수협|대구|경남|광주|전북|제주|SC|KDB|IBK|NH|KB|캐피탈|저축|증권|공제|보증/;
+function loanSnapRowOk(l){
+  var lim=+l.limit, amt=+l.amount;
+  if(!isFinite(lim) || !isFinite(amt) || lim<0 || amt<0 || lim>=1e13 || amt>=1e13) return false;
+  return LOAN_BANK_RE.test(String(l.bank||""));
+}
+function loanSnapOk(list){ return Array.isArray(list) && list.length>0 && list.every(loanSnapRowOk); }
 function loanSnapAt(c, iso){
   if(!iso) return null;
   var lo=isoAdd(iso,-45), best=null;
-  Object.keys(c.days).forEach(function(d){ if(d<=iso && d>=lo && (!best||d>best)){ var r=dayRec(c,d); if(r && r.loanSnap && r.loanSnap.length) best=d; } });
+  Object.keys(c.days).forEach(function(d){ if(d<=iso && d>=lo && (!best||d>best)){ var r=dayRec(c,d); if(r && loanSnapOk(r.loanSnap)) best=d; } });   // [v57] 검증 통과한 스냅샷만
   return best ? {date:best, loans:dayRec(c,best).loanSnap} : null;
 }
 function loanScope(iso){
@@ -1921,6 +1930,7 @@ function isTransferText(c, text){
     rem=rem.replace(/\d+/g,"");
     return rem==="";
   }
+  if(/^\d+$/.test(t) && t.length<10) return false;     // [v57] 짧은 숫자 코드(GD 하나 14704 교육청 입금 '00352')는 계좌번호 아님
   var pure=t;
   ["자금이동","계좌대체","당행이체","타행이체","대체","MMT"].forEach(function(a){ pure=pure.split(normalize(a)).join(""); });
   pure=pure.replace(/\d+/g,"");
@@ -1961,7 +1971,7 @@ function applyRules(row){
 var LOAN_NO_RE=/^\d{10,16}-\d+/;
 function isLoanInterest(row){
   if(!(+row.withdraw>0)) return false;
-  return String(row.txType||"").trim()==="대출이자" || LOAN_NO_RE.test(String(row.summary||"").replace(/\s/g,""));
+  return /^(대출이자|기일출금)$/.test(String(row.txType||"").trim()) || LOAN_NO_RE.test(String(row.summary||"").replace(/\s/g,""));   // [v57] 기일출금
 }
 function categorize(c,row){
   if(String(row.kind||"").indexOf("외화")!==0 && isLoanInterest(row)){ row.kind="지출"; return {cat:"이자비용",auto:false}; }
@@ -2301,6 +2311,7 @@ function parseLoanBlock(aoa){
     out.push({type:/통장|한도/.test(a)?"한도":a, bank:txt(row[1]), start:toISO(row[2])||"", end:toISO(row[3])||"",
       limit:lim, amount:amt, rate:cellNum(row[7])||0, method:txt(row[9]), acct:txt(row[10])});
   }
+  if(out.length && !loanSnapOk(out)){ try{ console.warn("[v57] 보고서 금융권 차입현황 양식이 달라 스냅샷을 저장하지 않음", out); }catch(e){} return []; }   // [v57]
   return out;
 }
 /* [외화예적금 세부 내역] — 입금 건별 환율·외화금액·원화금액·입금일 */
@@ -2894,11 +2905,26 @@ function applyFixedCats(c){
     (r.txns||[]).forEach(function(t){ if(t.kind!=="지출" || t.catManual || t.slip) return; var k=fixedOutCat(t); if(k && (t.cat!==k || t.auto)){ t.cat=k; t.auto=false; n++; } }); });   // [v55] 사용자·전표 구분 우선
   return n;
 }
+/* [v57] 저장된 CMS 자금이동 행 재분류 — 기일출금(대출 이자) · 숫자만 있는 짧은 거래처/적요 때문에 자금이동으로 잡힌 행만 */
+function fixMoveKinds(c){
+  var n=0, internal=internalNums(c);
+  var shortNum=function(s){ var t=String(s||"").replace(/[\s\-]/g,""); return /^\d{1,9}$/.test(t); };
+  Object.keys(c.days||{}).forEach(function(d){ var r=c.days[d]; if(!r || r.source!=="cms") return;
+    (r.txns||[]).forEach(function(t){
+      var k0=t.slipKind0||t.kind;
+      if(String(k0).indexOf("자금이동")!==0 || t.catManual || t.fxTrade || t.fxTradeFrom || t.fromSlip) return;
+      if(!(String(t.txType||"").trim()==="기일출금" || shortNum(t.client) || shortNum(t.summary))) return;
+      var nk=classifyKind(c, t, internal); if(String(nk).indexOf("자금이동")===0) return;
+      delete t.slipKind0; t.kind=nk; var x=categorize(c,t); t.cat=x.cat; t.auto=x.auto; t.kindFixV57=k0; n++;
+    }); });
+  return n;
+}
 function fxPostAll(){
-  var r={trade:0, slip:0, fixed:0, match:0};
+  var r={trade:0, slip:0, fixed:0, match:0, kfix:0};
   (D.companies||[]).forEach(function(c){
     Object.keys(c.slips||{}).forEach(function(d){ r.slip+=slipFxSellFix(c, c.slips[d]); });   // v53 이전 저장 전표
     Object.keys(c.days||{}).forEach(function(d){ r.trade+=linkFxTrades(c, d); });          // [v54] 매도·매수 연결
+    r.kfix+=fixMoveKinds(c);     // [v57]
     r.fixed+=applyFixedCats(c);
     /* [v55] 전표 ↔ CMS 매칭 — 업로드·로드 때마다 전 기간 소급(매도·매수 연결·고정 규칙 다음) */
     Object.keys(c.days||{}).forEach(function(d){
@@ -6985,6 +7011,16 @@ function matchSlipCms(c, iso){
   var eqAmt=function(t,L){ return Math.abs(smAmt(t)-L.amt)<0.5; };
   // ① 자금이동
   pairUp(lines.filter(function(L){ return L.kind==="move"; }), "mv", eqAmt, "자금이동");
+  /* ①' [v57] 자금이동 1:N — 같은 계좌·방향의 남은 CMS 자금이동 중 합이 줄 금액과 원 단위로 같은 조합이 하나뿐일 때
+     (02-02 FI…00018-9/10 농협 007994 → 하나 83804 1,244,422,080 = CMS 1,000,000,000 + 244,422,080) */
+  lines.filter(function(L){ return !usedL[L.key] && L.kind==="move" && L.acct!=="현금"; })
+    .sort(function(a,b){ return b.amt-a.amt; })
+    .forEach(function(L){
+      var C=cand(L,"mv"); if(C.length<2 || C.length>20) return;
+      var ss=subsetSum(C.map(function(i){ return Math.round(smAmt(T[i])); }), Math.round(L.amt));
+      if(ss.amb || !ss.sol || ss.sol.length<2) return;
+      add(L, ss.sol.map(function(q){ return C[q]; }), "자금이동");
+    });
   // ② 외화 — 계좌 + 외화금액 ±0.01
   pairUp(lines.filter(function(L){ return !usedL[L.key] && L.fx && L.kind!=="move" && L.kind!=="cash"; }), "fx", function(t,L){ return Math.abs(fxCents(smAmt(t))-fxCents(L.fx.amt))<=1; }, "외화");
   var rest=function(){ return lines.filter(function(L){ return !usedL[L.key] && L.kind!=="move" && L.kind!=="cash" && !L.fx; }); };
@@ -6993,7 +7029,8 @@ function matchSlipCms(c, iso){
   T.forEach(function(t,i){
     if(usedT[i] || String(t.kind).indexOf("자금이동")!==0 || t.fxTrade || t.fxTradeFrom) return;
     var o=t.kind==="자금이동(출금)", a=smAmt(t);
-    var pair=T.some(function(u,j){ return j!==i && String(u.kind).indexOf("자금이동")===0 && (u.kind==="자금이동(출금)")!==o && Math.abs(smAmt(u)-a)<=3000; });
+    /* [v57] 짝은 '다른' 자사 계좌여야 한다 — 같은 계좌에서 나가고 같은 금액이 다시 들어온 건(02-02 국민 002590: 이자 기일출금 5,452,602 ↔ 하나 00104에서 채워 넣은 입금)은 자금이동이 아니라 출금 */
+    var pair=T.some(function(u,j){ return j!==i && u.acct!==t.acct && String(u.kind).indexOf("자금이동")===0 && (u.kind==="자금이동(출금)")!==o && Math.abs(smAmt(u)-a)<=3000; });
     if(!pair) orphanMv[i]=1;
   });
   // ③ 1:1 (보험 계열 줄은 ⑦ 묶음에서)
@@ -7137,7 +7174,7 @@ function slipChip(c, t, iso, idx){
   var h=' <span class="chip slip" title="'+esc(tip)+'">전표 …'+esc(String(s.slipNo).split(",")[0].slice(-5))+(s.slipNo.indexOf(",")>0?" 외":"")+'</span>';
   if(s.type==="묶음") h+=' <span class="chip bund" title="4대보험 통합 징수 — 개별 금액은 다르고 합계가 같음">묶음</span>';
   if(s.split) h+=' <span class="chip bund" title="상대 줄 1개를 CMS 여러 건으로 나눠 송금">분할</span>';
-  if(s.mvFix) h+=' <span class="chip mix" title="CMS 수취인·적요가 자사명이라 자금이동으로 잡혔지만 같은 날 자사 계좌 입금 짝이 없고, 전표상 거래처 지급(수금)과 금액이 맞음 → '+(s.dir==="in"?"수입":"지출")+'">자금이동 아님</span>';   // [v56]
+  if(s.mvFix) h+=' <span class="chip mix" title="CMS 수취인·적요가 자사명(또는 계좌번호)이라 자금이동으로 잡혔지만 같은 날 다른 자사 계좌의 짝이 없고(같은 계좌 입출금은 짝 아님), 전표상 거래처 지급(수금)과 금액이 맞음 → '+(s.dir==="in"?"수입":"지출")+'">자금이동 아님</span>';   // [v56]
   if(s.mixed) h+=' <span class="chip mix" title="상대계정이 여러 구분으로 섞임 — 금액이 가장 큰 상대계정 기준">구분 혼합</span>';
   if(t.catManual && s.cat && t.cat!==s.cat && s.type!=="자금이동")
     h+=' <span class="chip man" title="전표 구분 '+esc(s.cat)+' 대신 직접 지정">직접</span> <button class="btn sm slipcatrevert" type="button" data-co="'+c.id+'" data-iso="'+iso+'" data-i="'+idx+'">전표값으로 되돌리기</button>';
@@ -11967,7 +12004,7 @@ function bindCpMaster(){
 bindCpMaster();
 
 function cpmOnSettings(){ if(CPMS.dirty){ renderCpMaster(); return; } cpMasterLoad(CPMS.co).then(function(){ CPMS.draft=null; renderCpMaster(); }); }
-window.__tr={slipMergeDay:slipMergeDay, matchSlipCms:matchSlipCms, slipCashLines:slipCashLines, slipText:slipText, nameKey:nameKey, nameScore:nameScore, subsetSum:subsetSum, get SLIP_MATCH(){return SLIP_MATCH}, linkFxTrades:linkFxTrades, fxTradeInfo:fxTradeInfo, fxTradesOf:fxTradesOf, slipFxSellFix:slipFxSellFix, parseSlip:parseSlip, buildSlip:buildSlip, slipDaysOf:slipDaysOf, saveSlipDays:saveSlipDays, relinkFxTrade:relinkFxTrade, fxPostAll:fxPostAll, applyFixedCats:applyFixedCats, unlinkFxTrade:unlinkFxTrade, CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
+window.__tr={fixMoveKinds:fixMoveKinds, loanSnapOk:loanSnapOk, loanScope:loanScope, classifyKind:classifyKind, slipMergeDay:slipMergeDay, matchSlipCms:matchSlipCms, slipCashLines:slipCashLines, slipText:slipText, nameKey:nameKey, nameScore:nameScore, subsetSum:subsetSum, get SLIP_MATCH(){return SLIP_MATCH}, linkFxTrades:linkFxTrades, fxTradeInfo:fxTradeInfo, fxTradesOf:fxTradesOf, slipFxSellFix:slipFxSellFix, parseSlip:parseSlip, buildSlip:buildSlip, slipDaysOf:slipDaysOf, saveSlipDays:saveSlipDays, relinkFxTrade:relinkFxTrade, fxPostAll:fxPostAll, applyFixedCats:applyFixedCats, unlinkFxTrade:unlinkFxTrade, CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
   daySummary:daySummary, dayAgg:dayAgg, rollup:rollup, scopeSummary:scopeSummary, allDates:allDates,
   parseCMS:parseCMS, parseFxLedger:parseFxLedger, fxTxnsOf:fxTxnsOf, parseDailySheet:parseDailySheet, guessCoFromName:guessCoFromName, loanAt:loanAt, parseCashBook:parseCashBook, parseLoanHtml:parseLoanHtml, processRows:processRows, coState:coState, periodBuckets:periodBuckets,
   loanScope:loanScope, isHoliday:isHoliday, setChart:function(x){chartKind=x}, autoGroups:autoGroups, openAutoFix:openAutoFix, toISO:toISO, accrueMonth:accrueMonth, setFinTab:function(x){finTab=x}, get finTab(){return finTab}, purgeFuture:purgeFuture,
