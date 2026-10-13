@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v55 · 2026-10-13</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v56 · 2026-10-13</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -5774,11 +5774,11 @@ function handleFiles(files){
           var b5=buildSlip(c5, sp.lines), days5=slipDaysOf(c5, b5, f.name), dl5=Object.keys(days5).sort();
           if(!dl5.length){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(f.name)+'</span><span class="mini">전표에서 회계일자를 찾지 못했습니다</span></div>'); return true; }
           result.slips[c5.id]=result.slips[c5.id]||{};
-          Object.keys(days5).forEach(function(d){ result.slips[c5.id][d]=days5[d]; });
+          Object.keys(days5).forEach(function(d){ result.slips[c5.id][d]=result.slips[c5.id][d]?slipMergeDay(result.slips[c5.id][d], days5[d]):days5[d]; });   // [v56] 같이 올린 다른 파일과 합침
           var nOut5=b5.lines.filter(function(x){return x.kind==="out"}).length, nMv5=b5.lines.filter(function(x){return x.kind.indexOf("move")===0}).length;
           var nOld5=dl5.filter(function(d){ return !!(c5.slips||{})[d]; }).length;
           log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip out">전표자료조회</span><span class="mini">'+esc(c5.name)+' · '+dl5[0]+' ~ '+dl5[dl5.length-1]+' · '+dl5.length+'일 · 전표 '+b5.vouchers+'건 → 출금계획 '+nOut5+'건 · 자금이동 '+nMv5+'건'+(b5.skipped?' · 현금·예금 계정 없는 전표 '+b5.skipped+'건 제외':'')+
-            ' · [저장]하면 자금일보 작성 ② 당일계획에 날짜별로 반영'+(nOld5?' · 이미 저장된 '+nOld5+'일은 이 파일로 교체(직접 고친 구분은 유지)':'')+'</span></div>');
+            ' · [저장]하면 자금일보 작성 ② 당일계획에 날짜별로 반영'+(nOld5?' · 이미 저장된 '+nOld5+'일은 같은 전표번호만 이 파일로 교체 · 다른 파일(관리팀·재무팀 등) 전표는 유지':'')+'</span></div>');
           return true;
         };
         if(sniffSlip(ab) && trySlip()) return;      // [v45] 전표 머리글이면 바로 처리
@@ -6670,7 +6670,8 @@ function buildSlip(c, lines){
            [v23] "전표자료조회_보통예금"처럼 상대계정 라인이 빠진 추출본은 한쪽 라인만 있으므로
            자금과목명이 자금이동일 때만 이동으로 보고, 그 외에는 실제 입금/출금으로 분류한다. */
         var hasD=money.some(function(x){ return x.side==="D"; }), hasC=money.some(function(x){ return x.side==="C"; });
-        if((hasD&&hasC) || /자금이동/.test(String(L.fundName||"")) || /자금이동/.test(String(L.memo||""))){
+        var oneAcct=money.every(function(x){ return digitsOnly(x.acctNum)===digitsOnly(L.acctNum) && x.code===L.code; });   // [v56]
+        if((hasD&&hasC&&!oneAcct) || /자금이동/.test(String(L.fundName||"")) || /자금이동/.test(String(L.memo||""))){
           base.kind=L.side==="C"?"move-out":"move-in"; base.cat="자금이동"; base.auto=false; out.push(base); return;
         }
         var isIn0=L.side==="D";
@@ -6679,6 +6680,9 @@ function buildSlip(c, lines){
         else { base.kind=isIn0?"in":"out"; var k0=slipCategory(c, L, [], isIn0); base.cat=k0.cat; base.auto=!!k0.auto; }
         out.push(base); return;
       }
+      /* [v56] 수수료 줄이 함께 있는 계좌간 이체 전표 — 적요·자금과목 '자금이동' + 같은 전표에 반대쪽 현금성 줄 → 자금이동 (수수료는 그 보통예금 줄이 따로 지급) */
+      if((/자금이동/.test(String(L.fundName||"")) || /자금이동/.test(String(L.memo||""))) && money.some(function(x){ return x!==L && x.side!==L.side; })){
+        base.kind=L.side==="C"?"move-out":"move-in"; base.cat="자금이동"; base.auto=false; base.vendor=""; base.cpAccount=""; out.push(base); return; }
       var isIn=L.side==="D", cps=others.filter(function(x){ return x.side!==L.side; });
       var vs=cps.map(function(x){return x.vendor}).filter(function(x,i,a){ return x && a.indexOf(x)===i; });
       base.vendor=vs.length>1 ? vs[0]+" 외 "+(vs.length-1) : (vs[0]||"");
@@ -6725,8 +6729,31 @@ function slipDaysOf(c, b, fileName){
 }
 function saveSlipDays(c, days){
   c.slips=c.slips||{};
-  Object.keys(days).forEach(function(d){ c.slips[d]=days[d]; slipFxSellFix(c, c.slips[d]); });   // [v53]
+  Object.keys(days).forEach(function(d){ c.slips[d]=slipMergeDay(c.slips[d], days[d]); slipFxSellFix(c, c.slips[d]); });   // [v53] · [v56] 같은 날 다른 파일 전표는 유지
   return Object.keys(days).sort();
+}
+/* [v56] 같은 날짜에 이미 저장된 전표와 새 파일 전표 합치기.
+   - 같은 파일(파일명)에서 온 줄은 새 파일로 통째로 교체(재업로드 = 최신본).
+   - 다른 파일(예: 관리팀 전표자료조회 ↔ 재무팀 전표자료조회)에서 온 줄은 유지하고, 같은 전표번호만 새 파일 것으로 교체.
+   - v55 이전 저장 줄은 출처(srcFile)가 없으므로 그날 문서의 file 이름을 출처로 본다.
+   - 직접 고친 구분(userSet)·내역 문구(textManual)는 전표번호·라인 단위로 이어받는다. */
+function slipMergeDay(old, nw){
+  if(!nw) return old;
+  var fname=String(nw.file||"");
+  (nw.lines||[]).forEach(function(L){ if(L.srcFile==null) L.srcFile=fname; });
+  if(!old || !(old.lines||[]).length) return Object.assign({}, nw, {files:fname?[fname]:[]});
+  var newV={}; nw.lines.forEach(function(L){ newV[L.voucher]=1; });
+  var oldSrc=function(L){ return L.srcFile!=null ? String(L.srcFile) : String(old.file||""); };
+  var um={};
+  old.lines.forEach(function(L){ var k=L.voucher+"#"+L.line; if(L.userSet) (um[k]=um[k]||{}).cat=L.cat; if(L.textManual) (um[k]=um[k]||{}).tm=L.textManual; });
+  nw.lines.forEach(function(L){ var u=um[L.voucher+"#"+L.line]; if(!u) return; if(u.cat){ L.cat=u.cat; L.auto=false; L.userSet=true; } if(u.tm) L.textManual=u.tm; });
+  var keep=old.lines.filter(function(L){ return oldSrc(L)!==fname && !newV[L.voucher]; });
+  keep.forEach(function(L){ if(L.srcFile==null) L.srcFile=oldSrc(L); });
+  var keptV={}; keep.forEach(function(L){ keptV[L.voucher]=1; });
+  var files=[]; keep.concat(nw.lines).forEach(function(L){ var f=String(L.srcFile||""); if(f && files.indexOf(f)<0) files.push(f); });
+  return Object.assign({}, nw, {lines:keep.concat(nw.lines), file:files.join(" + ")||fname, files:files,
+    fxTrades:(old.fxTrades||[]).filter(function(t){ return keptV[t.slipNo]; }).concat(nw.fxTrades||[]),
+    fxPlan:old.fxPlan||nw.fxPlan});
 }
 /* [v24] 회계일자보다 나중에 작성된 전표(사후 수금 처리분) 여부 — 추가일 YYYYMMDD... 기준 */
 function slipRetro(L){ var a=String(L.addedAt||"").replace(/\D/g,"").slice(0,8), d=String(L.date||"").replace(/\D/g,""); return a.length===8 && d.length===8 && a>d; }
@@ -6807,7 +6834,7 @@ function nameScore(a, b){
 /* 내역 문구 정리: 앞머리(…뱅킹)·(자동이체)·…입금) 등) 제거, ' / …' 메모·끝의 (○○은행 숫자) 제거, 다른 상대 거래처명 '_꼬리' 제거 */
 function slipText(raw, parties, own){
   var s=txt(raw), i=s.indexOf(")");
-  if(i>0 && i<=24){ var pre=s.slice(0,i+1); if(pre.indexOf("(")<=0 && /뱅킹|이체|입금|출금|자금이동|송금/.test(pre) && txt(s.slice(i+1))) s=txt(s.slice(i+1)); }
+  if(i>0 && i<=24){ var pre=s.slice(0,i+1); if(pre.indexOf("(")<=0 && /뱅킹|이체|입금|출금|자금이동|송금|지급/.test(pre) && txt(s.slice(i+1))) s=txt(s.slice(i+1)); }
   s=s.replace(/\s+\/\s.*$/,"");
   s=txt(s.replace(/\s*\([^()]*은행\s*[\d\-]+[^()]*\)\s*$/,""));
   var m=s.match(/^(.+)_([^_]+)$/);
@@ -6834,7 +6861,8 @@ function slipCpCatOf(x, isIn){
   if(isIn){
     if(/외환차/.test(a)) return null;
     if(/외상매출금|매출/.test(a)) return "판매대";
-    if(/미수금/.test(a)) return "미수금";
+    if(/미수금\(인사\)/.test(a)) return "미수금";      // 직원 정산(10-12 홍진수) → 미수금
+    if(/미수금/.test(a)) return "판매대";               // [v56] 거래처 미수금 회수(01-15 델 4,542,827 · 2,750,000) → 정답지 판매대
     if(/이자수익/.test(a)) return "이자수익";
     if(/차입금/.test(a)) return "차입";
     return /^1/.test(code) ? null : "기타";
@@ -6844,7 +6872,7 @@ function slipCpCatOf(x, isIn){
   if(/외상매입금/.test(a)) return "하도급";
   if(/미지급금\(급여\)|예수금/.test(a)) return "급여성";
   if(/미지급금\(자동이체\)/.test(a)) return /공단/.test(v) ? "급여성" : "운영경비";
-  if(/사원경비|법인카드/.test(a)) return "사원경비";
+  if(/사원경비|법인카드|개인카드/.test(a)) return "사원경비";     // [v56] 미지급금(법인개인카드) 포함
   if(/차입금/.test(a)) return "상환";
   if(/이자비용|지급이자/.test(a)) return "이자비용";
   if(/미지급금|지급수수료|^판\)|^제\)|비용|보증금|선급금/.test(a) || /^[45]/.test(code)) return "운영경비";
@@ -6852,6 +6880,8 @@ function slipCpCatOf(x, isIn){
 }
 /* 상대계정 구분표(상대계정 우선) — 여러 종류면 금액이 가장 큰 구분 + mixed */
 function slipCpCat(cps, isIn, hay){
+  /* [v56] 법인카드 결제(적요 '법인카드' + 상대 미지급금(법인카드)·외상매입금(자동결제)) → 사원경비 (01-15 삼성법인카드_통신료 14,831,336) */
+  if(!isIn && /법인카드/.test(hay||"") && (cps||[]).some(function(x){ return /법인카드|자동결제/.test(String(x.account||"")); })) return {cat:"사원경비", why:"법인카드 결제", mixed:false};
   var by={}, why={};
   (cps||[]).forEach(function(x){ if(!(x.amount>0)) return; var k=slipCpCatOf(x, isIn); if(!k) return;
     by[k]=(by[k]||0)+x.amount; if(!why[k] || x.amount>why[k].amt) why[k]={amt:x.amount, acct:x.account}; });
@@ -6865,9 +6895,12 @@ function slipIsIns(L){ return !!(L.ins || /4대보험/.test(String(L.fund||"")))
 /* 전표 현금성 줄 추출 — 매도·매수(v54)·합성 줄은 제외 */
 function slipCashLines(c, iso){
   var sl=(c.slips||{})[iso]; if(!sl) return [];
+  var vSide={};   // [v56] 전표별 현금성 줄 방향
+  (sl.lines||[]).forEach(function(L){ if(/^(in|out|move-in|move-out)$/.test(L.kind||"")){ var v=vSide[L.voucher]||(vSide[L.voucher]={i:0,o:0}); if(/in$/.test(L.kind)) v.i++; else v.o++; } });
   return (sl.lines||[]).filter(function(L){ return !L.fxTrade && !L.fxTradeSyn && !L.fxSell && !L.fxSellSyn && /^(in|out|move-in|move-out|cash-in|cash-out)$/.test(L.kind||""); })
     .map(function(L){
       var mv=L.kind.indexOf("move")===0, cash=L.kind.indexOf("cash")===0;
+      if(!mv && !cash && (/자금이동/.test(String(L.fund||"")) || /자금이동/.test(String(L.rawMemo||L.memo||""))) && vSide[L.voucher] && vSide[L.voucher].i && vSide[L.voucher].o) mv=true;   // [v56]
       return {key:L.voucher+"-"+L.line, slipNo:L.voucher, line:L.line, dir:/in$/.test(L.kind)?"in":"out", acct:L.acct, amt:+L.amount||0,
         fx:L.fx||null, text:slipLineText(L), cat:L.cat, catWhy:L.catWhy||"", mixed:!!L.mixed, parts:L.parts||[], pnames:L.pnames||[], ins:slipIsIns(L),
         kind:cash?"cash":mv?"move":(/in$/.test(L.kind)?"collect":"pay"), L:L};
@@ -6918,6 +6951,7 @@ function matchSlipCms(c, iso){
   rec.txns=(rec.txns||[]).filter(function(t){ return !t.fromSlip; });
   var T=rec.txns;
   T.forEach(function(t){
+    if(t.slipKind0){ t.kind=t.slipKind0; delete t.slipKind0; }      // [v56] 전표가 바꾼 분류(자금이동 → 지출/수입) 복원
     if(t.fxSlip0){ var z=t.fxSlip0; t.fxRate=z.fxRate; t.fxKrw=z.fxKrw; t.fxConfirmed=!!z.fxConfirmed; }
     if(t.slip && t.slipCat0!==undefined && !t.catManual){ t.cat=t.slipCat0; t.auto=!!t.slipAuto0; }
     delete t.fxSlip0; delete t.fxFromSlip; delete t.slipCat0; delete t.slipAuto0; delete t.slip; if(t.catSrc==="전표") delete t.catSrc;
@@ -6925,8 +6959,9 @@ function matchSlipCms(c, iso){
   });
   var sl=(c.slips||{})[iso]; if(!sl) return 0;
   var lines=slipCashLines(c, iso), usedT={}, usedL={}, res=[], amb=[];
-  var isK=function(t,g){ return g==="mv" ? String(t.kind).indexOf("자금이동")===0 : g==="fx" ? (t.kind==="외화(입금)"||t.kind==="외화(출금)") : (t.kind==="수입"||t.kind==="지출"); };
-  var cand=function(L,g){ var r=[]; T.forEach(function(t,i){ if(!usedT[i] && t.acct===L.acct && smDir(t)===L.dir && isK(t,g) && !t.fxTrade && !t.fxTradeFrom) r.push(i); }); return r; };
+  var orphanMv={};   // [v56] 짝(반대 방향 자사 계좌 자금이동)이 없는 CMS 자금이동 — 거래처 지급·수금 전표와 금액이 맞으면 지출/수입으로 본다
+  var isK=function(t,g,i){ return g==="mv" ? String(t.kind).indexOf("자금이동")===0 : g==="fx" ? (t.kind==="외화(입금)"||t.kind==="외화(출금)") : (t.kind==="수입"||t.kind==="지출"||(i!=null && !!orphanMv[i])); };
+  var cand=function(L,g){ var r=[]; T.forEach(function(t,i){ if(!usedT[i] && t.acct===L.acct && smDir(t)===L.dir && isK(t,g,i) && !t.fxTrade && !t.fxTradeFrom) r.push(i); }); return r; };
   var score=function(i,names){ var t=T[i], s=0; (names||[]).forEach(function(n){ s=Math.max(s, nameScore(n,t.summary), nameScore(n,t.client)); }); return s; };
   var add=function(L, ids, type, extra){ ids.forEach(function(i){ usedT[i]=1; }); usedL[L.key]=1; res.push(Object.assign({L:L, ids:ids, type:type}, extra||{})); };
   /* 금액이 같은 줄·CMS 끼리 배정(①②③ 공통) */
@@ -6949,6 +6984,14 @@ function matchSlipCms(c, iso){
   // ② 외화 — 계좌 + 외화금액 ±0.01
   pairUp(lines.filter(function(L){ return !usedL[L.key] && L.fx && L.kind!=="move" && L.kind!=="cash"; }), "fx", function(t,L){ return Math.abs(fxCents(smAmt(t))-fxCents(L.fx.amt))<=1; }, "외화");
   var rest=function(){ return lines.filter(function(L){ return !usedL[L.key] && L.kind!=="move" && L.kind!=="cash" && !L.fx; }); };
+  /* [v56] 짝 없는 CMS 자금이동 찾기: ①에서 전표 자금이동과 맞지 않았고, 같은 날 반대 방향 자금이동 중 금액 차 3,000원 이내가 없는 건.
+     예) 01-15 하나 83804 → '에스넷시스템' 1,157,860 · 156,110 = 전표 FI…00009 전남대학교 관리비(미지급금(거래처)) */
+  T.forEach(function(t,i){
+    if(usedT[i] || String(t.kind).indexOf("자금이동")!==0 || t.fxTrade || t.fxTradeFrom) return;
+    var o=t.kind==="자금이동(출금)", a=smAmt(t);
+    var pair=T.some(function(u,j){ return j!==i && String(u.kind).indexOf("자금이동")===0 && (u.kind==="자금이동(출금)")!==o && Math.abs(smAmt(u)-a)<=3000; });
+    if(!pair) orphanMv[i]=1;
+  });
   // ③ 1:1 (보험 계열 줄은 ⑦ 묶음에서)
   pairUp(rest().filter(function(L){ return !L.ins; }), "n", eqAmt, "1:1");
   amb=amb.filter(function(L){ return !usedL[L.key]; });
@@ -6975,16 +7018,37 @@ function matchSlipCms(c, iso){
     add(L, all, "1:N", {ps:ps});
   });
   // ⑥ 1:N 합계 — 같은 이름 계열의 남은 CMS 부분합 = 줄 금액
-  var FAM=["소득세","주민세","지방세","부가세","법인세","학자금","사회보험","산재보험","국민연금","건강보험","고용보험","장기요양"];
+  var FAM=["소득세","주민세","지방세","부가세","법인세","학자금","사회보험","산재보험","국민연금","건강보험","고용보험","장기요양","사원경비"];   // [v56] 사원경비 대량이체(SN_사원경비_날짜)
   rest().filter(function(L){ return !L.ins; }).forEach(function(L){
     var h=L.text+" "+(L.L.rawMemo||"")+" "+(L.L.cpAccount||""), fk=FAM.filter(function(k){ return h.indexOf(k)>=0; });
+    var nmL=L.pnames.concat([L.text]);          // [v56] 상대 거래처명이 없으면 전표 적요로도 이름 계열 확인(예: '기업 회계감사자료' ↔ CMS '기업회계')
     var C=cand(L,"n").filter(function(i){ var nm=smName(T[i]);
       if(fk.length) return fk.some(function(k){ return nm.indexOf(k)>=0; });
-      return L.pnames.some(function(n){ return score(i,[n])>=1; }); });
-    if(C.length<2 || C.length>20) return;
-    var ss=subsetSum(C.map(function(i){ return Math.round(smAmt(T[i])); }), Math.round(L.amt));
-    if(ss.amb){ amb.push(L); return; }
-    if(ss.sol && ss.sol.length>=2) add(L, ss.sol.map(function(q){ return C[q]; }), "1:N합계");
+      return nmL.some(function(n){ return score(i,[n])>=1; }); });
+    var tryFam=function(C){
+      if(C.length<2) return false;
+      var tot=C.reduce(function(a,i){ return a+Math.round(smAmt(T[i])); },0);
+      if(tot===Math.round(L.amt)){ add(L, C.slice(), "1:N합계"); return true; }      // [v56] 계열 전체 합 = 줄 금액이면 후보 수와 무관하게 확정(해가 하나뿐)
+      /* [v56] 계열 합이 줄 금액보다 크면, 빼야 할 1~3건(차액과 원 단위로 같은 조합)이 딱 하나일 때만 나머지를 확정
+         예) 01-15 직원 이체 34건 13,028,872 − 미지급금(급여) 10,685,852 = 2,343,020 = 김대건 1,293,150 + 조원섭 1,049,870(퇴직금, 다른 전표) */
+      var gap=tot-Math.round(L.amt);
+      if(gap>0 && C.length>=3){
+        var V=C.map(function(i){ return Math.round(smAmt(T[i])); }), hits=[], n=C.length;
+        for(var a=0;a<n && hits.length<2;a++){ if(V[a]===gap) hits.push([a]);
+          for(var b=a+1;b<n && hits.length<2;b++){ if(V[a]+V[b]===gap) hits.push([a,b]);
+            for(var e=b+1;e<n && hits.length<2;e++) if(V[a]+V[b]+V[e]===gap) hits.push([a,b,e]); } }
+        if(hits.length===1){ var ex=hits[0]; add(L, C.filter(function(_,q){ return ex.indexOf(q)<0; }), "1:N합계"); return true; }
+      }
+      if(C.length>20) return false;
+      var ss=subsetSum(C.map(function(i){ return Math.round(smAmt(T[i])); }), Math.round(L.amt));
+      if(ss.amb){ amb.push(L); return true; }
+      if(ss.sol && ss.sol.length>=2){ add(L, ss.sol.map(function(q){ return C[q]; }), "1:N합계"); return true; }
+      return false; };
+    if(tryFam(C)) return;
+    /* [v56] 미지급금(급여) 지급(퇴직금·연차수당 등)은 CMS가 직원 이름별로 나뉜다 — 받는 사람이 사람 이름인 남은 CMS 출금(01-15 32건 = 10,685,852) */
+    if(L.cat==="급여성" && /미지급금\(급여\)/.test(L.L.cpAccount||"") && tryFam(cand(L,"n").filter(function(i){ return looksPersonal(T[i].client)||looksPersonal(T[i].summary); }))) return;
+    /* [v56] 그 계좌·방향에 남은 CMS 전체 합이 줄 금액과 원 단위로 같을 때만(01-15 하나 31604 김건웅 314,000 + 안군헌 157,000 = 471,000) */
+    var rest2=cand(L,"n"); if(rest2.length>=2 && rest2.reduce(function(a,i){ return a+Math.round(smAmt(T[i])); },0)===Math.round(L.amt) && !rest().some(function(o){ return o!==L && o.acct===L.acct && o.dir===L.dir; })) add(L, rest2, "1:N합계");
   });
   // ⑦ 4대보험 묶음(N:M) — 부분합 먼저, 안 풀리면 그룹 합계가 원 단위로 같을 때 그룹 전체
   var INS_RE=/사회보험|산재보험|국민연금|건강보험|고용보험|장기요양/, grpN=0, byA={};
@@ -7035,15 +7099,18 @@ function matchSlipCms(c, iso){
           t.fxRate=L.fx.rate||null; t.fxKrw=Math.round(L.amt); t.fxConfirmed=true; t.fxFromSlip=true; st.fxAuto++;   // 환율 = 관리항목명7, 원화 = 전표 금액(재계산 금지)
         } else s.fxKeep=true;
       }
+      if(r.type!=="자금이동" && !r.syn && String(t.kind).indexOf("자금이동")===0){   // [v56] 짝 없는 자금이동 → 전표 기준 지출/수입
+        t.slipKind0=t.kind; t.kind=(L.dir==="in")?"수입":"지출"; s.mvFix=true; }
       if(r.type!=="자금이동" && !r.syn){
         if(t.slipCat0===undefined){ t.slipCat0=t.cat; t.slipAuto0=!!t.auto; }
-        if(!t.catManual && s.cat){ t.cat=s.cat; t.auto=false; t.catSrc="전표"; }
+        if(!t.catManual && s.cat && !(L.L && L.L.auto)){ t.cat=s.cat; t.auto=false; t.catSrc="전표"; }   // [v56] 전표 구분이 추정이면 CMS 구분 유지
       }
       t.slip=s; t.slipVoucher=L.slipNo;
       if(L.dir==="out" && r.type!=="자금이동") t.planMemo=s.text;
       if(r.syn) st.syn++;
     });
   });
+  st.mvFix=T.filter(function(t){ return t.slip && t.slip.mvFix; }).length;   // [v56]
   T.forEach(function(t){ if(t.fromSlip || t.fxTrade || t.fxTradeFrom) return; st.n++;
     if(t.slip){ st.m++; st.by[t.slip.type]=(st.by[t.slip.type]||0)+1; }
     else if(t.kind==="지출" || t.kind==="외화(출금)") st.unOut++; });
@@ -7061,6 +7128,7 @@ function slipChip(c, t, iso, idx){
   var h=' <span class="chip slip" title="'+esc(tip)+'">전표 …'+esc(String(s.slipNo).split(",")[0].slice(-5))+(s.slipNo.indexOf(",")>0?" 외":"")+'</span>';
   if(s.type==="묶음") h+=' <span class="chip bund" title="4대보험 통합 징수 — 개별 금액은 다르고 합계가 같음">묶음</span>';
   if(s.split) h+=' <span class="chip bund" title="상대 줄 1개를 CMS 여러 건으로 나눠 송금">분할</span>';
+  if(s.mvFix) h+=' <span class="chip mix" title="CMS 수취인·적요가 자사명이라 자금이동으로 잡혔지만 같은 날 자사 계좌 입금 짝이 없고, 전표상 거래처 지급(수금)과 금액이 맞음 → '+(s.dir==="in"?"수입":"지출")+'">자금이동 아님</span>';   // [v56]
   if(s.mixed) h+=' <span class="chip mix" title="상대계정이 여러 구분으로 섞임 — 금액이 가장 큰 상대계정 기준">구분 혼합</span>';
   if(t.catManual && s.cat && t.cat!==s.cat && s.type!=="자금이동")
     h+=' <span class="chip man" title="전표 구분 '+esc(s.cat)+' 대신 직접 지정">직접</span> <button class="btn sm slipcatrevert" type="button" data-co="'+c.id+'" data-iso="'+iso+'" data-i="'+idx+'">전표값으로 되돌리기</button>';
@@ -7155,7 +7223,8 @@ function ilboModel(c, iso){
         return;
       }
       var LL=slipLineOf(c, g.d, s.key);
-      var memo=(LL&&LL.textManual) || ((s.dir==="in" && g.rows.length===1 && s.type!=="전표만") ? (r0.name||s.text) : s.text);
+      var sameNm=g.rows.every(function(r){ return r.name===r0.name; });     // [v56]
+      var memo=(LL&&LL.textManual) || ((s.dir==="in" && sameNm && s.type!=="전표만") ? (r0.name||s.text) : s.text);
       if(s.lineAmt!=null && Math.abs(s.lineAmt-sum)>=1) m.slipWarn.push(g.d+" "+r0.acct+" "+s.text+": 전표 줄 "+fmt(s.lineAmt)+" ≠ 매칭 CMS 합계 "+fmt(sum));
       out.push(Object.assign({}, base, {memo:memo, amt:sum, slipRow:{key:s.key, d:g.d, slipNo:s.slipNo, type:s.type, n:g.rows.length, members:mem, split:g.rows.some(function(r){ return r.split; }), mixed:!!s.mixed}}));
     });
@@ -7164,6 +7233,11 @@ function ilboModel(c, iso){
   /* [v55] 매칭 안 된 CMS 입금 — 계좌 + 적요 + 구분이 같으면 1행 (쿠팡로지스틱 3건 → 1행) */
   (function(){ var mg={}, out=[];
     aIn.forEach(function(x){
+      if(x.slipRow && x.slipRow.type!=="전표만" && x.slipRow.type!=="묶음" && !x.fx && !x.fxTrade){   // [v56] 전표 매칭 입금도 계좌+이름+구분이 같으면 1행(01-15 DELL PARTN 2건 → 7,292,827)
+        var ks="S|"+x.d+"|"+x.acct+"|"+x.memo+"|"+x.cat, gs=mg[ks];
+        if(!gs){ gs=mg[ks]=Object.assign({}, x, {slipRow:Object.assign({}, x.slipRow, {members:(x.slipRow.members||[{name:x.memo, amt:x.amt}]).slice()})}); out.push(gs); return; }
+        gs.amt+=x.amt; gs.slipRow.n+=x.slipRow.n; gs.slipRow.members=gs.slipRow.members.concat(x.slipRow.members||[{name:x.memo, amt:x.amt}]);
+        if(String(gs.slipRow.slipNo).indexOf(x.slipRow.slipNo)<0) gs.slipRow.slipNo+=","+x.slipRow.slipNo; return; }
       if(x.slipRow || x.fx || x.fxTrade || x.acct==="현금"){ out.push(x); return; }
       var k=x.d+"|"+x.acct+"|"+x.memo+"|"+x.cat, g=mg[k];
       if(!g){ g=mg[k]=Object.assign({}, x, {merged:[x.idx], members:[{name:x.memo, amt:x.amt}]}); out.push(g); return; }
@@ -7310,7 +7384,7 @@ function ilboModel(c, iso){
   rdays.forEach(function(d){ var st2=SLIP_MATCH[c.id+"|"+d]; if(!st2 || (!st2.n && !st2.planOnly.length)) return;
     var b=st2.by, tag=(rdays.length>1?" ("+d+")":"");
     chk(st2.unOut===0, "전표 매칭"+tag+": CMS "+st2.n+"건 중 "+st2.m+"건 확정(1:1 "+(b["1:1"]||0)+" · 1:N "+((b["1:N"]||0)+(b["1:N합계"]||0))+" · 묶음 "+(b["묶음"]||0)+" · 외화 "+(b["외화"]||0)+" · 자금이동 "+(b["자금이동"]||0)+")"+
-      (st2.syn?" · 증권 전표값 반영 "+st2.syn+"건":"")+" · 미매칭 출금 "+st2.unOut+"건");
+      (st2.syn?" · 증권 전표값 반영 "+st2.syn+"건":"")+(st2.mvFix?" · 자사명 수취 자금이동 → 전표 지급·수금 "+st2.mvFix+"건":"")+" · 미매칭 출금 "+st2.unOut+"건");
     if(st2.fxAuto) chk(true, "전표 환율로 외화 자동 확정 "+st2.fxAuto+"건");
     if(st2.planOnly.length) chk(true, "전표만 있고 CMS 없음(계획만)"+tag+" "+st2.planOnly.length+"건: "+st2.planOnly.slice(0,6).map(function(x){ return x.acct+" "+x.text+" "+(x.fx?fxSym(x.fx.ccy,x.fx.amt):fmt(x.amt)); }).join(" · ")+(st2.planOnly.length>6?" 외":""));
     if(st2.amb.length) chk(false, "같은 금액 후보를 거래처명으로 가리지 못해 미확정"+tag+" "+st2.amb.length+"건: "+st2.amb.slice(0,4).map(function(x){ return x.acct+" "+x.text+" "+fmt(x.amt); }).join(" · "));
@@ -11884,7 +11958,7 @@ function bindCpMaster(){
 bindCpMaster();
 
 function cpmOnSettings(){ if(CPMS.dirty){ renderCpMaster(); return; } cpMasterLoad(CPMS.co).then(function(){ CPMS.draft=null; renderCpMaster(); }); }
-window.__tr={matchSlipCms:matchSlipCms, slipCashLines:slipCashLines, slipText:slipText, nameKey:nameKey, nameScore:nameScore, subsetSum:subsetSum, get SLIP_MATCH(){return SLIP_MATCH}, linkFxTrades:linkFxTrades, fxTradeInfo:fxTradeInfo, fxTradesOf:fxTradesOf, slipFxSellFix:slipFxSellFix, parseSlip:parseSlip, buildSlip:buildSlip, slipDaysOf:slipDaysOf, saveSlipDays:saveSlipDays, relinkFxTrade:relinkFxTrade, fxPostAll:fxPostAll, applyFixedCats:applyFixedCats, unlinkFxTrade:unlinkFxTrade, CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
+window.__tr={slipMergeDay:slipMergeDay, matchSlipCms:matchSlipCms, slipCashLines:slipCashLines, slipText:slipText, nameKey:nameKey, nameScore:nameScore, subsetSum:subsetSum, get SLIP_MATCH(){return SLIP_MATCH}, linkFxTrades:linkFxTrades, fxTradeInfo:fxTradeInfo, fxTradesOf:fxTradesOf, slipFxSellFix:slipFxSellFix, parseSlip:parseSlip, buildSlip:buildSlip, slipDaysOf:slipDaysOf, saveSlipDays:saveSlipDays, relinkFxTrade:relinkFxTrade, fxPostAll:fxPostAll, applyFixedCats:applyFixedCats, unlinkFxTrade:unlinkFxTrade, CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
   daySummary:daySummary, dayAgg:dayAgg, rollup:rollup, scopeSummary:scopeSummary, allDates:allDates,
   parseCMS:parseCMS, parseFxLedger:parseFxLedger, fxTxnsOf:fxTxnsOf, parseDailySheet:parseDailySheet, guessCoFromName:guessCoFromName, loanAt:loanAt, parseCashBook:parseCashBook, parseLoanHtml:parseLoanHtml, processRows:processRows, coState:coState, periodBuckets:periodBuckets,
   loanScope:loanScope, isHoliday:isHoliday, setChart:function(x){chartKind=x}, autoGroups:autoGroups, openAutoFix:openAutoFix, toISO:toISO, accrueMonth:accrueMonth, setFinTab:function(x){finTab=x}, get finTab(){return finTab}, purgeFuture:purgeFuture,
