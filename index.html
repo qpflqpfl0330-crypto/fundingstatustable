@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v57 · 2026-10-13</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v58 · 2026-10-14</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -1936,6 +1936,23 @@ function isTransferText(c, text){
   pure=pure.replace(/\d+/g,"");
   return pure==="";
 }
+/* [v58] CMS 거래처·적요가 비었거나 자사명 + 은행·이체 문구뿐인가 (전표 자금이동으로 정정할 후보) */
+function cmsOwnish(c, t){
+  var h=(String(t.client||"")+" "+String(t.summary||"")).trim(); if(!h) return true;
+  if(isTransferText(c,t.client) || isTransferText(c,t.summary)) return true;
+  var n=normalize(h), mk=isCompanyName(c,h); if(!mk) return false;
+  var rem=n.split(mk).join("");
+  BANK_KEYWORDS.concat(TRANSFER_AUX).concat(["인터넷뱅킹","뱅킹","인터넷","대체지급","지급"]).forEach(function(b){ rem=rem.split(normalize(b)).join(""); });
+  return rem.replace(/[\d\s\/()（）<>주]/g,"")==="";
+}
+/* [v58] CMS 의뢰인/수취인이 자사·금융기관·계좌번호·이체 문구가 아닌 '다른 거래처'인가 (예: 양유석, 엔지스인포텍(주)) */
+function clientIsOther(c, cl){
+  var s=String(cl||"").trim(); if(!s) return false;
+  if(isTransferText(c,s) || isCompanyName(c,s)) return false;
+  if(/^[\d\-\s]+$/.test(s)) return false;
+  if(/증권|선물|금융투자|투자|은행|뱅킹|저축|캐피탈|금고|신협|수협|MMT|MMDA|펌뱅킹|자금|대체|이체|송금|입금|출금|현금|수표/i.test(s)) return false;
+  return true;
+}
 function classifyKind(c, row, internal){
   var a=acctOf(c,row.acct);
   if(a && a.group==="외화") return row.deposit>0 ? "외화(입금)" : "외화(출금)";
@@ -1948,7 +1965,7 @@ function classifyKind(c, row, internal){
   if(row.deposit>0 && isInterest(row)) return "수입";
   /* MMT/MMDA 계좌는 내부 자금 스윕 전용 — 이자수익이 아니면 전부 자금이동 */
   if(isMMT(c,row.acctNum,row.acct)) return row.deposit>0 ? "자금이동(입금)" : "자금이동(출금)";
-  var isT = isTransferText(c,cl)||isTransferText(c,sm);
+  var isT = isTransferText(c,cl)||(!clientIsOther(c,cl) && isTransferText(c,sm));   // [v58] 거래처가 다른 사람·회사면 적요만으로 자금이동 판정 안 함
   var sd = digitsOnly(sm);
   var isA = sd ? !!internal[sd] : false;
   if(isT||isA) return row.deposit>0 ? "자금이동(입금)" : "자금이동(출금)";
@@ -2417,7 +2434,7 @@ function buildSheetDay(c, one){
   });
   var txns=(one.txns||[]).map(function(t){
     var isIn=t.deposit>0;
-    var ac=acctOf(c,t.acct);
+    var ac=acctOf(c,t.acct)||acctByBankOnly(c,t.acct);   // [v58]
     var kind = (ac&&ac.group==="외화") ? (isIn?"외화(입금)":"외화(출금)") : (isIn?"수입":"지출");
     return {date:t.date, acct:(ac&&ac.label)||t.acct, bank:(ac&&ac.bank)||"", acctNum:(ac&&ac.num)||"",
       summary:"", client:t.client, deposit:t.deposit, withdraw:t.withdraw,
@@ -2830,6 +2847,28 @@ function fxFifo(det, bank, ccy, usd){
   return {book:book, left:other.concat(left), short:rem>0?rem/100:0, lots:mine.length, used:usedL};
 }
 /* 전표 랏(환율·외화·원화)으로 정확히 찾아 차감 — FIFO로 대체하지 않는다. 못 찾으면 warn */
+/* [v58] 보고서 외화 앵커가 그날까지의 CMS 외화 거래후잔액(은행별 합)과 맞는가 — CMS 잔액이 없는 은행은 비교하지 않음 */
+function fxAnchorOk(c, rec, iso, fxAfter, log){
+  var rb={}, cb={};
+  (rec.fxDetail||[]).forEach(function(x){ if((x.ccy||"USD")!=="USD") return; rb[x.bank]=(rb[x.bank]||0)+fxCents(x.amt); });
+  Object.keys(fxAfter).forEach(function(a){ var f=fxAfter[a]; var ac=acctOf(c,a); if(ac && ac.group==="외화" && /JPY|EUR|CNY/.test(String(ac.note||"")+String(ac.label||""))) return; cb[f.bank]=(cb[f.bank]||0)+fxCents(f.amt); });
+  var bad=Object.keys(cb).filter(function(b){ return Math.abs((rb[b]||0)-cb[b])>1; });
+  if(bad.length && log) log.push(iso+" "+bad.map(function(b){ return b+" 보고서 "+fxSym("USD",(rb[b]||0)/100)+" ≠ CMS "+fxSym("USD",cb[b]/100); }).join(", "));
+  return !bad.length;
+}
+var SEC_ACCT_RE=/증권|금융투자|미래에셋|선물/;   // [v58] CMS에 없는 증권 계좌
+function acctByBankOnly(c, name){ var s=String(name||"").trim(); if(!s || /\d/.test(s)) return null; var m=effAccounts(c).filter(function(a){ return a.group!=="미등록" && (a.bank===s || String(a.label||"").indexOf(s+" ")===0); }); return m.length===1?m[0]:null; }
+/* [v58] 보고서 원본(sheetRef)에 있는 증권 계좌 입출금 행(예: 08-27 KB증권 인성정보 주식매수 533,181,062 기타)을 CMS 날짜에 실적 행으로 */
+function injectSheetSec(c){ var n=0;
+  Object.keys(c.sheetRef||{}).forEach(function(d){ var rec=c.days[d]; if(!rec || rec.source!=="cms") return; var T=rec.txns||(rec.txns=[]);
+    ((c.sheetRef[d]||{}).txns||[]).forEach(function(t){ var ac=acctOf(c,t.acct)||acctByBankOnly(c,t.acct), lab=ac?ac.label:t.acct;
+      if(!SEC_ACCT_RE.test(String(lab||""))) return;
+      if(T.some(function(u){ return u.fromSheet && u.acct===lab && Math.round(+u.deposit||0)===Math.round(+t.deposit||0) && Math.round(+u.withdraw||0)===Math.round(+t.withdraw||0); })) return;
+      T.push(Object.assign({}, t, {acct:lab, bank:ac?ac.bank:(t.bank||""), acctNum:ac?ac.num:(t.acctNum||""), fromSheet:true, date:d})); n++; }); });
+  return n; }
+/* [v58] 저장된 보고서 행 중 계좌 표기가 은행명뿐인 행을 등록 계좌로 */
+function fixSheetAccts(c){ var n=0; Object.keys(c.days||{}).forEach(function(d){ txnsOf(c,d).forEach(function(t){ if(!t.fromSheet || acctOf(c,t.acct)) return; var a=acctByBankOnly(c,t.acct); if(a){ t.acct=a.label; t.bank=a.bank; t.acctNum=a.num; n++; } }); }); return n; }
+function repAcctsOf(accts){ var o={}; (accts||[]).forEach(function(a){ if(a && !a.isFx && a.label) o[a.label]=+a.close||0; }); return o; }   // [v58]
 function fxConsumeLots(det, bank, ccy, lots){
   var L=(det||[]).map(function(x){ return Object.assign({},x); }), warn=[];
   (lots||[]).forEach(function(tl){
@@ -2913,22 +2952,46 @@ function fixMoveKinds(c){
     (r.txns||[]).forEach(function(t){
       var k0=t.slipKind0||t.kind;
       if(String(k0).indexOf("자금이동")!==0 || t.catManual || t.fxTrade || t.fxTradeFrom || t.fromSlip) return;
-      if(!(String(t.txType||"").trim()==="기일출금" || shortNum(t.client) || shortNum(t.summary))) return;
+      if(!(String(t.txType||"").trim()==="기일출금" || shortNum(t.client) || shortNum(t.summary) || clientIsOther(c,t.client))) return;   // [v58] 다른 거래처
       var nk=classifyKind(c, t, internal); if(String(nk).indexOf("자금이동")===0) return;
       delete t.slipKind0; t.kind=nk; var x=categorize(c,t); t.cat=x.cat; t.auto=x.auto; t.kindFixV57=k0; n++;
     }); });
   return n;
 }
+/* [v58] 전표가 없는 외화 입금(예: NVIDIA)의 장부 랏은, 나중에 그 외화가 나갈 때 전표(관리항목명7 환율·8 금액)에 그대로 적힌다.
+   같은 계좌에서 금액이 같은 출금·이체 줄이 그 뒤 전표에 딱 하나 있으면 그 환율·원화로 확정한다(출처 표시, 다음 계산 때 다시 판정). */
+function fxInferRevert(c){
+  Object.keys(c.days||{}).forEach(function(d){ txnsOf(c,d).forEach(function(t){ if(t.fxLot0){ t.fxConfirmed=false; t.fxRate=null; t.fxKrw=null; delete t.fxLots; delete t.fxLotSrc; delete t.fxLot0; } }); });
+}
+function fxInferLots(c){
+  var n=0, L=[];
+  Object.keys(c.slips||{}).forEach(function(d){ ((c.slips[d]||{}).lines||[]).forEach(function(x){ if(x.fx && +x.fx.amt>0 && /^(out|move-out|fx-sell)$/.test(x.kind||"")) L.push({d:d, acct:x.acct, rate:+x.fx.rate||null, amt:+x.fx.amt, krw:Math.round(+x.amount||0), v:x.voucher}); }); });
+  var R={};   // 보고서 외화 세부내역 랏(입금일 · 은행 · 금액)
+  Object.keys(c.days||{}).forEach(function(d){ var r=c.days[d]; ((r&&r.fxDetail)||[]).forEach(function(x){ if(!x || x.cms || !x.date || !(+x.amt>0) || !x.rate) return; var k=x.date+"|"+x.bank+"|"+fxCents(x.amt); if(!R[k]) R[k]={d:d, rate:+x.rate, krw:Math.round(+x.krw||0), v:"보고서 "+d}; }); });
+  Object.keys(c.days||{}).sort().forEach(function(d){ txnsOf(c,d).forEach(function(t){
+    if(t.kind!=="외화(입금)" || t.fxConfirmed || t.fxTrade || t.fxTradeFrom || !(+t.deposit>0)) return;
+    var hit=L.filter(function(x){ return x.d>=d && x.acct===t.acct && Math.abs(fxCents(x.amt)-fxCents(t.deposit))<=1; });
+    var rk=R[d+"|"+(t.bank||String(t.acct||"").split(" ")[0])+"|"+fxCents(t.deposit)];
+    if(hit.length!==1 && rk) hit=[{d:rk.d, rate:rk.rate, krw:rk.krw, v:rk.v}];
+    if(hit.length!==1 || !hit[0].rate) return;
+    var h=hit[0]; t.fxLot0=true; t.fxConfirmed=true; t.fxRate=h.rate; t.fxKrw=h.krw; t.fxLots=[{rate:h.rate, fx:+t.deposit, krw:h.krw}]; t.fxLotSrc=/^보고서/.test(h.v)?h.v+" 외화예적금 세부내역 랏":h.v+" ("+h.d+") 외화 줄 랏"; n++;
+  }); });
+  return n;
+}
 function fxPostAll(){
-  var r={trade:0, slip:0, fixed:0, match:0, kfix:0};
+  var r={trade:0, slip:0, fixed:0, match:0, kfix:0, lotInf:0};
+  (D.companies||[]).forEach(function(c){ fxInferRevert(c); });   // [v58]
   (D.companies||[]).forEach(function(c){
-    Object.keys(c.slips||{}).forEach(function(d){ r.slip+=slipFxSellFix(c, c.slips[d]); });   // v53 이전 저장 전표
+    Object.keys(c.slips||{}).forEach(function(d){ r.slip+=slipFxSellFix(c, c.slips[d]); r.slip+=slipKindFix((c.slips[d]||{}).lines); });   // v53 이전 저장 전표 · [v58] 줄 종류 보정
     Object.keys(c.days||{}).forEach(function(d){ r.trade+=linkFxTrades(c, d); });          // [v54] 매도·매수 연결
     r.kfix+=fixMoveKinds(c);     // [v57]
+    r.kfix+=fixSheetAccts(c);    // [v58]
+    r.kfix+=injectSheetSec(c);   // [v58]
     r.fixed+=applyFixedCats(c);
     /* [v55] 전표 ↔ CMS 매칭 — 업로드·로드 때마다 전 기간 소급(매도·매수 연결·고정 규칙 다음) */
     Object.keys(c.days||{}).forEach(function(d){
       if((c.slips||{})[d] || txnsOf(c,d).some(function(t){ return t.slip||t.slipVoucher||t.fromSlip; })) r.match+=matchSlipCms(c, d); });
+    r.lotInf+=fxInferLots(c);   // [v58]
   });
   return r;
 }
@@ -3093,7 +3156,7 @@ function coState(c){
   var fy=c.fyOpen||null, base=fy?fy.asOf:null;
   var dates=Object.keys(c.days).filter(function(d){ return d<=_t && (!base || d>=base); }).sort(), accs=effAccounts(c);
   var hasBase=!!(base && dates[0]===base);
-  var chain={}, totals={}, fxState={}, fxDetail=[], fxSrcIso=null, cashState=null, fxPrev=0;
+  var chain={}, totals={}, fxState={}, fxDetail=[], fxSrcIso=null, cashState=null, fxPrev=0, fxAfter={}, fxAnchorSkip=[];   // [v58]
   if(fy){
     Object.keys(fy.fxState||{}).forEach(function(cy){ fxState[cy]={amt:fy.fxState[cy].amt||0, krw:fy.fxState[cy].krw||0}; });
     fxDetail=(fy.fxDetail||[]).slice(); fxSrcIso=base; fxPrev=fy.fx||0;
@@ -3121,6 +3184,8 @@ function coState(c){
         g[ac.label]={in:0,out:0,mvIn:0,mvOut:0,fxIn:0,fxOut:0, delta:0, anchor:null, anchorOpen:null, src:"none", cmsAfter:null};
       }
     });
+    var rrA=dayRec(c,iso);   // [v58] CMS 잔액 앵커가 없는 계좌는 그날 보고서 마감값으로
+    if(rrA && rrA.source==="cms" && rrA.repAccts && rrA.asOf===iso) Object.keys(rrA.repAccts).forEach(function(lab){ var gg=g[lab]; if(gg && gg.anchor==null){ gg.anchor=rrA.repAccts[lab]; gg.src="report"; } });
     grid[iso]=g;
   });
   /* 계좌별로 앵커에서 전방·후방 전파 — 기초잔액을 넣지 않아도 CMS 잔액에 맞춰집니다 */
@@ -3162,10 +3227,11 @@ function coState(c){
       if(ac.group!=="외화"){ krwClose+=row.close; krwOpen+=row.open; if(ac.group==="국고") gov+=row.close; }
     });
     chain[iso]=cur;
+    txnsOf(c,iso).forEach(function(t){ if((fxIsInKind(t.kind)||fxIsOutKind(t.kind)) && t.hasAfter && t.after!=null) fxAfter[t.acct]={bank:t.bank||String(t.acct||"").split(" ")[0], amt:+t.after}; });   // [v58]
     if(fy && iso===base){                                  // [v25] 기준일 외화 = 결산환율 재평가 확정값
       var nb={}; Object.keys(fy.fxState||{}).forEach(function(cy){ nb[cy]={amt:fy.fxState[cy].amt||0, krw:fy.fxState[cy].krw||0}; });
       fxState=nb; fxDetail=(fy.fxDetail||[]).slice(); fxSrcIso=iso;
-    } else if(rec.fxState && Object.keys(rec.fxState).length){
+    } else if(rec.fxState && Object.keys(rec.fxState).length && fxAnchorOk(c, rec, iso, fxAfter, fxAnchorSkip)){   // [v58] CMS 외화 잔액과 맞는 보고서만
       /* 보고서(sheet) 앵커 — CMS 재업로드로 source가 바뀐 뒤에도 보존된 fxState/fxDetail이면 그대로 인정합니다.
          원본 객체를 그대로 쓰지 않고 복제해서, 이후 CMS 확정분이 다음 보고서 전까지 덧붙습니다 */
       var nf={}; Object.keys(rec.fxState).forEach(function(cy){ nf[cy]={amt:rec.fxState[cy].amt||0, krw:rec.fxState[cy].krw||0}; });
@@ -3176,7 +3242,7 @@ function coState(c){
     }
     /* CMS로 잡힌 외화 입출금 중 환율을 확인·확정한 건은 그날부터 외화 잔액에 증분 반영 */
     /* [v53] 그날 자금현황보고 마감값(asOf = 그날)이 들어 있으면 그날 거래는 이미 보고서 마감에 포함 — CMS 확정분을 다시 더하거나 빼지 않는다 */
-    var repClose=!(fy && iso===base) && rec.asOf===iso && rec.fxState && Object.keys(rec.fxState).length>0;
+    var repClose=!(fy && iso===base) && rec.asOf===iso && rec.fxState && Object.keys(rec.fxState).length>0 && fxSrcIso===iso;   // [v58] 앵커로 쓴 날만
     txnsOf(c,iso).forEach(function(t){
       if(!t.fxConfirmed) return;
       if(!fxIsInKind(t.kind) && !fxIsOutKind(t.kind)) return;
@@ -3197,11 +3263,14 @@ function coState(c){
         return;
       }
       if(t.kind==="외화(입금)"){
+        var bk0=t.bank||String(t.acct||"").split(" ")[0];
+        if(fxSrcIso && fxSrcIso<iso && fxDetail.some(function(x){ return !x.cms && x.bank===bk0 && x.date===iso && Math.abs(fxCents(x.amt)-fxCents(t.deposit||0))<=1; })) return;   // [v58] 보고서 랏에 이미 있음
         slot.amt+=(t.deposit||0); slot.krw+=(t.fxKrw||0);
-        fxDetail.push({ccy:cy, bank:t.bank||"", rate:t.fxRate||null, amt:t.deposit||0, krw:t.fxKrw||0, date:iso, cms:true});
+        if(t.fxLots && t.fxLots.length>1) t.fxLots.forEach(function(lt){ fxDetail.push({ccy:cy, bank:t.bank||"", rate:lt.rate||null, amt:lt.fx||0, krw:lt.krw||0, date:iso, cms:true, moved:!!t.fxInternal}); });   // [v58] 랏별
+        else fxDetail.push({ccy:cy, bank:t.bank||"", rate:t.fxRate||null, amt:t.deposit||0, krw:t.fxKrw||0, date:iso, cms:true});
       } else { slot.amt-=(t.withdraw||0); slot.krw-=(t.fxKrw||0);
-        if(t.fxFromSlip && t.fxRate){   // [v55] 전표 관리항목명7(환율)·8(금액)로 같은 랏을 찾아 뺀다
-          var clS=fxConsumeLots(fxDetail, t.bank||String(t.acct||"").split(" ")[0], cy, [{rate:t.fxRate, fx:t.withdraw||0, krw:t.fxKrw||0}]); fxDetail=clS.left;
+        if(t.fxFromSlip && (t.fxRate || (t.fxLots&&t.fxLots.length))){   // [v55] 전표 관리항목명7(환율)·8(금액)로 같은 랏을 찾아 뺀다 · [v58] 랏 여러 개
+          var clS=fxConsumeLots(fxDetail, t.bank||String(t.acct||"").split(" ")[0], cy, (t.fxLots&&t.fxLots.length)?t.fxLots:[{rate:t.fxRate, fx:t.withdraw||0, krw:t.fxKrw||0}]); fxDetail=clS.left;
           if(clS.warn.length) FX_LOT_WARN[c.id+"|"+iso]=(FX_LOT_WARN[c.id+"|"+iso]||[]).concat(clS.warn); }
       }
     });
@@ -3231,10 +3300,12 @@ function coState(c){
   });
 
   /* 2차: 앵커 기준 전방 전파 (sheet는 항상 앵커, xlsm은 직전이 상세 데이터가 아닐 때만 앵커) */
-  var firstAnchor=-1, running=(fy && !hasBase) ? fy.total : null;     // [v25] 기준일 이후 첫날은 개시 기초에서 출발
+  var firstAnchor=-1, running=(fy && !hasBase) ? fy.total : null, seenDetail=false;     // [v25] 기준일 이후 첫날은 개시 기초에서 출발
   for(var i=0;i<rows.length;i++){
     var r=rows[i], prevSrc=i>0?rows[i-1].src:null;
-    var useAbs = (r.src==="sheet") || (r.src==="cms" && r.absClose!=null) || (r.src==="xlsm" && (prevSrc===null || prevSrc==="xlsm"));
+    var useAbs = (r.src==="sheet") || (r.src==="cms" && r.absClose!=null) || (r.src==="xlsm" && !seenDetail && (prevSrc===null || prevSrc==="xlsm"));   // [v58]
+    if(r.src==="xlsm" && seenDetail) r.delta=r.net||0;   // [v58] 상세 데이터 사이의 일별현황 날(주말)은 수지차만
+    if(r.src==="sheet"||r.src==="cms") seenDetail=true;
     if(useAbs && r.absClose!=null){
       r.open = (r.absOpen!=null && running===null) ? r.absOpen : (running!==null?running:r.absOpen);
       r.close = r.absClose;
@@ -6338,6 +6409,8 @@ function commitImport(res){
         if(sh[d].plan && Object.keys(sh[d].plan).length) ex.plan=sh[d].plan;
         if(sh[d].asOf) ex.asOf=sh[d].asOf;
         if(sh[d].loanSnap) ex.loanSnap=sh[d].loanSnap;          // [v24] 보고서 차입현황 스냅샷
+        if(sh[d].accts && sh[d].accts.length) ex.repAccts=repAcctsOf(sh[d].accts);   // [v58] 계좌별 마감(원화)
+        ex.txns=(ex.txns||[]).filter(function(t){ return !t.fromSheet; }).concat((sh[d].txns||[]).filter(function(t){ return SEC_ACCT_RE.test(String(t.acct||"")); }));   // [v58] 증권 계좌 행
         return;
       }
       if(cms[d]) return;
@@ -6364,6 +6437,7 @@ function commitImport(res){
          (예전에는 CMS 재업로드 때마다 보고서로 확정한 외화 잔액이 통째로 사라졌습니다.) */
       var prevRec = sh[d] || dayRec(c,d);
       var nrec = {source:"cms", txns:cms[d]};
+      if(prevRec && prevRec.txns) nrec.txns=cms[d].concat(prevRec.txns.filter(function(t){ return t.fromSheet && SEC_ACCT_RE.test(String(t.acct||"")) && !cms[d].some(function(u){ return u.acct===t.acct; }); }));   // [v58] 보고서 증권 계좌 행 유지
       if(prevRec){
         if(prevRec.fxState && Object.keys(prevRec.fxState).length) nrec.fxState=prevRec.fxState;
         if(prevRec.fxDetail && prevRec.fxDetail.length) nrec.fxDetail=prevRec.fxDetail;
@@ -6373,6 +6447,7 @@ function commitImport(res){
         if(prevRec.fxTxns && prevRec.fxTxns.length) nrec.fxTxns=prevRec.fxTxns;
         if(prevRec.fxLedgerSrc) nrec.fxLedgerSrc=true;
         if(prevRec.loanSnap) nrec.loanSnap=prevRec.loanSnap;   // [v24]
+        if(prevRec.repAccts) nrec.repAccts=prevRec.repAccts; else if(prevRec.accts && prevRec.accts.length) nrec.repAccts=repAcctsOf(prevRec.accts);   // [v58]
       }
       c.days[d]=nrec; if(!last||d>last) last=d;
     });
@@ -6736,7 +6811,36 @@ function buildSlip(c, lines){
   lines.forEach(function(L){ if(slipIsCash(L.code)||slipIsDeposit(L.code)) return; var k=nameKey(L.branch||L.vendor); if(k) (parties[L.date]=parties[L.date]||{})[k]=1; });
   out.forEach(function(o){ if(o.fxTrade||o.fxTradeSyn) return; o.text=slipText(o.rawMemo||o.memo, Object.keys(parties[o.date]||{}), ownKeys[o.voucher]||[]); });
   var ds=Object.keys(dates).sort(function(a,b){ return dates[b]-dates[a]; });
+  slipKindFix(out);   // [v58]
   return {date:ds[0]||"", lines:out, skipped:skipped, vouchers:order.length, fxTrades:trades};
+}
+/* [v58] 전표 현금성 줄 종류 보정 — 전표 단위로
+   ① 수수료 줄: 자금이동으로 잡혔지만 같은 전표에 반대 방향 같은 금액 줄이 없고, 자금과목이 자금이동이 아니거나(예: 일반경비) 3,000원 이하
+      (01-30 FI…00025 부산 103 '인터넷뱅킹)자금이동' 500 · 자금과목 일반경비 + 판)지급수수료 500) → 출금 운영경비
+   ② 자금이동 짝 줄: 입금/출금으로 잡혔지만 같은 전표에 반대 방향 · 다른 계좌 · 같은 금액의 자금이동 줄이 있고 그 줄의 짝이 없으면 자금이동
+      (06-09 BM…00001 하나 MMT 이자 1,774,229: 기타제예금 대변(자금이동) ↔ 보통예금 83804 차변 '자동입금') */
+function slipKindFix(lines){
+  var by={}, n=0;
+  (lines||[]).forEach(function(L){ if(L.fxTrade||L.fxTradeSyn||L.fxSell||L.fxSellSyn) return; if(/^(in|out|move-in|move-out)$/.test(L.kind||"")) (by[L.voucher]=by[L.voucher]||[]).push(L); });
+  Object.keys(by).forEach(function(v){ var ls=by[v];
+    if(ls.some(function(L){ return (+L.amount||0)<0; })) return;   // [v58] 정정(음수) 전표는 그대로
+    var opp=function(L,pred){ return ls.filter(function(x){ return x!==L && /in$/.test(x.kind)!==/in$/.test(L.kind) && Math.abs((+x.amount||0)-(+L.amount||0))<0.5 && (!pred||pred(x)); }); };
+    ls.forEach(function(L){
+      if(!/^move/.test(L.kind) || L.acct==="현금" || L.fx) return;
+      if(opp(L).length) return;
+      var fund=String(L.fund||"");
+      if((fund && !/자금이동/.test(fund)) || (+L.amount||0)<=3000){
+        L.kind0=L.kind; L.kind=/in$/.test(L.kind)?"in":"out"; L.cat=L.kind==="out"?"운영경비":"기타"; L.auto=false; L.catWhy="자금이동 전표의 수수료 줄"; L.feeLine=true; n++; }
+    });
+    ls.forEach(function(L){
+      if(!/^(in|out)$/.test(L.kind) || L.feeLine || L.userSet) return;
+      var mv=opp(L,function(x){ return /^move/.test(x.kind) && x.acct!==L.acct && x.acct!=="현금"; });
+      if(mv.length!==1) return;
+      var x=mv[0]; if(opp(x,function(y){ return y!==L && /^move/.test(y.kind); }).length) return;   // 이미 짝이 있는 이동 줄
+      L.kind0=L.kind; L.kind=L.kind==="in"?"move-in":"move-out"; L.cat="자금이동"; L.auto=false; L.catWhy="같은 전표 자금이동 줄의 짝"; n++;
+    });
+  });
+  return n;
 }
 /* [v23] 여러 회계일자가 섞인 전표 파일(예: 2026.08.01~2026.09.21 전표자료조회)을 날짜별로 쪼개
    c.slips[날짜] 형태로 만든다. 사용자가 직접 고친 구분(userSet)은 날짜·전표·라인 단위로 보존. */
@@ -6840,7 +6944,7 @@ function applySlipToCmsLegacy(c, iso){
    단계: ① 자금이동 ② 외화(계좌+외화금액) ③ 1:1 ④ 1:N(상대 줄) ⑤ part 분할 ⑥ 1:N 합계(이름 계열 부분합) ⑦ 4대보험 묶음(N:M)
    금액이 정확히 맞을 때만 확정, 이름은 같은 금액 후보를 가를 때만. 우선순위: 사용자(catManual) > 전표 > 고정규칙 > 추정. */
 var SLIP_MATCH={};
-var SLIP_NAME_ALIAS=[["삼성sds","삼성에스디에스"],["한화손보","한화손해보험"]];
+var SLIP_NAME_ALIAS=[["삼성sds","삼성에스디에스"],["한화손보","한화손해보험"],["ciscosyst","시스코시스템즈"],["cisco","시스코"]];   // [v58] CISCO SYST ↔ 시스코시스템즈코리아
 function nameKey(s){ return String(s==null?"":s).toLowerCase().replace(/\(주\)|㈜|주식회사|\(사\)|\(유\)|유한회사|\(재\)|재단법인|사단법인/g,"").replace(/[\s.,·\-_()\[\]]/g,""); }
 function slipAliasList(){
   var a=SLIP_NAME_ALIAS.map(function(p){ return [nameKey(p[0]),nameKey(p[1])]; });
@@ -6938,6 +7042,15 @@ function slipCashLines(c, iso){
 }
 function slipLineOf(c, iso, key){ var sl=(c.slips||{})[iso]; return sl ? (sl.lines||[]).filter(function(L){ return L.voucher+"-"+L.line===key; })[0]||null : null; }
 /* 부분합: 정수 금액 목록에서 합 = target 인 조합. 해가 2개 이상이면 amb (탐색 상한 초과도 amb) */
+/* [v58] 부분합 — 금액 구성(멀티셋)이 하나뿐이면 그 인덱스(같은 금액은 앞 건부터), 둘 이상·없음이면 null */
+function subsetSumMS(vals, target){
+  var idx=vals.map(function(v,i){ return i; }).sort(function(a,b){ return vals[b]-vals[a]; }), n=idx.length, sols=[], cur=[], nodes=0;
+  var suf=new Array(n+1); suf[n]=0; for(var i=n-1;i>=0;i--) suf[i]=suf[i+1]+Math.max(0,vals[idx[i]]);
+  (function go(k, rem){ if(sols.length>1 || ++nodes>300000) return; if(rem===0 && cur.length){ sols.push(cur.slice()); return; }
+    if(k>=n || rem<0 || suf[k]<rem) return;
+    for(var j=k;j<n;j++){ if(j>k && vals[idx[j]]===vals[idx[j-1]]) continue; cur.push(idx[j]); go(j+1, rem-vals[idx[j]]); cur.pop(); if(sols.length>1) return; } })(0, target);
+  return (sols.length===1 && nodes<=300000) ? sols[0] : null;
+}
 function subsetSum(vals, target){
   var idx=vals.map(function(v,i){ return i; }).sort(function(a,b){ return vals[b]-vals[a]; }), n=idx.length;
   var suf=new Array(n+1); suf[n]=0; for(var i=n-1;i>=0;i--) suf[i]=suf[i+1]+Math.max(0,vals[idx[i]]);
@@ -6982,7 +7095,8 @@ function matchSlipCms(c, iso){
   var T=rec.txns;
   T.forEach(function(t){
     if(t.slipKind0){ t.kind=t.slipKind0; delete t.slipKind0; }      // [v56] 전표가 바꾼 분류(자금이동 → 지출/수입) 복원
-    if(t.fxSlip0){ var z=t.fxSlip0; t.fxRate=z.fxRate; t.fxKrw=z.fxKrw; t.fxConfirmed=!!z.fxConfirmed; }
+    if(t.fxSlip0){ var z=t.fxSlip0; t.fxRate=z.fxRate; t.fxKrw=z.fxKrw; t.fxConfirmed=!!z.fxConfirmed; if("fxInternal" in z){ if(z.fxInternal==null) delete t.fxInternal; else t.fxInternal=z.fxInternal; } }
+    delete t.fxLots;   // [v58]
     if(t.slip && t.slipCat0!==undefined && !t.catManual){ t.cat=t.slipCat0; t.auto=!!t.slipAuto0; }
     delete t.fxSlip0; delete t.fxFromSlip; delete t.slipCat0; delete t.slipAuto0; delete t.slip; if(t.catSrc==="전표") delete t.catSrc;
     delete t.slipVoucher; delete t.planMemo; delete t.planVendor;
@@ -7021,8 +7135,89 @@ function matchSlipCms(c, iso){
       if(ss.amb || !ss.sol || ss.sol.length<2) return;
       add(L, ss.sol.map(function(q){ return C[q]; }), "자금이동");
     });
+  var byAmtDesc=function(a,b){ return b.amt-a.amt; };
+  /* ①-4 [v58] 자금이동 N:1 — 전표 자금이동 줄 여러 개(전표 여러 장) = CMS 이체 1건
+     (06-09 MMT → 83804 4,964,229 = FI…00005 3,190,000 + BM…00001 1,774,229 · 07-01 2,755,969,343 = 2,681,052,665 + 74,916,678) */
+  T.map(function(t,i){ return i; }).filter(function(i){ var t=T[i]; return !usedT[i] && String(t.kind).indexOf("자금이동")===0 && !t.fxTrade && !t.fxTradeFrom && !t.fromSlip; }).forEach(function(i){
+    var t=T[i], C=lines.filter(function(L){ return !usedL[L.key] && L.kind==="move" && L.acct===t.acct && L.dir===smDir(t); });
+    if(C.length<2 || C.length>20) return;
+    var ss=subsetSum(C.map(function(L){ return Math.round(L.amt); }), Math.round(smAmt(t)));
+    if(ss.amb || !ss.sol || ss.sol.length<2) return;
+    var GL=ss.sol.map(function(q){ return C[q]; }); GL.forEach(function(L){ usedL[L.key]=1; }); usedT[i]=1;
+    res.push({group:"이동:"+t.acct+":"+i, lines:GL, ids:[i], type:"자금이동"});
+  });
+  /* ①-5 [v58] 자금이동 + 타행이체 수수료 — CMS 출금 = 전표 이동 줄 + 수수료(3,000원 이하, 후보 1건일 때만) (부산 103 'IB지급' 500,000,500 = 500,000,000 + 500) */
+  lines.filter(function(L){ return !usedL[L.key] && L.kind==="move" && L.dir==="out" && L.acct!=="현금"; }).forEach(function(L){
+    var C=[]; T.forEach(function(t,i){ var df=smAmt(t)-L.amt; if(!usedT[i] && t.acct===L.acct && smDir(t)==="out" && String(t.kind).indexOf("자금이동")===0 && df>0.5 && df<=3000) C.push(i); });
+    if(C.length!==1) return; var i=C[0], df=Math.round(smAmt(T[i])-L.amt);
+    var fee=lines.filter(function(x){ return !usedL[x.key] && x!==L && x.slipNo===L.slipNo && x.acct===L.acct && x.dir==="out" && Math.abs(x.amt-df)<0.5; })[0];
+    if(fee) usedL[fee.key]=1;
+    add(L,[i],"자금이동",{fee:df});
+  });
+  var vMv={}; lines.forEach(function(L){ if(L.kind==="move") (vMv[L.slipNo]=vMv[L.slipNo]||[]).push(L); });
+  /* ①-2 [v58] 전표 자금이동 줄 ↔ CMS 지출/수입 — CMS 적요가 비거나 자사명으로 못 읽어 지출/수입으로 잡힌 이체
+     (02-25 · 07-10 우리 143951 '대체지급' → 하나 MMT, 05-18 산업 867 '인터넷뱅킹/에스넷시스템(주)' 4건 = 1,605,908,068).
+     같은 전표에 반대쪽 자금이동 줄이 다른 은행 계좌(현금 아님)에 있을 때만 · 같은 계좌·방향 · 금액 1건 또는 합이 유일한 조합 */
+  var bankPeer=function(L){ return (vMv[L.slipNo]||[]).some(function(x){ return x!==L && x.dir!==L.dir && x.acct!=="현금" && x.acct!==L.acct; }); };
+  lines.filter(function(L){ return !usedL[L.key] && L.kind==="move" && L.acct!=="현금" && !L.fx && bankPeer(L); }).sort(byAmtDesc).forEach(function(L){
+    var C=[]; T.forEach(function(t,i){ if(!usedT[i] && t.acct===L.acct && smDir(t)===L.dir && (t.kind==="지출"||t.kind==="수입") && !t.catManual && !t.fxTrade && !t.fxTradeFrom && cmsOwnish(c,t)) C.push(i); });
+    if(!C.length) return;
+    var one=C.filter(function(i){ return Math.abs(smAmt(T[i])-L.amt)<0.5; });
+    if(one.length===1){ add(L,[one[0]],"자금이동",{mvConv:true}); return; }
+    if(one.length>1 || C.length>20) return;
+    var ss=subsetSum(C.map(function(i){ return Math.round(smAmt(T[i])); }), Math.round(L.amt));
+    if(!ss.amb && ss.sol && ss.sol.length>=2) add(L, ss.sol.map(function(q){ return C[q]; }), "자금이동", {mvConv:true});
+  });
+  /* ①-3 [v58] 은행 → 현금 인출(인출증·수표인출) 전표 줄 ↔ CMS 출금 — 정답지처럼 은행 출금 '현금인출'(운영경비)로 확정.
+     1:1 → 줄마다 합이 유일한 조합 → 같은 계좌 남은 줄 합계 = 현금·수표 표기 CMS 합계(N:M, 02-02 수표 55,000,000 + 10,000,000 = 20,000,000 + 20,000,000 + 25,000,000) */
+  var CASH_HINT=/현금|수표|백만원|십만원|인출|^#/;
+  var cashPeer=function(L){ return (vMv[L.slipNo]||[]).some(function(x){ return x!==L && x.acct==="현금"; }); };
+  var cg={}; lines.filter(function(L){ return !usedL[L.key] && L.kind==="move" && L.dir==="out" && L.acct!=="현금" && !L.fx && cashPeer(L); }).forEach(function(L){ (cg[L.acct]=cg[L.acct]||[]).push(L); });
+  Object.keys(cg).forEach(function(ac){
+    var GL=cg[ac].sort(byAmtDesc);
+    var candC=function(){ var r=[]; T.forEach(function(t,i){ if(!usedT[i] && t.acct===ac && t.kind==="지출" && !t.catManual && !t.fxTrade && !t.fxTradeFrom) r.push(i); }); return r; };
+    var hint=function(i){ var t=T[i]; return CASH_HINT.test(String(t.summary||"").trim()) || CASH_HINT.test(String(t.client||"").trim()) || /현금|수표/.test(String(t.txType||"")); };
+    GL.forEach(function(L){ var C=candC(), one=C.filter(function(i){ return Math.abs(smAmt(T[i])-L.amt)<0.5; });
+      if(one.length>1) one=one.filter(hint);
+      if(one.length===1) add(L,[one[0]],"현금인출"); });
+    var RL=GL.filter(function(L){ return !usedL[L.key]; }); if(!RL.length) return;
+    var HC=candC().filter(hint); if(!HC.length) return;
+    RL.forEach(function(L){ if(HC.length>20) return; var H=HC.filter(function(i){ return !usedT[i]; });
+      var ss=subsetSum(H.map(function(i){ return Math.round(smAmt(T[i])); }), Math.round(L.amt));
+      if(!ss.amb && ss.sol && ss.sol.length>=2) add(L, ss.sol.map(function(q){ return H[q]; }), "현금인출"); });
+    RL=RL.filter(function(L){ return !usedL[L.key]; }); HC=HC.filter(function(i){ return !usedT[i]; });
+    if(!RL.length || !HC.length) return;
+    var sL=RL.reduce(function(s,L){ return s+Math.round(L.amt); },0), sC=HC.reduce(function(s,i){ return s+Math.round(smAmt(T[i])); },0);
+    if(sL===sC){ RL.forEach(function(L){ usedL[L.key]=1; }); HC.forEach(function(i){ usedT[i]=1; }); res.push({group:"현금:"+ac+":"+RL[0].slipNo, lines:RL, ids:HC, type:"현금인출"}); }
+  });
   // ② 외화 — 계좌 + 외화금액 ±0.01
   pairUp(lines.filter(function(L){ return !usedL[L.key] && L.fx && L.kind!=="move" && L.kind!=="cash"; }), "fx", function(t,L){ return Math.abs(fxCents(smAmt(t))-fxCents(L.fx.amt))<=1; }, "외화");
+  /* ②' [v58] 외화: 전표 외화 줄 여러 개(랏별) = CMS 외화 1건 — 같은 계좌·방향, 외화금액 합 ±0.01이 유일한 조합.
+     자금이동 줄이면 외화 계좌간 이체(fxInternal: 자금수지 입·출금에서 빼고 3p 외화 행 자금이동, 랏은 환율 그대로 옮김)
+     (02-26 신한 819249 → 하나 64838 $772,535.39 = 4랏, 09-04 씨티 438 대여금 $1,000,000 = 6랏, 07-10 하나 64838 $77,257.60 = 3랏) */
+  T.map(function(t,i){ return i; }).filter(function(i){ var t=T[i]; return !usedT[i] && (t.kind==="외화(입금)"||t.kind==="외화(출금)") && !t.fxTrade && !t.fxTradeFrom; })
+    .sort(function(a,b){ return smAmt(T[b])-smAmt(T[a]); }).forEach(function(i){
+      var t=T[i], dir=smDir(t), tc=fxCents(smAmt(t));
+      var C=lines.filter(function(L){ return !usedL[L.key] && L.fx && L.kind!=="cash" && L.acct===t.acct && L.dir===dir; });
+      if(!C.length || C.length>20) return;
+      var sol=null;
+      var one=C.filter(function(L){ return Math.abs(fxCents(L.fx.amt)-tc)<=1; });
+      if(one.length===1) sol=[one[0]];
+      else if(!one.length){ var ss=subsetSum(C.map(function(L){ return fxCents(L.fx.amt); }), tc); if(!ss.amb && ss.sol && ss.sol.length) sol=ss.sol.map(function(q){ return C[q]; }); }
+      if(!sol) return;
+      var mv=sol.every(function(L){ return L.kind==="move"; });
+      sol.forEach(function(L){ usedL[L.key]=1; }); usedT[i]=1;
+      res.push({L:sol[0], lines:sol, ids:[i], type:"외화", fxLs:sol, fxMove:mv});
+    });
+  /* ②'' [v58] 외화: 전표 외화 줄 1개 = CMS 외화 여러 건 — 합 ±0.01이 유일한 조합. 원화는 줄 환율 × 금액, 끝 건이 줄 원화와의 차를 흡수 */
+  lines.filter(function(L){ return !usedL[L.key] && L.fx && L.kind!=="cash"; }).forEach(function(L){
+    var C=[]; T.forEach(function(t,i){ if(!usedT[i] && (t.kind==="외화(입금)"||t.kind==="외화(출금)") && !t.fxTrade && !t.fxTradeFrom && t.acct===L.acct && smDir(t)===L.dir) C.push(i); });
+    if(C.length<2 || C.length>20) return;
+    var ss=subsetSum(C.map(function(i){ return fxCents(smAmt(T[i])); }), fxCents(L.fx.amt));
+    if(ss.amb || !ss.sol || ss.sol.length<2) return;
+    var ids=ss.sol.map(function(q){ return C[q]; }); usedL[L.key]=1; ids.forEach(function(i){ usedT[i]=1; });
+    res.push({L:L, ids:ids, type:"외화", fxSplit:true, fxMove:L.kind==="move", acc:0});
+  });
   var rest=function(){ return lines.filter(function(L){ return !usedL[L.key] && L.kind!=="move" && L.kind!=="cash" && !L.fx; }); };
   /* [v56] 짝 없는 CMS 자금이동 찾기: ①에서 전표 자금이동과 맞지 않았고, 같은 날 반대 방향 자금이동 중 금액 차 3,000원 이내가 없는 건.
      예) 01-15 하나 83804 → '에스넷시스템' 1,157,860 · 156,110 = 전표 FI…00009 전남대학교 관리비(미지급금(거래처)) */
@@ -7089,6 +7284,22 @@ function matchSlipCms(c, iso){
     if(tryFam(C)) return;
     /* [v56] 미지급금(급여) 지급(퇴직금·연차수당 등)은 CMS가 직원 이름별로 나뉜다 — 받는 사람이 사람 이름인 남은 CMS 출금(01-15 32건 = 10,685,852) */
     if(L.cat==="급여성" && /미지급금\(급여\)/.test(L.L.cpAccount||"") && tryFam(cand(L,"n").filter(function(i){ return looksPersonal(T[i].client)||looksPersonal(T[i].summary); }))) return;
+    /* [v58] 같은 금액 CMS가 여러 건이어도 '금액 구성'이 하나뿐이면 확정(1,000,000,000 × 2 처럼 같은 금액끼리는 어느 건이든 같다) */
+    var tryFamMS=function(C){
+      if(!C.length) return false;
+      var V=C.map(function(i){ return Math.round(smAmt(T[i])); }), tot=V.reduce(function(a,v){ return a+v; },0), tg=Math.round(L.amt);
+      if(tot===tg){ add(L, C.slice(), C.length>1?"1:N합계":"1:1"); return true; }
+      if(C.length>20) return false;
+      var ms=subsetSumMS(V, tg); if(!ms || ms.length<1) return false;
+      add(L, ms.map(function(q){ return C[q]; }), ms.length>1?"1:N합계":"1:1"); return true; };
+    /* [v58] 경유은행 송금(수취인이 '○○은행 ○○지점'뿐) = 해외 결제(시스코·델) — 그 CMS들을 계열로 (06-10 시스코 2,706,921,902 = 1,000,000,000 × 2 + 706,921,902) */
+    if(!L.L.auto && /^(시스코|델|오라클|하도급)$/.test(L.cat||"")){
+      var viaB=cand(L,"n").filter(function(i){ var nm=String(T[i].client||T[i].summary||"").replace(/\s/g,""); return /^[가-힣A-Za-z]*은행[가-힣A-Za-z]*(지점|센터|본점)$/.test(nm); });
+      if(viaB.length && tryFamMS(viaB)) return; }
+    /* [v58] 법인카드 대금 — 적요의 카드사 + CMS '○○카드' (02-27 롯데법인카드 25,380,400 = 롯데카드 4,000,000 + 124,800 + 21,255,600 · 09-23 하나법인카드 9,535,870 = 1,000,000 + 8,535,870) */
+    var iss=(String(L.text||"")+" "+String(L.L.rawMemo||"")).replace(/\s/g,"").match(/(하나|롯데|삼성|신한|국민|KB|현대|비씨|BC|농협|NH|우리)(법인)?카드/);
+    if(iss){ var cardC=cand(L,"n").filter(function(i){ return (String(T[i].client||"")+String(T[i].summary||"")).replace(/\s/g,"").indexOf(iss[1]+"카드")>=0; });
+      if(cardC.length && tryFamMS(cardC)) return; }
   });
   // ⑦ 4대보험 묶음(N:M) — 부분합 먼저, 안 풀리면 그룹 합계가 원 단위로 같을 때 그룹 전체
   var INS_RE=/사회보험|산재보험|국민연금|건강보험|고용보험|장기요양/, grpN=0, byA={};
@@ -7118,14 +7329,33 @@ function matchSlipCms(c, iso){
     if(usedL[L.key] || rest().some(function(o){ return o!==L && o.acct===L.acct && o.dir===L.dir; })) return;
     var R2=cand(L,"n"); if(R2.length>=2 && R2.reduce(function(a,i){ return a+Math.round(smAmt(T[i])); },0)===Math.round(L.amt)) add(L, R2, "1:N합계");
   });
+  /* ⑨ [v58] 같은 전표의 여러 줄 = CMS 1건 (07-31 국민 247484 한도미사용수수료 1,273,972 = 1,232,876 + 41,096) */
+  T.map(function(t,i){ return i; }).filter(function(i){ var t=T[i]; return !usedT[i] && (t.kind==="지출"||t.kind==="수입") && !t.fromSlip && !t.fromSheet; }).forEach(function(i){
+    var t=T[i], byV={};
+    rest().forEach(function(L){ if(L.acct===t.acct && L.dir===smDir(t)) (byV[L.slipNo]=byV[L.slipNo]||[]).push(L); });
+    var hit=Object.keys(byV).filter(function(v){ var g=byV[v]; return g.length>=2 && Math.abs(g.reduce(function(a,L){ return a+L.amt; },0)-smAmt(t))<0.5; });
+    if(hit.length!==1) return; var GL=byV[hit[0]];
+    GL.forEach(function(L){ usedL[L.key]=1; }); usedT[i]=1;
+    res.push({group:"전표:"+hit[0]+":"+i, lines:GL, ids:[i], type:"1:N합계"});
+  });
+  /* ⑧' [v58] 그 계좌·방향 남은 줄에 음수(정정) 줄이 섞여 있으면, 남은 줄 합계 = 남은 CMS 합계(원 단위)일 때 큰 줄로 묶어 확정
+     (07-15 하나 83804 FI…00005 미지급금(거래처) 415,322,546 + FI…00029 '49번행' −10) */
+  var g8={}; rest().forEach(function(L){ (g8[L.acct+"|"+L.dir]=g8[L.acct+"|"+L.dir]||[]).push(L); });
+  Object.keys(g8).forEach(function(k){ var GL=g8[k]; if(GL.length<2 || !GL.some(function(L){ return L.amt<0; })) return;
+    var C=cand(GL[0],"n"); if(!C.length) return;
+    var sL=GL.reduce(function(s,L){ return s+Math.round(L.amt); },0), sC=C.reduce(function(s,i){ return s+Math.round(smAmt(T[i])); },0);
+    if(sL!==sC) return;
+    var main=GL.slice().sort(byAmtDesc)[0]; GL.forEach(function(L){ if(L!==main) usedL[L.key]=1; });
+    add(main, C, "1:N합계", {adj:GL.filter(function(L){ return L!==main; })});
+  });
   /* 증권 계좌 — CMS에 없는 계좌의 전표 입·출금은 전표값으로 실적 행을 만든다(파일 끝에 붙여 기존 행 번호 유지) */
   var SEC_RE=/증권|금융투자|미래에셋|선물/;
   lines.forEach(function(L){
-    if(usedL[L.key] || L.kind==="cash" || L.kind==="move" || L.fx || !SEC_RE.test(String(L.acct||""))) return;
-    if(T.some(function(t){ return t.acct===L.acct && !t.fromSlip; })) return;
-    var isIn=L.dir==="in";
+    if(usedL[L.key] || L.kind==="cash" || L.fx || !SEC_RE.test(String(L.acct||""))) return;   // [v58] 자금이동 줄도
+    if(T.some(function(t){ return t.acct===L.acct && !t.fromSlip && smDir(t)===L.dir && Math.abs(smAmt(t)-L.amt)<0.5; })) return;   // [v58] 같은 방향·금액 행이 있을 때만 생략
+    var isIn=L.dir==="in", mvS=L.kind==="move";
     T.push({date:iso, at:"", acct:L.acct, bank:String(L.acct).split(" ")[0], acctNum:L.L.acctNum||"", summary:L.text, client:"", txType:"전표",
-      deposit:isIn?L.amt:0, withdraw:isIn?0:L.amt, after:null, hasAfter:false, kind:isIn?"수입":"지출", cat:L.cat||"기타", auto:false, fromSlip:true, catSrc:"전표"});
+      deposit:isIn?L.amt:0, withdraw:isIn?0:L.amt, after:null, hasAfter:false, kind:mvS?(isIn?"자금이동(입금)":"자금이동(출금)"):(isIn?"수입":"지출"), cat:mvS?"자금이동":(L.cat||"기타"), auto:false, fromSlip:true, catSrc:"전표"});
     add(L, [T.length-1], "전표만", {syn:true});
   });
   /* 결과 반영 */
@@ -7135,16 +7365,29 @@ function matchSlipCms(c, iso){
     var lineInfo=Ls.map(function(x){ return {key:x.key, slipNo:x.slipNo, line:x.line, text:x.text, amt:x.amt, cat:x.cat}; });
     r.ids.forEach(function(i,k){ var t=T[i], part="", split=false;
       (r.ps||[]).forEach(function(o){ if(o.ids && o.ids.indexOf(i)>=0){ part=o.p.name; split=o.split; } });
+      var cashW=r.type==="현금인출", lsum=Ls.reduce(function(a,x){ return a+x.amt; },0);
       var s={key:r.group||L.key, slipNo:Ls.map(function(x){ return x.slipNo; }).filter(function(x,j,a){ return a.indexOf(x)===j; }).join(","), type:r.type,
-        text:bund?"4대보험 묶음":L.text, cat:bund?"급여성":L.cat, part:part, n:n, k:k+1, lineAmt:bund?null:L.amt, dir:L.dir};
+        text:bund?"4대보험 묶음":(cashW?(/수표/.test(L.text)?"수표인출":"현금인출"):L.text), cat:bund?"급여성":(cashW?"운영경비":L.cat), part:part, n:n, k:k+1, lineAmt:bund?null:(Ls.length>1?lsum:L.amt), dir:L.dir};   // [v58] 현금인출
+      if(r.adj){ s.adj=r.adj.map(function(x){ return x.slipNo+" "+fmt(x.amt); }); s.lineAmt=L.amt+r.adj.reduce(function(a,x){ return a+x.amt; },0); }
+      if(r.fee){ s.fee=r.fee; s.lineAmt=L.amt+r.fee; }
+      if(Ls.length>1 && !bund) s.lines=lineInfo;
       if(split) s.split=true; if(L.mixed && !bund) s.mixed=true; if(L.catWhy && !bund) s.why=L.catWhy;
       if(bund) s.lines=lineInfo;
       if(r.type==="외화"){
         if(!(t.fxConfirmed && !t.fxFromSlip)){
-          t.fxSlip0={fxRate:t.fxRate==null?null:t.fxRate, fxKrw:t.fxKrw==null?null:t.fxKrw, fxConfirmed:!!t.fxConfirmed};
-          t.fxRate=L.fx.rate||null; t.fxKrw=Math.round(L.amt); t.fxConfirmed=true; t.fxFromSlip=true; st.fxAuto++;   // 환율 = 관리항목명7, 원화 = 전표 금액(재계산 금지)
+          t.fxSlip0={fxRate:t.fxRate==null?null:t.fxRate, fxKrw:t.fxKrw==null?null:t.fxKrw, fxConfirmed:!!t.fxConfirmed, fxInternal:(t.fxInternal==null?null:t.fxInternal)};
+          var FL=r.fxLs||[L];   // [v58] 랏 여러 개
+          t.fxLots=FL.map(function(x){ return {rate:x.fx.rate||null, fx:x.fx.amt, krw:Math.round(x.amt)}; });
+          var fk=FL.reduce(function(a,x){ return a+Math.round(x.amt); },0), rates=FL.map(function(x){ return x.fx.rate; }).filter(function(x,j,a){ return a.indexOf(x)===j; });
+          if(r.fxSplit){ var sh=(k===n-1) ? Math.round(L.amt)-r.acc : Math.round(smAmt(t)*(+L.fx.rate||0)); r.acc+=sh; fk=sh; t.fxLots=[{rate:L.fx.rate||null, fx:smAmt(t), krw:sh}]; }   // [v58] 줄 1개를 여러 CMS로 나눔
+          t.fxRate=rates.length===1?(rates[0]||null):null; t.fxKrw=fk; t.fxConfirmed=true; t.fxFromSlip=true; st.fxAuto++;   // 환율 = 관리항목명7, 원화 = 전표 금액(재계산 금지)
+          if(r.fxMove){ t.fxInternal=true; s.fxMove=true; st.fxMove=(st.fxMove||0)+1; }
         } else s.fxKeep=true;
       }
+      if(r.type==="자금이동" && r.mvConv && (t.kind==="지출"||t.kind==="수입")){   // [v58] 전표상 자금이동 → CMS 지출/수입을 자금이동으로
+        t.slipKind0=t.kind; t.kind=(L.dir==="in")?"자금이동(입금)":"자금이동(출금)"; s.mvConv=true;
+        if(t.slipCat0===undefined){ t.slipCat0=t.cat; t.slipAuto0=!!t.auto; }
+        if(!t.catManual){ t.cat="자금이동"; t.auto=false; t.catSrc="전표"; } }
       if(r.type!=="자금이동" && !r.syn && String(t.kind).indexOf("자금이동")===0){   // [v56] 짝 없는 자금이동 → 전표 기준 지출/수입
         t.slipKind0=t.kind; t.kind=(L.dir==="in")?"수입":"지출"; s.mvFix=true; }
       if(r.type!=="자금이동" && !r.syn){
@@ -7157,6 +7400,8 @@ function matchSlipCms(c, iso){
     });
   });
   st.mvFix=T.filter(function(t){ return t.slip && t.slip.mvFix; }).length;   // [v56]
+  st.mvConv=T.filter(function(t){ return t.slip && t.slip.mvConv; }).length;   // [v58]
+  st.cashW=T.filter(function(t){ return t.slip && t.slip.type==="현금인출"; }).length;
   T.forEach(function(t){ if(t.fromSlip || t.fxTrade || t.fxTradeFrom) return; st.n++;
     if(t.slip){ st.m++; st.by[t.slip.type]=(st.by[t.slip.type]||0)+1; }
     else if(t.kind==="지출" || t.kind==="외화(출금)") st.unOut++; });
@@ -7174,6 +7419,11 @@ function slipChip(c, t, iso, idx){
   var h=' <span class="chip slip" title="'+esc(tip)+'">전표 …'+esc(String(s.slipNo).split(",")[0].slice(-5))+(s.slipNo.indexOf(",")>0?" 외":"")+'</span>';
   if(s.type==="묶음") h+=' <span class="chip bund" title="4대보험 통합 징수 — 개별 금액은 다르고 합계가 같음">묶음</span>';
   if(s.split) h+=' <span class="chip bund" title="상대 줄 1개를 CMS 여러 건으로 나눠 송금">분할</span>';
+  if(s.mvConv) h+=' <span class="chip mix" title="CMS 적요로는 지출/수입으로 읽혔지만 전표상 자사 계좌 간 자금이동(같은 계좌·금액)">자금이동으로 정정</span>';   // [v58]
+  if(s.fxMove) h+=' <span class="chip bund" title="외화 계좌 간 이체 — 자금수지 입·출금에서 빼고 랏(환율)을 그대로 옮김">외화 계좌간 이체</span>';
+  if(s.type==="현금인출") h+=' <span class="chip bund" title="은행 → 현금시재 인출(인출증·수표) — 은행 출금 운영경비, 현금시재 입금">현금인출</span>';
+  if(s.fee) h+=' <span class="chip bund" title="CMS 출금 = 전표 자금이동 + 타행이체 수수료 '+fmt(s.fee)+'원">수수료 포함</span>';
+  if(s.adj&&s.adj.length) h+=' <span class="chip bund" title="정정 줄 '+esc(s.adj.join(", "))+' 포함 합계">정정 포함</span>';
   if(s.mvFix) h+=' <span class="chip mix" title="CMS 수취인·적요가 자사명(또는 계좌번호)이라 자금이동으로 잡혔지만 같은 날 다른 자사 계좌의 짝이 없고(같은 계좌 입출금은 짝 아님), 전표상 거래처 지급(수금)과 금액이 맞음 → '+(s.dir==="in"?"수입":"지출")+'">자금이동 아님</span>';   // [v56]
   if(s.mixed) h+=' <span class="chip mix" title="상대계정이 여러 구분으로 섞임 — 금액이 가장 큰 상대계정 기준">구분 혼합</span>';
   if(t.catManual && s.cat && t.cat!==s.cat && s.type!=="자금이동")
@@ -7368,6 +7618,10 @@ function ilboModel(c, iso){
         else { C.mvIn+=fi.krwAmt; fr.mvIn=(fr.mvIn||0)+fi.krwAmt; fr.uMvInC=(fr.uMvInC||0)+fxCents(fi.fxAmt); }
         return; }
       if(!t.fxConfirmed && !sh) return; var v=sh?(t.deposit||t.withdraw):(t.fxKrw||0);
+      if(t.fxInternal && !sh && !fxIsTradeKind(t.kind)){   // [v58] 외화 계좌간 이체 — 입금·출금이 아니라 자금이동(원화 = 옮긴 랏 장부가, 외화금액 표시)
+        if(t.kind==="외화(입금)"){ C.mvIn+=v; C.ixIn=(C.ixIn||0)+v; fr.mvIn=(fr.mvIn||0)+v; fr.uMvInC=(fr.uMvInC||0)+fxCents(t.deposit||0); }
+        else { C.mvOut+=v; C.ixOut=(C.ixOut||0)+v; fr.mvOut=(fr.mvOut||0)+v; fr.uMvOutC=(fr.uMvOutC||0)+fxCents(t.withdraw||0); }
+        return; }
       if(t.kind==="외화(입금)"){ C.in+=v; fr.in=(fr.in||0)+v; } if(t.kind==="외화(출금)"){ C.out+=v; fr.out=(fr.out||0)+v; } }); });
   m.C=C; m.D={open:B.open+C.open, in:B.in+C.in, out:B.out+C.out, mvIn:B.mvIn+C.mvIn, mvOut:B.mvOut+C.mvOut, close:B.close+C.close};
   m.unalloc=ps.unalloc||0;
@@ -7380,7 +7634,9 @@ function ilboModel(c, iso){
   chk(!bad.length, bad.length ? "시재표 1원 검증 불일치: "+bad.join(", ") : "시재표 계좌별 전일시재+입금−출금±자금이동 = 금일시재 (1원 단위 일치)");
   var dd=Math.round(m.D.close-ps.close);
   chk(Math.abs(dd)<1, Math.abs(dd)<1 ? "예적금 현황표 합계 = 일자별 보고·대시보드 시재 "+fmt(ps.close)+"원" : "현황표 합계와 대시보드 시재 차이 "+fmt(dd)+"원"+(m.unalloc?" (보고서 총액 기준 미배분 "+fmt(m.unalloc)+"원)":""));
-  var mvGap=Math.round(B.mvIn-B.mvOut-C.mvOut+C.mvIn-m.cash.mvOut);
+  var cIx=(C.ixIn||0)-(C.ixOut||0);   // [v58] 외화 계좌간 이체(입 = 출)
+  var mvGap=Math.round(B.mvIn-B.mvOut-(C.mvOut-(C.ixOut||0))+(C.mvIn-(C.ixIn||0))-m.cash.mvOut);
+  if(C.ixIn||C.ixOut) chk(Math.abs(cIx)<1, "외화 계좌간 이체 입 "+fmt(C.ixIn||0)+" / 출 "+fmt(C.ixOut||0)+(Math.abs(cIx)<1?" · 일치(랏 장부가 그대로 이동)":" · 차액 "+fmt(cIx)+"원 — 상대 계좌 거래 확인"));
   chk(Math.abs(mvGap)<1 || Math.abs(mvGap)<=((D.settings&&D.settings.feeCap)||100000), "전일 자금이동 입 "+fmt(B.mvIn)+(C.mvIn?" + 외화매수 원화지급 "+fmt(C.mvIn):"")+" / 출 "+fmt(B.mvOut)+
     (C.mvOut?" + 외화매도 원화대가 "+fmt(C.mvOut):"")+(m.cash.mvOut?" + 현금시재→은행 입금 "+fmt(m.cash.mvOut):"")+(mvGap?" · 차액 "+fmt(mvGap)+"원":" · 일치"));
   /* [v22] 월간실적·누계 열 데이터 충분성 + 자금수지 항등식(기초+수지차=기말) */
@@ -7409,19 +7665,20 @@ function ilboModel(c, iso){
   if(sl){
     var mi=m.plan.moves.filter(function(x){return x.kind==="move-in"}).reduce(function(s,x){return s+x.amount},0);
     var mo=m.plan.moves.filter(function(x){return x.kind==="move-out"}).reduce(function(s,x){return s+x.amount},0);
-    chk(Math.abs(mi-mo)<1, "당일 자금이동 전표 입 "+fmt(mi)+" / 출 "+fmt(mo)+(Math.abs(mi-mo)<1?" · 일치":" · 불일치"));
+    chk(Math.abs(mi-mo)<1, "당일 자금이동 전표 입 "+fmt(mi)+" / 출 "+fmt(mo)+(Math.abs(mi-mo)<1?" · 일치":" · 불일치 "+fmt(mi-mo)+"원"));
     var pAuto=L.filter(function(x){return x.auto}).length;
     chk(!pAuto, pAuto ? "당일 계획 중 구분 추정 "+pAuto+"건" : "당일 계획 구분 전건 확정");
     /* 계좌별 예상 잔액 (전일 금일시재 + 당일 계획) */
     var exp={};
     L.forEach(function(x){
       if(x.acct==="현금") return;
-      var e=exp[x.acct]||(exp[x.acct]={acct:x.acct, open:(ch&&ch[x.acct])?ch[x.acct].close:0, in:0, out:0, mvIn:0, mvOut:0});
+      var abx=acctOf(c,x.acct), fxo=null; if(x.fx || (abx && abx.group==="외화") || x.fxTrade || x.fxTradeSyn){ var ab=abx, bk=ab?ab.bank:String(x.acct).split(" ")[0]; fxo=(m.fxRows||[]).filter(function(r){ return r.bank===bk; }).reduce(function(s,r){ return s+(r.cKrw||0); },0); }   // [v58] 외화 계좌 = 랏 원화 잔액
+      var e=exp[x.acct]||(exp[x.acct]={acct:x.acct, open:fxo!=null?fxo:((ch&&ch[x.acct])?ch[x.acct].close:0), in:0, out:0, mvIn:0, mvOut:0});
       if(x.kind==="in") e.in+=x.amount; else if(x.kind==="out") e.out+=x.amount; else if(x.kind==="move-in") e.mvIn+=x.amount; else if(x.kind==="move-out") e.mvOut+=x.amount;
     });
     m.expected=Object.keys(exp).map(function(k){ var e=exp[k]; e.close=e.open+e.in-e.out+e.mvIn-e.mvOut; return e; });
-    var neg=m.expected.filter(function(e){ return e.close<0; });
-    chk(!neg.length, neg.length ? "계획 반영 시 잔액 부족: "+neg.map(function(e){return e.acct+" "+fmt(e.close)}).join(", ") : "계획 반영 후 계좌별 예상 잔액 모두 0 이상");
+    var neg=m.expected.filter(function(e){ return e.open+e.in-e.out+e.mvIn < -0.5; });   // [v58] 지급 기준(자금이동 출금 = 당일 수금분 스윕은 제외)
+    chk(!neg.length, neg.length ? "계획 반영 시 지급 잔액 부족: "+neg.map(function(e){return e.acct+" "+fmt(e.open+e.in-e.out+e.mvIn)}).join(", ") : "계획 반영 후 계좌별 지급 가능 잔액 모두 0 이상");
     var cashExp=m.cash.close+slipTotals(c,iso).cashIn-slipTotals(c,iso).cashOut;
     chk(cashExp>=0, "현금시재 예상 "+fmt(cashExp)+"원 (전일 "+fmt(m.cash.close)+" − 당일 현금지출 "+fmt(slipTotals(c,iso).cashOut)+")");
     if(m.planInList.length) chk(true, "사후 수금 전표 "+m.planInList.length+"건 "+fmt(m.planInList.reduce(function(s,x){return s+x.amount},0))+"원 — 회계일자 이후 작성분이라 당일계획 입금에서 제외");
@@ -7430,7 +7687,7 @@ function ilboModel(c, iso){
   rdays.forEach(function(d){ var st2=SLIP_MATCH[c.id+"|"+d]; if(!st2 || (!st2.n && !st2.planOnly.length)) return;
     var b=st2.by, tag=(rdays.length>1?" ("+d+")":"");
     chk(st2.unOut===0, "전표 매칭"+tag+": CMS "+st2.n+"건 중 "+st2.m+"건 확정(1:1 "+(b["1:1"]||0)+" · 1:N "+((b["1:N"]||0)+(b["1:N합계"]||0))+" · 묶음 "+(b["묶음"]||0)+" · 외화 "+(b["외화"]||0)+" · 자금이동 "+(b["자금이동"]||0)+")"+
-      (st2.syn?" · 증권 전표값 반영 "+st2.syn+"건":"")+(st2.mvFix?" · 자사명 수취 자금이동 → 전표 지급·수금 "+st2.mvFix+"건":"")+" · 미매칭 출금 "+st2.unOut+"건");
+      (st2.syn?" · 증권 전표값 반영 "+st2.syn+"건":"")+(st2.mvFix?" · 자사명 수취 자금이동 → 전표 지급·수금 "+st2.mvFix+"건":"")+(st2.mvConv?" · 전표 자금이동으로 정정 "+st2.mvConv+"건":"")+(st2.cashW?" · 현금인출 "+st2.cashW+"건":"")+(st2.fxMove?" · 외화 계좌간 이체 "+st2.fxMove+"건":"")+" · 미매칭 출금 "+st2.unOut+"건");
     if(st2.fxAuto) chk(true, "전표 환율로 외화 자동 확정 "+st2.fxAuto+"건");
     if(st2.planOnly.length) chk(true, "전표만 있고 CMS 없음(계획만)"+tag+" "+st2.planOnly.length+"건: "+st2.planOnly.slice(0,6).map(function(x){ return x.acct+" "+x.text+" "+(x.fx?fxSym(x.fx.ccy,x.fx.amt):fmt(x.amt)); }).join(" · ")+(st2.planOnly.length>6?" 외":""));
     if(st2.amb.length) chk(false, "같은 금액 후보를 거래처명으로 가리지 못해 미확정"+tag+" "+st2.amb.length+"건: "+st2.amb.slice(0,4).map(function(x){ return x.acct+" "+x.text+" "+fmt(x.amt); }).join(" · "));
@@ -12004,7 +12261,7 @@ function bindCpMaster(){
 bindCpMaster();
 
 function cpmOnSettings(){ if(CPMS.dirty){ renderCpMaster(); return; } cpMasterLoad(CPMS.co).then(function(){ CPMS.draft=null; renderCpMaster(); }); }
-window.__tr={fixMoveKinds:fixMoveKinds, loanSnapOk:loanSnapOk, loanScope:loanScope, classifyKind:classifyKind, slipMergeDay:slipMergeDay, matchSlipCms:matchSlipCms, slipCashLines:slipCashLines, slipText:slipText, nameKey:nameKey, nameScore:nameScore, subsetSum:subsetSum, get SLIP_MATCH(){return SLIP_MATCH}, linkFxTrades:linkFxTrades, fxTradeInfo:fxTradeInfo, fxTradesOf:fxTradesOf, slipFxSellFix:slipFxSellFix, parseSlip:parseSlip, buildSlip:buildSlip, slipDaysOf:slipDaysOf, saveSlipDays:saveSlipDays, relinkFxTrade:relinkFxTrade, fxPostAll:fxPostAll, applyFixedCats:applyFixedCats, unlinkFxTrade:unlinkFxTrade, CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
+window.__tr={fxInferLots:fxInferLots, fxAnchorOk:fxAnchorOk, cmsOwnish:cmsOwnish, slipKindFix:slipKindFix, clientIsOther:clientIsOther, fixMoveKinds:fixMoveKinds, loanSnapOk:loanSnapOk, loanScope:loanScope, classifyKind:classifyKind, slipMergeDay:slipMergeDay, matchSlipCms:matchSlipCms, slipCashLines:slipCashLines, slipText:slipText, nameKey:nameKey, nameScore:nameScore, subsetSum:subsetSum, get SLIP_MATCH(){return SLIP_MATCH}, linkFxTrades:linkFxTrades, fxTradeInfo:fxTradeInfo, fxTradesOf:fxTradesOf, slipFxSellFix:slipFxSellFix, parseSlip:parseSlip, buildSlip:buildSlip, slipDaysOf:slipDaysOf, saveSlipDays:saveSlipDays, relinkFxTrade:relinkFxTrade, fxPostAll:fxPostAll, applyFixedCats:applyFixedCats, unlinkFxTrade:unlinkFxTrade, CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
   daySummary:daySummary, dayAgg:dayAgg, rollup:rollup, scopeSummary:scopeSummary, allDates:allDates,
   parseCMS:parseCMS, parseFxLedger:parseFxLedger, fxTxnsOf:fxTxnsOf, parseDailySheet:parseDailySheet, guessCoFromName:guessCoFromName, loanAt:loanAt, parseCashBook:parseCashBook, parseLoanHtml:parseLoanHtml, processRows:processRows, coState:coState, periodBuckets:periodBuckets,
   loanScope:loanScope, isHoliday:isHoliday, setChart:function(x){chartKind=x}, autoGroups:autoGroups, openAutoFix:openAutoFix, toISO:toISO, accrueMonth:accrueMonth, setFinTab:function(x){finTab=x}, get finTab(){return finTab}, purgeFuture:purgeFuture,
