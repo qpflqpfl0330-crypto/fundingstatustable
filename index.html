@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v61 · 2026-10-15</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v62 · 2026-10-15</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4020,6 +4020,7 @@ function renderLoans(){
 function catCell(c,t,iso,idx){
   if(t && t.fxTrade) return '<span class="chip '+(t.fxTrade.side==="buy"?"fxbuy":"fxsell")+'" title="외화 '+(t.fxTrade.side==="buy"?"매수":"매도")+' = 외화 ↔ 원화 자금이동 (차익·차손만 기타)">'+(t.fxTrade.side==="buy"?"매수":"매도")+'</span>';   // [v54]
   if(t && t.fxTradeFrom) return '<span class="chip mv" title="외화 '+(t.fxTradeSide==="buy"?"매수 원화 지급":"매도 원화 대가")+' — 자금이동">자금이동</span>';
+  if(t && t.refundPair) return '<span class="chip nv" title="같은 날 같은 거래처로 같은 금액이 출금됐다가 다시 입금 — 출금·입금 상계, 자금수지 제외">반환 상계</span>';   // [v62]
   var cats = t.deposit>0 ? IN_CATS : OUT_CATS;
   /* [v20→v21] 대외 외화 입·출금은 원장으로 이미 자금수지에 합산되지 않은 건(순수 CMS 확정분)에 한해
      구분 지정을 허용한다(v21: 출금뿐 아니라 입금도 대칭 지원 — 판매대/그룹사정산 등). 원장으로 자동확정된
@@ -7176,7 +7177,7 @@ function applySlipToCmsLegacy(c, iso){
    단계: ① 자금이동 ② 외화(계좌+외화금액) ③ 1:1 ④ 1:N(상대 줄) ⑤ part 분할 ⑥ 1:N 합계(이름 계열 부분합) ⑦ 4대보험 묶음(N:M)
    금액이 정확히 맞을 때만 확정, 이름은 같은 금액 후보를 가를 때만. 우선순위: 사용자(catManual) > 전표 > 고정규칙 > 추정. */
 var SLIP_MATCH={};
-var SLIP_NAME_ALIAS=[["삼성sds","삼성에스디에스"],["한화손보","한화손해보험"],["ciscosyst","시스코시스템즈"],["cisco","시스코"]];   // [v58] CISCO SYST ↔ 시스코시스템즈코리아
+var SLIP_NAME_ALIAS=[["삼성sds","삼성에스디에스"],["한화손보","한화손해보험"],["ciscosyst","시스코시스템즈"],["cisco","시스코"],["kthcn","현대에이치씨엔"]];   // [v62] KTHCN동작2605 ↔ 주식회사 현대에이치씨엔 동작방송(05-26 자동결제)   // [v58] CISCO SYST ↔ 시스코시스템즈코리아
 function nameKey(s){ return String(s==null?"":s).toLowerCase().replace(/\(주\)|㈜|주식회사|\(사\)|\(유\)|유한회사|\(재\)|재단법인|사단법인/g,"").replace(/[\s.,·\-_()\[\]]/g,""); }
 function slipAliasList(){
   var a=SLIP_NAME_ALIAS.map(function(p){ return [nameKey(p[0]),nameKey(p[1])]; });
@@ -7403,6 +7404,7 @@ function matchSlipCms(c, iso){
   rec.txns=(rec.txns||[]).filter(function(t){ return !t.fromSlip; });
   var T=rec.txns;
   T.forEach(function(t){
+    if(t.rfKind0){ t.kind=t.rfKind0; t.cat=t.rfCat0; t.auto=!!t.rfAuto0; delete t.rfKind0; delete t.rfCat0; delete t.rfAuto0; delete t.refundPair; }   // [v62] 반환 상계 복원
     if(t.slipKind0){ t.kind=t.slipKind0; delete t.slipKind0; }      // [v56] 전표가 바꾼 분류(자금이동 → 지출/수입) 복원
     if(t.fxSlip0){ var z=t.fxSlip0; t.fxRate=z.fxRate; t.fxKrw=z.fxKrw; t.fxConfirmed=!!z.fxConfirmed; if("fxInternal" in z){ if(z.fxInternal==null) delete t.fxInternal; else t.fxInternal=z.fxInternal; } }
     delete t.fxLots;   // [v58]
@@ -7558,7 +7560,10 @@ function matchSlipCms(c, iso){
       var ids=C.filter(function(i){ return !taken[i] && score(i,[o.p.name])>=1; });
       if(ids.length<2 || ids.length>20){ ok=false; return; }
       var ss=subsetSum(ids.map(function(i){ return Math.round(smAmt(T[i])); }), Math.round(o.p.amt));
-      if(!ss.sol || ss.amb){ ok=false; return; }
+      if(!ss.sol || ss.amb){   /* [v62] 같은 금액 CMS가 여러 건이라 조합이 여럿이어도 '금액 구성'이 하나뿐이면 어느 건이든 결과가 같다 → 확정
+                                  (05-26 나비엠알오 1,517,978 = 758,989 × 2, CMS 758,989 출금 3건 중 2건) */
+        var ms=subsetSumMS(ids.map(function(i){ return Math.round(smAmt(T[i])); }), Math.round(o.p.amt));
+        if(!ms || !ms.length){ ok=false; return; } ss={sol:ms}; }
       o.ids=ss.sol.map(function(q){ return ids[q]; }); o.split=true; o.ids.forEach(function(i){ taken[i]=1; });
     });
     if(!ok || ps.some(function(o){ return !o.ids; })) return;
@@ -7720,6 +7725,7 @@ function matchSlipCms(c, iso){
       if(r.syn) st.syn++;
     });
   });
+  st.refund=refundOffset(c, T);   // [v62]
   st.mvFix=T.filter(function(t){ return t.slip && t.slip.mvFix; }).length;   // [v56]
   st.mvConv=T.filter(function(t){ return t.slip && t.slip.mvConv; }).length;   // [v58]
   st.cashW=T.filter(function(t){ return t.slip && t.slip.type==="현금인출"; }).length;
@@ -7730,6 +7736,24 @@ function matchSlipCms(c, iso){
   st.amb=amb.filter(function(L){ return !usedL[L.key]; }).map(function(L){ return {key:L.key, acct:L.acct, text:L.text, amt:L.amt}; });
   SLIP_MATCH[key]=st;
   return st.m;
+}
+/* [v62] 반환 상계 — 전표와 매칭되지 않은 CMS 중 같은 날·같은 계좌·같은 거래처로 같은 금액이 출금됐다가 다시 입금된 건은
+   출금·입금을 서로 상계해 자금수지(입금·출금·구분)에서 뺀다. 계좌 잔액은 그대로(출금−입금 = 0).
+   (05-26 하나 83804 나비엠알오 758,989: 출금 3 · 입금 1 — 전표 1,517,978 = 출금 2건, 남은 출금 1 ↔ 입금 1 상계)
+   사용자가 구분을 직접 지정한 건·자사명 이체·외화·자금이동은 대상이 아니다. 매칭할 때마다 0) 단계에서 복원 후 다시 판정. */
+function refundOffset(c, T){
+  var n=0, used={};
+  var ok=function(t){ return !t.slip && !t.fromSlip && !t.catManual && !t.fxTrade && !t.fxTradeFrom && !t.fromSheet; };
+  T.forEach(function(o,i){
+    if(used[i] || o.kind!=="지출" || !ok(o) || !nameKey(smName(o)) || cmsOwnish(c,o)) return;
+    for(var j=0;j<T.length;j++){ var u=T[j];
+      if(j===i || used[j] || u.kind!=="수입" || !ok(u) || u.acct!==o.acct) continue;
+      if(Math.abs(smAmt(u)-smAmt(o))>=0.5 || nameScore(smName(o), smName(u))<2) continue;
+      [o,u].forEach(function(t){ t.rfKind0=t.kind; t.rfCat0=t.cat; t.rfAuto0=!!t.auto;
+        t.kind=(t===o)?"반환상계(출금)":"반환상계(입금)"; t.cat="반환상계"; t.auto=false; t.refundPair=true; });
+      used[i]=used[j]=1; n++; break; }
+  });
+  return n;
 }
 /* [v55] 종전 이름 유지 — 전표 1일분 재매칭 */
 function applySlipToCms(c, iso){ return matchSlipCms(c, iso); }
@@ -8020,6 +8044,7 @@ function ilboModel(c, iso){
     chk(st2.unOut===0, "전표 매칭"+tag+": CMS "+st2.n+"건 중 "+st2.m+"건 확정(1:1 "+(b["1:1"]||0)+" · 1:N "+((b["1:N"]||0)+(b["1:N합계"]||0))+" · 묶음 "+(b["묶음"]||0)+" · 외화 "+(b["외화"]||0)+" · 자금이동 "+(b["자금이동"]||0)+")"+
       (st2.syn?" · 증권 전표값 반영 "+st2.syn+"건":"")+(st2.mvFix?" · 자사명 수취 자금이동 → 전표 지급·수금 "+st2.mvFix+"건":"")+(st2.mvConv?" · 전표 자금이동으로 정정 "+st2.mvConv+"건":"")+(st2.cashW?" · 현금인출 "+st2.cashW+"건":"")+(st2.fxMove?" · 외화 계좌간 이체 "+st2.fxMove+"건":"")+" · 미매칭 출금 "+st2.unOut+"건");
     if(st2.fxAuto) chk(true, "전표 환율로 외화 자동 확정 "+st2.fxAuto+"건");
+    if(st2.refund) chk(true, "반환 상계"+tag+" "+st2.refund+"쌍: "+txnsOf(c,d).filter(function(t){ return t.refundPair && t.kind==="반환상계(출금)"; }).map(function(t){ return t.acct+" "+smName(t)+" "+fmt(t.withdraw); }).join(" · ")+" — 같은 날 같은 거래처로 출금 후 같은 금액 입금, 자금수지에서 제외");   // [v62]
     if(st2.planOnly.length) chk(true, "전표만 있고 CMS 없음(계획만)"+tag+" "+st2.planOnly.length+"건: "+st2.planOnly.slice(0,6).map(function(x){ return x.acct+" "+x.text+" "+(x.fx?fxSym(x.fx.ccy,x.fx.amt):fmt(x.amt)); }).join(" · ")+(st2.planOnly.length>6?" 외":""));
     if(st2.amb.length) chk(false, "같은 금액 후보를 거래처명으로 가리지 못해 미확정"+tag+" "+st2.amb.length+"건: "+st2.amb.slice(0,4).map(function(x){ return x.acct+" "+x.text+" "+fmt(x.amt); }).join(" · "));
   });
