@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v59 · 2026-10-14</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v60 · 2026-10-15</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -420,6 +420,8 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
         <div class="auto-grid" id="autoGrid"></div>
       </div>
       <div class="auto-back" id="autoBack" hidden><button class="btn sm" id="btnAutoBack">← 자금업무자동화 목록</button><b id="autoToolTitle"></b></div>
+      <!-- [v60] 이자수익전표 카드 하위 탭 — mmt = 기존 #mmt-app 그대로 · int = 기타 이자수익전표(#int-app) -->
+      <div class="seg" id="intTabs" role="group" aria-label="이자수익전표 종류" hidden><button type="button" data-t="mmt" aria-pressed="true">MMT 이자수익전표</button><button type="button" data-t="int" aria-pressed="false">기타 이자수익전표</button></div>
 
       <div class="auto-screen" data-tool="plan" hidden>
       <div class="panel">
@@ -891,6 +893,182 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 <div class="modal-bg" id="mmt-modal"><div class="modal">
   <div class="mh" id="mmt-mh"></div><div class="mb" id="mmt-mb"></div><div class="mf" id="mmt-mf"></div>
 </div></div>
+</div>
+      </div>
+
+      <!-- [v60] 기타 이자수익전표 — 이자수익전표 카드의 [기타 이자수익전표] 탭. 로직은 window.IntParser(int-core) 전담, 화면은 #int-app · window.IntSlipApp(int-ui).
+           MMT 화면(#mmt-app · MMTSlipApp)과 DOM·상태·저장 키를 공유하지 않는다. 모든 규칙은 #int-app(+ 탭 #intTabs) 하위로만 건다. -->
+      <div class="auto-screen" data-tool="int" hidden>
+<style>
+#intTabs{margin:0 0 12px}
+#int-app{color:var(--ink);font-family:var(--f-sans);font-size:14px;line-height:1.55;box-sizing:border-box}
+#int-app *,#int-app *::before,#int-app *::after{box-sizing:inherit}
+#int-app>.panel+.panel{margin-top:14px}
+#int-app .num,#int-app td.num,#int-app th.num{text-align:right;font-variant-numeric:tabular-nums}
+#int-app th.ctr,#int-app td.ctr,#int-app td.code{text-align:center}
+#int-app td.code{font-variant-numeric:tabular-nums}
+#int-app .int-head .pad{display:flex;flex-direction:column;gap:12px}
+#int-app .fer-steps li.cur{color:var(--ink);border-color:var(--navy);background:var(--navy-soft);font-weight:600}
+#int-app .fer-steps li.cur::before{background:var(--navy);border-color:var(--navy);color:var(--on-accent)}
+#int-app .ctl{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+#int-app .ctl .grp{display:flex;flex-direction:column;gap:5px;min-width:0}
+#int-app .ctl .lbl{font-size:11.5px;color:var(--ink-2);font-weight:600;white-space:nowrap}
+#int-app .ctl .lbl .muted{font-weight:400;font-size:10.5px}
+#int-app .pair{display:flex;gap:4px;flex-wrap:wrap}
+#int-app .ctl input{padding:4px 8px;height:30px;border:1px solid var(--rule-strong);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:0;max-width:100%}
+#int-app .ctl input.code{width:124px}
+#int-app .ctl input.name{width:150px}
+#int-app .ctl input[type=month],#int-app .ctl input[type=date]{width:150px}
+#int-app .ctl input:focus-visible,#int-app select:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
+#int-app .ctl input.inp-warn{border-color:var(--warn);background:var(--move-soft)}
+#int-app .ctl .fb{font-size:10.5px;color:var(--warn);min-height:14px;white-space:nowrap}
+#int-app .ctl .act{display:flex;flex-direction:column;gap:5px;align-items:flex-end;margin-left:auto}
+#int-app .saved{font-size:11px;font-weight:600;color:var(--in);background:var(--in-soft);border-radius:6px;padding:1px 7px;opacity:0;transition:opacity .25s;white-space:nowrap}
+#int-app .saved.on{opacity:1}
+#int-app .saved.err{color:var(--out);background:var(--out-soft)}
+#int-app .cocfg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#int-app .cocfg .ctl{border:1px solid var(--rule);border-radius:var(--r-md);padding:9px 12px;background:var(--surface-2);gap:10px}
+#int-app .cocfg .ctl input.code{width:112px}
+#int-app .cocfg .ctl input.name{width:130px}
+@media (max-width:1180px){#int-app .cocfg{grid-template-columns:1fr}}
+@media (max-width:880px){#int-app .ctl{align-items:flex-start}#int-app .ctl .act{margin-left:0;align-items:flex-start}}
+#int-app .locked{opacity:.55}
+#int-app .locked>.pad{pointer-events:none}
+#int-app .ilbo-drop{display:block}
+#int-app .ilbo-drop.busy{opacity:.6;cursor:progress}
+#int-app .prog{height:4px;background:var(--rule);border-radius:3px;overflow:hidden;margin-top:10px;display:none}
+#int-app .prog.on{display:block}
+#int-app .prog i{display:block;height:100%;width:0;background:var(--navy);transition:width .2s}
+#int-app .status{font-size:12px;color:var(--ink-2);margin-top:8px;min-height:18px;white-space:pre-line}
+#int-app .status.err{color:var(--out)}
+#int-app .det{font-size:12px;color:var(--ink-2);line-height:1.6;padding:9px 13px;border-left:3px solid var(--in);border-radius:var(--r-md);background:var(--in-soft)}
+#int-app .det.warn{border-left-color:var(--warn);background:var(--move-soft)}
+#int-app .det.err{border-left-color:var(--out);background:var(--out-soft)}
+#int-app .det ul{margin:4px 0 0;padding-left:18px}
+#int-app .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:12px}
+@media (max-width:980px){#int-app .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:520px){#int-app .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#int-app .kpi{border:1px solid var(--rule);border-radius:var(--r-md);padding:9px 12px;background:var(--surface-2);min-width:0}
+#int-app .kpi .l{font-size:11px;color:var(--muted);font-weight:600}
+#int-app .kpi .v{font-size:15px;font-weight:700;text-align:right;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+#int-app .kpi.err .v{color:var(--out)} #int-app .kpi.warn .v{color:var(--warn)} #int-app .kpi.ok .v{color:var(--in)}
+#int-app .tbl-wrap{overflow:auto;border:1px solid var(--rule);border-radius:var(--r-md);max-height:640px;margin-top:12px}
+#int-app .tbl th{text-align:left}
+#int-app .tbl th.num{text-align:right} #int-app .tbl th.ctr{text-align:center}
+#int-app .tbl td{padding:6px 10px;white-space:nowrap;font-size:12.5px;vertical-align:top}
+#int-app .tbl tfoot td{background:var(--surface-2);font-weight:600;border-top:1px solid var(--rule-strong)}
+#int-app td.fname{white-space:normal;word-break:break-all;min-width:160px;max-width:280px}
+#int-app td input.ed{width:100%;min-width:0;border:1px solid transparent;background:transparent;color:inherit;font:inherit;font-variant-numeric:tabular-nums;padding:3px 5px;border-radius:5px;text-align:inherit}
+#int-app td.num input.ed{text-align:right;min-width:84px}
+#int-app td.code input.ed{text-align:center;min-width:92px}
+#int-app td.per input.ed{min-width:184px}
+#int-app td.rt input.ed{min-width:56px}
+#int-app td input.ed:hover{border-color:var(--rule-strong)}
+#int-app td input.ed:focus{outline:none;border-color:var(--navy);background:var(--surface)}
+#int-app td.c-err{background:var(--out-soft)!important;color:var(--out);font-weight:600}
+#int-app td.c-warn{background:var(--move-soft)!important;color:var(--warn);font-weight:600}
+#int-app td.c-info{background:var(--surface-2)!important;color:var(--ink-2)}
+#int-app tr.off td{opacity:.42}
+#int-app .pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;white-space:nowrap;border:1px solid currentColor}
+#int-app .pill.ok{background:var(--in-soft);color:var(--in)} #int-app .pill.warn{background:var(--move-soft);color:var(--warn)} #int-app .pill.err{background:var(--out-soft);color:var(--out)}
+#int-app .pill.mute{background:var(--surface-2);color:var(--muted)}
+#int-app td.msgs{white-space:normal;min-width:200px;max-width:360px;font-size:11.5px;color:var(--ink-2)}
+#int-app tr.msgrow td.msgs{max-width:none;min-width:0;padding-top:0;border-top:0}
+#int-app tr.drow.has-msg td{border-bottom:0}
+#int-app .chips{display:flex;flex-wrap:wrap;gap:4px}
+#int-app .chips .pill{white-space:normal;max-width:100%;text-align:left;font-weight:500;line-height:1.45;border-radius:8px}
+#int-app .fix{display:flex;align-items:center;gap:4px;margin-top:4px;font-size:11px}
+#int-app .fix input.ed{border-color:var(--rule-strong);min-width:90px;width:90px;text-align:right}
+#int-app .ent{border:1px solid var(--rule);border-radius:var(--r-md);padding:12px;margin-top:12px;background:var(--surface)}
+#int-app .ent.err{border-left:3px solid var(--out)} #int-app .ent.warn{border-left:3px solid var(--warn)} #int-app .ent.ok{border-left:3px solid var(--in)}
+#int-app .ent-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:12.5px}
+#int-app .ent-h .acct{font-weight:700;font-size:13.5px}
+#int-app .ent-h .k{color:var(--muted);font-size:11.5px}
+#int-app .ent-h .sp{flex:1}
+#int-app .ent .tbl-wrap{margin-top:10px}
+#int-app .ent select{height:30px;border:1px solid var(--warn);border-radius:6px;background:var(--move-soft);color:var(--ink);font:inherit;font-size:12.5px;padding:2px 6px;max-width:100%}
+#int-app .ent .files{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+#int-app .ent .files .pill{font-weight:500;white-space:normal;word-break:break-all}
+#int-app .ent .chips{margin-top:8px}
+#int-app .co-out{border:1px solid var(--rule);border-radius:var(--r-md);padding:12px;margin-top:12px}
+#int-app .co-out:first-child{margin-top:0}
+#int-app .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#int-app .toolbar .sp{flex:1}
+#int-app .bal{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 13px;border-left:3px solid var(--rule-strong);border-radius:var(--r-md);background:var(--surface-2);margin-top:10px;font-size:13px}
+#int-app .bal.ok{background:var(--in-soft);border-left-color:var(--in)}
+#int-app .bal.err{background:var(--out-soft);border-left-color:var(--out)}
+#int-app .bal .n{font-weight:700;font-variant-numeric:tabular-nums}
+#int-app .slip-start td{border-top:2px solid var(--rule-strong)}
+#int-app .dr{color:var(--navy);font-weight:600} #int-app .cr{color:var(--out);font-weight:600}
+#int-app .muted{color:var(--muted)}
+#int-app .note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.6}
+#int-app .empty{font-size:12.5px;color:var(--muted);padding:6px 0}
+#int-app .x{border:0;background:none;color:var(--muted);cursor:pointer;font:inherit;font-size:13px;padding:0 4px}
+#int-app .x:hover{color:var(--out)}
+#int-app .modal-bg{position:fixed;inset:0;background:rgba(10,14,22,.55);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px}
+#int-app .modal-bg.on{display:flex}
+#int-app .modal{background:var(--surface);color:var(--ink);border-radius:var(--r-lg);max-width:560px;width:100%;border:1px solid var(--rule)}
+#int-app .modal .mh{padding:15px 18px 6px;font-weight:700;font-size:15px}
+#int-app .modal .mb{padding:4px 18px 12px;font-size:13px;color:var(--ink-2);max-height:50vh;overflow:auto}
+#int-app .modal .mb ul{margin:6px 0;padding-left:18px}
+#int-app .modal .mf{padding:12px 18px 16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+</style>
+<div id="int-app">
+  <section class="panel int-head">
+    <header><h2>기타 이자수익전표</h2><span class="sub">MMT 외 계좌(하나 일반 · 우리 · 신한 · 부산 · 씨티 MMDA · RCMS) 원천징수영수증 PDF → ERP 업로드용 KO 시트</span>
+      <div class="sp"><button class="btn sm" id="int-new" type="button">새로 시작</button></div></header>
+    <div class="pad">
+      <ol class="fer-steps" id="int-steps"><li data-s="1">PDF 올리기</li><li data-s="2">검증·선택</li><li data-s="3">전표 다운로드</li></ol>
+      <div class="ctl">
+        <div class="grp"><span class="lbl">작업월 <span class="muted">빈 값 = 자동(여러 행 PDF는 마지막 지급월)</span></span><input type="month" id="int-wm"></div>
+        <div class="grp"><span class="lbl">작성사원 사번 <span class="muted">ID_WRITE</span></span><input type="text" class="code" id="int-emp" data-k="idWrite" autocomplete="off"><span class="fb" data-fb="idWrite"></span></div>
+        <div class="grp"><span class="lbl">전표작성일 <span class="muted">DT_WRITE</span></span><input type="date" id="int-dtw"><span class="fb" data-fb="dtWrite"></span></div>
+        <div class="act"><span class="saved" id="int-saved">✔ 설정 자동 저장됨</span><button class="btn sm" id="int-reset" type="button">↺ 기본값 복원</button></div>
+      </div>
+      <div class="cocfg" id="int-cocfg"></div>
+      <div class="det" id="int-map"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="int-step1">
+    <header><h2>1. PDF 올리기</h2><span class="sub">원천징수영수증 · (RCMS) 이자지급증명서 · 거래내역확인증 — 여러 파일을 한 번에</span></header>
+    <div class="pad">
+      <label class="ilbo-drop" id="int-drop" tabindex="0">
+        <input type="file" id="int-file" accept="application/pdf,.pdf" multiple hidden>
+        PDF 여러 개 — 끌어다 놓거나 눌러서 선택
+        <span class="mini" style="display:block;margin-top:4px">파일은 이 브라우저 안에서만 처리됩니다 · 저장하거나 전송하지 않습니다</span>
+      </label>
+      <div class="prog" id="int-prog"><i></i></div>
+      <div class="status" id="int-status"></div>
+      <div class="tbl-wrap" id="int-docs-wrap" hidden>
+        <table class="tbl" id="int-docs">
+          <thead><tr><th>파일</th><th>종류</th><th class="ctr">판독</th><th>징수의무자</th><th class="ctr">법인</th><th class="ctr">상태</th><th>메시지</th><th class="ctr"></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel locked" id="int-step2">
+    <header><h2>2. 검증·선택</h2><span class="sub">셀을 눌러 직접 고칠 수 있습니다 · 회색 행은 작업월 외(전표 제외)</span></header>
+    <div class="pad">
+      <div class="kpis" id="int-kpis"></div>
+      <div id="int-entries"><div class="empty">PDF를 올리면 전표 단위로 표시됩니다.</div></div>
+      <div class="note">검증 규칙 — ① 법인세 ≈ 지급액×세율(10원 미만 절사) ② 지방세 ≈ 법인세×10% ③ 지급일 − 기간 종료일 1~5일 ④ 귀속연월 = 지급월 ⑤ 세액 0/0이면 2라인, 둘 다 양수면 4라인. 칩 색: 빨강 = 오류(전표 제외) · 노랑 = 원본 대조 필요(OCR 등) · 회색 = 참고.</div>
+    </div>
+  </section>
+
+  <section class="panel locked" id="int-step3">
+    <header><h2>3. 전표 다운로드</h2><span class="sub" id="int-slipcnt"></span></header>
+    <div class="pad">
+      <div id="int-out"><div class="empty">검증을 통과한 행이 있으면 법인별 KO 시트 미리보기가 표시됩니다.</div></div>
+      <div class="note">엑셀 구성: <b>KO</b> 시트(ERP 표준 헤더 4행 + 5행부터 분개, MMT 전표와 같은 양식) · <b>{법인}_이자요약</b> 시트(건별 원천징수 내역). 파일명: {법인}_그외이자수익전표_{전표작성일}.</div>
+    </div>
+  </section>
+
+  <div class="modal-bg" id="int-modal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="int-mh">
+    <div class="mh" id="int-mh"></div><div class="mb" id="int-mb"></div><div class="mf" id="int-mf"></div>
+  </div></div>
 </div>
       </div>
 
@@ -10007,15 +10185,19 @@ var AUTO_TOOLS=[
   {k:"check",  t:"대량이체 파일점검",   d:"작성 전표(차변) ↔ 은행 대량이체 파일 1:1 대사 검증", tags:["은행·계좌·금액·예금주","정상 건만 결과 생성"], ico:'<path d="M4 7h16M4 12h10M4 17h7"/><path d="M15 16l2 2 4-4"/>'},
   {k:"expense",t:"사원경비 대량이체",   d:"사원경비 전표 및 계좌 매핑, 인별 집계 및 대량이체 파일 생성", tags:["계좌 매핑","성명=예금주 검증","대량이체 생성"], ico:'<circle cx="9" cy="7.5" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 9.4-3.9"/><circle cx="17" cy="16.5" r="4.5"/>'},
   {k:"card",   t:"법인카드 등록",       d:"삼성카드 발급내역 → ERP 업로드 파일 · CMS 등록 파일", tags:["발급내역 업로드","ERP·CMS 파일"], ico:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6 15h4"/>'},
-  {k:"mmt",    t:"MMT 이자수익전표",   d:"하나 MMT 원천징수영수증 PDF 업로드 → 이자수익·법인세·지방세 4라인 전표 생성", tags:["PDF 업로드","글리프 자동판독","ERP KO 엑셀 다운로드"], ico:'<rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M7 9h4M7 13h6M7 17h3"/><circle cx="16.5" cy="15.5" r="3.2"/><path d="M15 17l3-3"/>'}
+  {k:"mmt",    t:"이자수익전표",       d:"MMT·기타 계좌 원천징수영수증 PDF → 이자수익 전표", tags:["MMT · 기타 계좌","PDF 판독","ERP KO 엑셀 다운로드"], ico:'<rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M7 9h4M7 13h6M7 17h3"/><circle cx="16.5" cy="15.5" r="3.2"/><path d="M15 17l3-3"/>'}
 ,
   {k:"cardpay",t:"법인카드 계정대체",   d:"명세서·승인내역·ERP 전표 → 계정대체전표 · 지급전표 (월 작업파일)", tags:["회장님 카드 분리","ERP 승인번호 매칭","작업파일 생성"], ico:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M7 15h3M14 13.5l2 2 3.5-3.5"/>'}
 ];
+/* [v60] 'int'(기타 이자수익전표)는 이자수익전표 카드(k:"mmt")의 하위 탭 — 카드 정의는 하나, 화면은 둘 */
+var INT_TABS={mmt:"MMT", int:"기타"};
+function autoToolOf(t){ return AUTO_TOOLS.filter(function(x){ return x.k===(t==="int"?"mmt":t); })[0]; }
 function renderAutoHub(){
   var t=AUTO.tool;
   $("#autoHub").hidden=!!t; $("#autoBack").hidden=!t;
+  $("#intTabs").hidden=!INT_TABS[t]; $$("#intTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });
   $$("#v-fep .auto-screen").forEach(function(s){ s.hidden=s.dataset.tool!==t; });
-  $("#viewTitle").textContent = t ? "자금업무 자동화 · "+AUTO_TOOLS.filter(function(x){ return x.k===t; })[0].t : TITLES.fep;
+  $("#viewTitle").textContent = t ? "자금업무 자동화 · "+autoToolOf(t).t+(INT_TABS[t]?" · "+INT_TABS[t]:"") : TITLES.fep;
   if(!t){
     $("#autoGrid").innerHTML=AUTO_TOOLS.map(function(x){
       return '<button class="auto-card" data-k="'+x.k+'"><span class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+x.ico+'</svg></span>'+
@@ -10024,12 +10206,14 @@ function renderAutoHub(){
     $$("#autoGrid .auto-card").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.k; renderAutoHub(); window.scrollTo(0,0); }; });
     return;
   }
-  $("#autoToolTitle").textContent=AUTO_TOOLS.filter(function(x){ return x.k===t; })[0].t;
+  $("#autoToolTitle").textContent=autoToolOf(t).t;
   if(t==="plan") renderFep(); else if(t==="result") renderExecResult(); else if(t==="check") renderTc(); else if(t==="expense") renderEx(); else if(t==="card") renderCards();
   else if(t==="cardpay"){ renderCardpay(); cpMasterLoad(CPS.co).then(function(){ renderCardpay(); cpLoadSaved(); }); }   // [v46]
   else if(t==="mmt"){ /* [v31] #mmt-app · window.MMTSlipApp이 자체 초기화·렌더링을 전담 — 대시보드 쪽 추가 호출 불필요 */ }
+  else if(t==="int"){ if(window.IntSlipApp) window.IntSlipApp.show(); }   // [v60] 기타 이자수익전표 — 계좌 목록(D) 로드 후 매핑 상태를 다시 읽는다
 }
 $("#btnAutoBack").onclick=function(){ AUTO.tool=null; renderAutoHub(); };
+$$("#intTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });   // [v60]
 
 /* 공용: 드롭존 바인딩 */
 function bindDrop(item, onFile){
@@ -13220,7 +13404,7 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
   const HDR = MP.HDR, COL = MP.COL, NCOL = MP.NCOL, U = MP.U, COMPANIES = MP.COMPANIES;
 
   /* ---------- 1. 상수 (운영 정책은 상수로만 분리) ---------- */
-  const VERSION = 'int-core v59';
+  const VERSION = 'int-core v60';
   const ACTIVE_COS = Object.freeze(['SN', 'GD', 'GS']);   // 활성 법인 (layout은 COMPANIES[co].layout 참조)
   const SLIP_PREFIX = 'BM';                              // 전표번호 접두어 (BM+일자+순번5)
   const SLIP_SEQ_START = 1;                              // 일자별 시작 순번
@@ -13254,23 +13438,22 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
     GD: { '1208504063': '하나은행 선릉역지점', '1208525715': '우리은행 선릉역금융센터', '1028114717': '한국씨티은행 강남대기업업무센터' },
     GS: { '1208527498': '신한은행 선릉중앙금융센터', '7588500412': '신한은행 선릉중앙기업금융센터' }
   };
-  /* ERP 예금 라인 정보. 키 = 계좌번호 digits — 코드에 직접 적지 않는다.
-     담당자가 로컬에서 FILL_LOCALLY_* 자리표시자를 해당 계좌의 숫자(하이픈 없이)로 바꾼다. 미설정 키는 매칭되지 않아 '계좌 미등록' error가 된다.
-     label은 안내용(대시보드 계좌 표기)이며 판정에는 쓰지 않는다. */
+  /* ERP 예금 라인 정보. 키 = 대시보드 [설정 → 계좌 목록]의 계좌 표기(라벨). 코드에 계좌번호를 쓰지 않는다 — [v60 A안]
+     실제 번호는 __acctDirectory에서 이 표기로 읽는다. 표기가 계좌 목록에 없으면 mapStatus가 알리고, 그 계좌 PDF는 '계좌 미등록' error. */
   const ERP_ACCT_MAP = {
     SN: {
-      FILL_LOCALLY_SN_HANA_00104: { label: '하나 00104', depAcct: '1110400', depCd: '081-001', bank: { code: '1208504063', name: '(주)하나은행 선릉역' }, noteStyle: 'std' },
-      FILL_LOCALLY_SN_SHINHAN_590348: { label: '신한 590348', depAcct: '1110400', depCd: '088-001', bank: { code: '7588500412', name: '신한은행 선릉중앙기업금융센터' }, noteStyle: 'std' },
-      FILL_LOCALLY_SN_WOORI_143951: { label: '우리 143951', depAcct: '1110400', depCd: '020-001', bank: { code: '1208513413', name: '우리은행 포스코금융센터' }, noteStyle: 'std_nospace' },
-      FILL_LOCALLY_SN_BUSAN_103: { label: '부산 103', depAcct: '1110400', depCd: '032-001', bank: { code: '6068514385', name: '부산은행 구남지점' }, noteStyle: 'std' }
+      '하나 00104': { depAcct: '1110400', depCd: '081-001', bank: { code: '1208504063', name: '(주)하나은행 선릉역' }, noteStyle: 'std' },
+      '신한 590348': { depAcct: '1110400', depCd: '088-001', bank: { code: '7588500412', name: '신한은행 선릉중앙기업금융센터' }, noteStyle: 'std' },
+      '우리 143951': { depAcct: '1110400', depCd: '020-001', bank: { code: '1208513413', name: '우리은행 포스코금융센터' }, noteStyle: 'std_nospace' },
+      '부산 103': { depAcct: '1110400', depCd: '032-001', bank: { code: '6068514385', name: '부산은행 구남지점' }, noteStyle: 'std' }
     },
     GD: {
-      FILL_LOCALLY_GD_HANA_13104: { label: '하나 13104', depAcct: '1110400', depCd: '081-000', bank: { code: '1208504063', name: '하나은행 선릉역지점' }, noteStyle: 'std' },
-      FILL_LOCALLY_GD_WOORI_572706: { label: '우리 572706', depAcct: '1110400', depCd: '020-001', bank: { code: '1208525715', name: '우리은행 선릉역금융센터' }, noteStyle: 'std' },
-      FILL_LOCALLY_GD_CITI_MMDA: { label: '씨티 824', depAcct: '1110600', depCd: '027-0010', bank: { code: '1028114717', name: '한국씨티은행 강남대기업업무센터' }, noteStyle: 'mmda', noteLabel: '씨티 MMDA', cc: { code: 'DE2001-0004', name: '[공통] 경영지원실' } }
+      '하나 13104': { depAcct: '1110400', depCd: '081-000', bank: { code: '1208504063', name: '하나은행 선릉역지점' }, noteStyle: 'std' },
+      '우리 572706': { depAcct: '1110400', depCd: '020-001', bank: { code: '1208525715', name: '우리은행 선릉역금융센터' }, noteStyle: 'std' },
+      '씨티 824': { depAcct: '1110600', depCd: '027-0010', bank: { code: '1028114717', name: '한국씨티은행 강남대기업업무센터' }, noteStyle: 'mmda', noteLabel: '씨티 MMDA', cc: { code: 'DE2001-0004', name: '[공통] 경영지원실' } }
     },
     GS: {
-      FILL_LOCALLY_GS_SHINHAN_430011: { label: '신한 430011', depAcct: '1110400', depCd: '088-001', bank: { code: '7588500412', name: '신한은행 선릉중앙기업금융센터' }, noteStyle: 'std' }
+      '신한 430011': { depAcct: '1110400', depCd: '088-001', bank: { code: '7588500412', name: '신한은행 선릉중앙기업금융센터' }, noteStyle: 'std' }
     }
   };
 
@@ -13326,10 +13509,22 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
     const a = dirList(coCode).find(x => x.digits === dg);
     return a ? { label: a.label, acctNoDisplay: a.num, isMMT: a.isMMT, bank: a.bank, digits: a.digits } : null;
   }
-  function erpEntry(coCode, dg) { const m = ERP_ACCT_MAP[coCode]; return (m && Object.prototype.hasOwnProperty.call(m, dg) && /^\d+$/.test(dg)) ? m[dg] : null; }
+  /* 계좌번호(digits) → 계좌 목록 표기 → ERP 매핑. 표기가 같아도 법인 범위 안에서만 찾는다 */
+  function erpEntry(coCode, dg) {
+    const m = ERP_ACCT_MAP[coCode]; if (!m) return null;
+    const meta = lookupAccountMeta(coCode, dg);
+    return meta && Object.prototype.hasOwnProperty.call(m, meta.label) ? m[meta.label] : null;
+  }
+  /* 매핑 표기 중 계좌 목록에서 찾지 못한 것(미설정) — D 미로드면 전부 미확인 */
   function mapStatus() {
     const out = [];
-    Object.keys(ERP_ACCT_MAP).forEach(co => Object.keys(ERP_ACCT_MAP[co]).forEach(k => out.push({ co, key: /^\d+$/.test(k) ? '(설정됨)' : k, filled: /^\d+$/.test(k), label: ERP_ACCT_MAP[co][k].label, depAcct: ERP_ACCT_MAP[co][k].depAcct })));
+    Object.keys(ERP_ACCT_MAP).forEach(co => {
+      let list = null; try { list = dirList(co); } catch (e) { list = null; }
+      Object.keys(ERP_ACCT_MAP[co]).forEach(label => {
+        const hits = list ? list.filter(x => x.label === label) : [];
+        out.push({ co, label, filled: hits.length === 1, reason: !list ? '계좌 목록 미로드' : hits.length === 0 ? '계좌 목록에 없음' : hits.length > 1 ? '같은 표기 ' + hits.length + '개' : '', depAcct: ERP_ACCT_MAP[co][label].depAcct });
+      });
+    });
     return { total: out.length, unfilled: out.filter(x => !x.filled).length, entries: out };
   }
   function mmtAcctOwner(dg) { const hit = Object.keys(COMPANIES).find(k => digits(COMPANIES[k].acct) === dg); return hit || null; }
@@ -13989,7 +14184,7 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
   function resolveEarner(doc, texts) {
     const iss = doc.issues;
     const mmtHit = acctTokens(texts).map(a => a.digits).find(dg => mmtAcctOwner(dg));
-    if (mmtHit) { iss.push(issue('error', 'acct', 'MMT 계좌(' + mmtAcctOwner(mmtHit) + ') 증빙입니다 — MMT 이자수익전표 메뉴를 사용하세요')); return; }
+    if (mmtHit) { iss.push(issue('error', 'acct', 'MMT 계좌(' + mmtAcctOwner(mmtHit) + ') 증빙입니다 — [MMT 이자수익전표] 탭을 사용하세요')); return; }
     const bz = bizTokens(texts).filter(b => !WITHHOLDERS[b.digits]);
     const hits = new Map();
     bz.forEach(b => ACTIVE_COS.forEach(co => {
@@ -14200,11 +14395,11 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
       }
       // 계좌 · ERP 매핑 · 모듈 소속
       const owner = mmtAcctOwner(acctDigits);
-      if (owner) { e.issues.push(issue('error', 'acct', 'MMT 계좌입니다 — MMT 이자수익전표 메뉴를 사용하세요')); e.status = 'error'; return; }
+      if (owner) { e.issues.push(issue('error', 'acct', 'MMT 계좌입니다 — [MMT 이자수익전표] 탭을 사용하세요')); e.status = 'error'; return; }
       const meta = lookupAccountMeta(co, acctDigits);
       if (!meta) { e.issues.push(issue('error', 'acct', '계좌 미등록 — [설정] 또는 ERP_ACCT_MAP 확인 (대시보드 ' + co + ' 계좌 목록에 없음)')); e.status = 'error'; return; }
       const erp = erpEntry(co, acctDigits);
-      if (!erp) { e.issues.push(issue('error', 'acct', '계좌 미등록 — [설정] 또는 ERP_ACCT_MAP 확인 (' + co + ' ' + meta.label + ': ERP_ACCT_MAP 키 미설정)')); e.status = 'error'; return; }
+      if (!erp) { e.issues.push(issue('error', 'acct', '계좌 미등록 — [설정] 또는 ERP_ACCT_MAP 확인 (' + co + ' ' + meta.label + ': ERP_ACCT_MAP에 이 계좌 표기 없음)')); e.status = 'error'; return; }
       const label = noteLabelOf(meta, erp);
       if (!label) { e.issues.push(issue('error', 'acct', '적요 라벨을 만들 수 없습니다(' + meta.label + ') — ERP_ACCT_MAP noteLabel 지정 필요')); e.status = 'error'; return; }
       if (meta.isMMT !== (erp.depAcct === '1110600')) e.issues.push(issue('info', 'acct', '대시보드 MMT 표시(isMMT=' + meta.isMMT + ')와 예금계정(' + erp.depAcct + ')이 다름 — 정보'));
@@ -14232,7 +14427,7 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
     const out = { cos: {}, skipped: [] };
     const units = [];
     entries.forEach(e => {
-      if (e.status !== 'ok') { out.skipped.push({ entryId: e.id, files: e.files, reason: e.status === 'needsAccount' ? '계좌 선택 필요' : (e.issues.filter(i => i.level === 'error').map(i => i.msg)[0] || '오류') }); return; }
+      if (e.status !== 'ok') { out.skipped.push({ entryId: e.id, files: e.files, reason: e.status === 'needsAccount' ? '계좌 선택 필요' : (e.issues.filter(i => i.level === 'error').map(i => i.msg)[0] || e.issues.filter(i => i.level === 'warn').map(i => i.msg)[0] || '오류') }); return; }
       e.rows.forEach(r => {
         if (!r.include) return;
         if (r.level === 'error' || r.nLines === 0) { out.skipped.push({ entryId: e.id, rowId: r.id, files: e.files, reason: r.issues.filter(i => i.level === 'error').map(i => i.msg).join(' / ') || '분개 불가' }); return; }
@@ -14763,6 +14958,397 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
   // 대시보드 임베딩용 단일 네임스페이스 — [v38] stage()·onStage(구독)·resetDoc 추가
   window.MMTSlipApp = { parser: P, state: S, setCo, rebuild, revalidate, handleFile, loadCfg, saveCfg, defaults, effectiveCfg, stage, resetDoc, onStage: null };
   notifyStage();
+})();
+</script>
+
+<script id="int-ui">
+/* [v60] 기타 이자수익전표 화면(#int-app) — 이자수익전표 카드의 [기타 이자수익전표] 탭.
+   · 판독·조립·분개·엑셀은 window.IntParser 전담. 이 스크립트는 화면 상태 · 렌더링 · 다운로드만 맡는다.
+   · PDF는 이 브라우저 메모리에서만 처리한다(저장·전송·console 출력 없음). 설정만 localStorage 'int_cfg'(MMT 키와 별도).
+   · 조용한 실패 금지: 판독·조립·분개 오류는 문서 표 · 전표 카드 · 제외 목록 · 모달 중 한 곳에 반드시 보인다. */
+(function () {
+  'use strict';
+  const app = document.getElementById('int-app');
+  if (!app) return;
+  const $ = s => app.querySelector(s), $$ = s => Array.from(app.querySelectorAll(s));
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const IP = window.IntParser, MP = window.MMTParser;
+
+  if (!IP || !IP.ready || !MP) {
+    const msg = (IP && IP.error) || 'IntParser(int-core)를 불러오지 못했습니다 — 페이지를 새로고침하세요.';
+    const st = $('#int-status'); st.textContent = msg; st.classList.add('err');
+    $('#int-drop').classList.add('busy');
+    window.IntSlipApp = { state: null, error: msg, show() {}, handleFiles() { return Promise.resolve(); }, recompute() {}, reset() {} };
+    return;
+  }
+  const U = MP.U, COS = IP.ACTIVE_COS;
+  const digits = s => String(s == null ? '' : s).replace(/[^\d]/g, '');
+  const won = n => U.won(n), fmtYmd = s => U.fmtYmd(s);
+  const KIND = { wht: '원천징수영수증', rcmsCert: '이자지급증명서', txn: '거래내역확인증', error: '판독 실패', unknown: '판독 실패' };
+  const LV_PILL = { error: 'err', warn: 'warn', info: 'mute', ok: 'ok' };
+
+  /* ---------- 설정 (localStorage 'int_cfg' · 실패 시 메모리만) ---------- */
+  const CFG_KEY = 'int_cfg';
+  const CO_FIELDS = ['dept', 'deptName', 'cc', 'ccName'];
+  const CODE_FIELDS = ['idWrite', 'dept', 'cc'];
+  function defaultEmp() { try { return (window.MMTSlipApp && window.MMTSlipApp.defaults) ? String(window.MMTSlipApp.defaults('SN').idWrite || '') : ''; } catch (e) { return ''; } }
+  function defaults() {
+    const out = { idWrite: defaultEmp(), cos: {} };
+    COS.forEach(co => { const c = MP.COMPANIES[co]; out.cos[co] = { dept: c.dept, deptName: c.deptName, cc: c.cc, ccName: c.ccName }; });
+    return out;
+  }
+  function loadCfg() {
+    const d = defaults(); let v = null;
+    try { v = JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); } catch (e) { v = null; }
+    if (v && typeof v === 'object') {
+      if (typeof v.idWrite === 'string') d.idWrite = v.idWrite;
+      COS.forEach(co => { const s = v.cos && v.cos[co]; if (s) CO_FIELDS.forEach(k => { if (typeof s[k] === 'string') d.cos[co][k] = s[k]; }); });
+    }
+    return d;
+  }
+  let savedT = 0;
+  function saveCfg() {
+    let ok = true;
+    try { localStorage.setItem(CFG_KEY, JSON.stringify(S.cfg)); } catch (e) { ok = false; }
+    const el = $('#int-saved'); el.textContent = ok ? '✔ 설정 자동 저장됨' : '저장 불가(이 창에서만 유지)';
+    el.classList.toggle('err', !ok); el.classList.add('on'); clearTimeout(savedT); savedT = setTimeout(() => el.classList.remove('on'), 1600);
+  }
+  function cfgIssue(k, v) { const t = String(v == null ? '' : v); if (!t.trim()) return '빈 값'; if (CODE_FIELDS.indexOf(k) >= 0 && /\s/.test(t)) return '공백 포함'; return ''; }
+
+  /* ---------- 상태 ---------- */
+  const S = { docs: [], seen: new Set(), choice: {}, workMonth: '', res: null, built: null, buildErr: '', busy: false, env: null, cfg: loadCfg() };
+  const pad = n => String(n).padStart(2, '0'), today = new Date();
+  $('#int-dtw').value = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
+
+  function metaOf() {
+    const d = defaults(), cfg = {};
+    COS.forEach(co => { cfg[co] = {}; CO_FIELDS.forEach(k => { const v = S.cfg.cos[co][k]; if (!cfgIssue(k, v)) cfg[co][k] = String(v).trim(); else cfg[co][k] = d.cos[co][k]; }); });
+    return { idWrite: String(S.cfg.idWrite || '').trim(), dtWrite: digits($('#int-dtw').value), cfg };
+  }
+
+  /* ---------- 머리: 사번 · 법인별 부서/CC ---------- */
+  function renderCoCfg() {
+    $('#int-cocfg').innerHTML = COS.map(co => {
+      const c = S.cfg.cos[co], C = MP.COMPANIES[co];
+      const inp = (k, cls, ph) => '<input type="text" class="' + cls + '" data-co="' + co + '" data-k="' + k + '" value="' + esc(c[k]) + '" placeholder="' + ph + '" autocomplete="off" aria-label="' + co + ' ' + ph + '">';
+      return '<div class="ctl" data-co="' + co + '"><div class="grp"><span class="lbl">법인</span><span class="chip co" style="color:var(--c-' + co.toLowerCase() + ')" title="' + esc(C.name) + '">' + co + '</span></div>' +
+        '<div class="grp"><span class="lbl">작성부서 <span class="muted">관리항목1</span></span><div class="pair">' + inp('dept', 'code', '부서코드') + inp('deptName', 'name', '부서명') + '</div><span class="fb" data-fb="' + co + '.dept"></span></div>' +
+        '<div class="grp"><span class="lbl">코스트센터 <span class="muted">CD_MNGD2</span></span><div class="pair">' + inp('cc', 'code', 'CC코드') + inp('ccName', 'name', 'CC명') + '</div><span class="fb" data-fb="' + co + '.cc"></span></div></div>';
+    }).join('');
+    $$('#int-cocfg input').forEach(el => el.addEventListener('input', () => { S.cfg.cos[el.dataset.co][el.dataset.k] = el.value; markCfg(); saveCfg(); scheduleRecompute(); }));
+    $('#int-emp').value = S.cfg.idWrite;
+    markCfg();
+  }
+  function markCfg() {
+    const emp = $('#int-emp'), ei = cfgIssue('idWrite', S.cfg.idWrite);
+    emp.classList.toggle('inp-warn', !!ei); app.querySelector('[data-fb="idWrite"]').textContent = ei ? ei + ' — 전표 생성 불가' : '';
+    const dt = digits($('#int-dtw').value);
+    $('#int-dtw').classList.toggle('inp-warn', !U.isYmd(dt)); app.querySelector('[data-fb="dtWrite"]').textContent = U.isYmd(dt) ? '' : '날짜를 입력하세요';
+    COS.forEach(co => ['dept', 'cc'].forEach(g => {
+      const ks = g === 'dept' ? ['dept', 'deptName'] : ['cc', 'ccName'];
+      const bad = ks.filter(k => cfgIssue(k, S.cfg.cos[co][k]));
+      ks.forEach(k => { const el = app.querySelector('#int-cocfg input[data-co="' + co + '"][data-k="' + k + '"]'); if (el) el.classList.toggle('inp-warn', bad.indexOf(k) >= 0); });
+      const fb = app.querySelector('[data-fb="' + co + '.' + g + '"]'); if (fb) fb.textContent = bad.length ? '빈 값/공백 → 기본값으로 생성' : '';
+    }));
+  }
+  $('#int-emp').addEventListener('input', e => { S.cfg.idWrite = e.target.value; markCfg(); saveCfg(); scheduleRecompute(); });
+  $('#int-dtw').addEventListener('change', () => { markCfg(); recompute(); });
+  $('#int-wm').addEventListener('change', e => { S.workMonth = e.target.value || ''; recompute(); });
+  $('#int-reset').addEventListener('click', () => { S.cfg = defaults(); saveCfg(); renderCoCfg(); recompute(); });
+  let rcT = 0;
+  function scheduleRecompute() { clearTimeout(rcT); rcT = setTimeout(recompute, 250); }
+
+  /* ---------- ERP 계좌 매핑 상태 (계좌 목록 표기 기준) ---------- */
+  function renderMap() {
+    const el = $('#int-map');
+    let st;
+    try { st = IP.mapStatus(); } catch (e) { el.className = 'det err'; el.textContent = 'ERP 계좌 매핑 상태를 확인하지 못했습니다: ' + (e && e.message || e); return; }
+    if (!st.unfilled) { el.className = 'det'; el.innerHTML = 'ERP 계좌 매핑 <b>' + st.total + '/' + st.total + '</b> 연결됨 — [설정 → 계좌 목록] 표기 기준(' + st.entries.map(x => esc(x.co + ' ' + x.label)).join(' · ') + ')'; return; }
+    const unloaded = st.entries.every(x => x.reason === '계좌 목록 미로드');
+    el.className = 'det ' + (unloaded ? 'err' : 'warn');
+    el.innerHTML = unloaded
+      ? '대시보드 계좌 목록이 아직 로드되지 않았습니다 — 로그인·데이터 로드 후 PDF를 올리세요(지금 올리면 계좌 확인 단계에서 오류가 납니다).'
+      : 'ERP 계좌 매핑 ' + (st.total - st.unfilled) + '/' + st.total + ' 연결 — 아래 표기를 [설정 → 계좌 목록]에서 찾지 못했습니다. 해당 계좌 PDF는 "계좌 미등록"이 됩니다.<ul>' +
+        st.entries.filter(x => !x.filled).map(x => '<li><b>' + esc(x.co + ' ' + x.label) + '</b> — ' + esc(x.reason) + '</li>').join('') + '</ul>';
+  }
+
+  /* ---------- 1. PDF 올리기 ---------- */
+  const drop = $('#int-drop'), fileInp = $('#int-file');
+  drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInp.click(); } });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); handleFiles(Array.from((e.dataTransfer && e.dataTransfer.files) || [])); });
+  fileInp.addEventListener('change', () => { const fs = Array.from(fileInp.files || []); setTimeout(() => { fileInp.value = ''; }, 0); handleFiles(fs); });
+
+  function setProg(frac) { const p = $('#int-prog'); if (frac == null) { p.classList.remove('on'); p.firstElementChild.style.width = '0'; return; } p.classList.add('on'); p.firstElementChild.style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%'; }
+  function setStatus(msg, err) { const s = $('#int-status'); s.textContent = msg || ''; s.classList.toggle('err', !!err); }
+
+  async function handleFiles(files) {
+    if (!files || !files.length) return;
+    if (S.busy) { setStatus('판독 중입니다 — 끝난 뒤 다시 올리세요. (이번에 고른 ' + files.length + '개는 받지 않았습니다)', true); return; }
+    if (!window.pdfjsLib) { modal('라이브러리 로드 실패', '<p>pdf.js를 불러오지 못했습니다. 네트워크(사내 방화벽) 상태를 확인하세요.</p>', [{ t: '확인', p: true }]); return; }
+    const notes = [], todo = [];
+    files.forEach(f => {
+      const key = f.name + '|' + f.size + '|' + f.lastModified;
+      if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') notes.push('PDF가 아님 — 건너뜀: ' + f.name);
+      else if (S.seen.has(key)) notes.push('이미 올린 파일 — 건너뜀: ' + f.name);
+      else todo.push({ f, key });
+    });
+    if (!todo.length) { setStatus(notes.join('\n'), true); return; }
+    S.busy = true; drop.classList.add('busy');
+    if (!S.env) { try { S.env = IP.browserEnv(); } catch (e) { S.busy = false; drop.classList.remove('busy'); setStatus('판독 환경을 만들지 못했습니다: ' + (e && e.message || e), true); return; } }
+    try {
+      for (let i = 0; i < todo.length; i++) {
+        const { f, key } = todo[i];
+        const head = '(' + (i + 1) + '/' + todo.length + ') ' + f.name;
+        setStatus(head + ' — 읽는 중'); setProg(i / todo.length);
+        let doc;
+        try {
+          const data = new Uint8Array(await f.arrayBuffer());
+          doc = await IP.readPdf(window.pdfjsLib, data, { fileName: f.name, env: S.env, onProgress: (msg, fr) => { setStatus(head + ' — ' + msg); setProg((i + (Number.isFinite(fr) ? fr : 0)) / todo.length); } });
+        } catch (e) {
+          doc = { id: 'x' + Date.now() + i, fileName: f.name, kind: 'error', status: 'error', issues: [{ level: 'error', field: 'file', msg: '파일을 읽지 못했습니다: ' + (e && e.message || e) }] };
+        }
+        doc._key = key;
+        S.seen.add(key); S.docs.push(doc);
+        renderDocs();
+      }
+      const errN = S.docs.filter(d => d.status === 'error' || d.kind === 'error').length;
+      setStatus('판독 완료 — ' + todo.length + '개' + (errN ? ' · 오류 문서 ' + errN + '개(문서 표 메시지 확인)' : '') + (notes.length ? '\n' + notes.join('\n') : ''), !!errN || !!notes.length);
+    } finally { S.busy = false; drop.classList.remove('busy'); setProg(null); }
+    recompute();
+  }
+  function removeDoc(id) {
+    const d = S.docs.find(x => x.id === id); if (!d) return;
+    S.docs = S.docs.filter(x => x.id !== id); S.seen.delete(d._key); delete S.choice[id];
+    recompute();
+  }
+  function docStatus(d) {
+    if (d.kind === 'error' || d.status === 'error') return ['err', '오류'];
+    if (d.needsAccount) return ['warn', '계좌 선택'];
+    if (d.mode === 'ocr') return ['warn', 'OCR 확인'];
+    return ['ok', '정상'];
+  }
+  function issueChips(list, opt) {
+    opt = opt || {};
+    const items = list.filter(i => opt.all || i.level !== 'info' || opt.info);
+    if (!items.length) return '';
+    return '<div class="chips">' + items.map(i => '<span class="pill ' + LV_PILL[i.level] + '">' + esc(i.msg) + '</span>').join('') + '</div>';
+  }
+  function renderDocs() {
+    const wrap = $('#int-docs-wrap'); wrap.hidden = !S.docs.length;
+    $('#int-docs tbody').innerHTML = S.docs.map(d => {
+      const [pc, pt] = docStatus(d);
+      const wh = d.withholder ? esc(d.withholder.bank + (d.withholder.pdfName ? ' · ' + d.withholder.pdfName : '')) : (d.kind === 'txn' && d.txn ? esc(d.txn.branch || '') : d.kind === 'rcmsCert' && d.cert ? esc(d.cert.bank || '') : '<span class="muted">—</span>');
+      const co = d.co ? '<span class="chip co" style="color:var(--c-' + d.co.toLowerCase() + ')">' + d.co + '</span>' : '<span class="muted">—</span>';
+      return '<tr data-doc="' + esc(d.id) + '"><td class="fname">' + esc(d.fileName) + '</td><td>' + esc(KIND[d.kind] || d.kind) + '</td><td class="ctr">' + (d.mode === 'ocr' ? 'OCR' : d.mode === 'text' ? '텍스트' : '—') + '</td><td>' + wh + '</td><td class="ctr">' + co + '</td>' +
+        '<td class="ctr"><span class="pill ' + pc + '">' + pt + '</span></td><td class="msgs">' + (issueChips(d.issues || [], { info: true }) || '<span class="muted">—</span>') + '</td>' +
+        '<td class="ctr"><button type="button" class="x" data-rm="' + esc(d.id) + '" title="이 파일 빼기" aria-label="' + esc(d.fileName) + ' 빼기">✕</button></td></tr>';
+    }).join('');
+    $$('#int-docs [data-rm]').forEach(b => b.addEventListener('click', () => removeDoc(b.dataset.rm)));
+  }
+
+  /* ---------- 조립 · 분개 ---------- */
+  function recompute() {
+    try { S.res = IP.assemble(S.docs, { workMonth: S.workMonth, accountChoice: S.choice }); }
+    catch (e) { S.res = { entries: [], workMonth: S.workMonth, fatal: (e && e.message) || String(e) }; }
+    S.built = null; S.buildErr = '';
+    const okN = S.res.entries.filter(e => e.status === 'ok').length;
+    if (okN) {
+      try { S.built = IP.buildSlips(S.res.entries, metaOf()); }
+      catch (e) { S.buildErr = (e && e.code ? '[' + e.code + '] ' : '') + ((e && e.message) || String(e)); }
+    }
+    render();
+  }
+  function render() { renderMap(); renderDocs(); renderEntries(); renderOut(); renderSteps(); }
+  function stage() {
+    if (!S.docs.length) return 1;
+    const lines = S.built ? Object.keys(S.built.cos).reduce((a, k) => a + S.built.cos[k].lines.length, 0) : 0;
+    return lines ? 3 : 2;
+  }
+  function renderSteps() {
+    const st = stage();
+    $$('#int-steps li').forEach(li => { const n = +li.dataset.s; li.className = n < st ? 'on' : n === st ? 'cur' : ''; li.setAttribute('aria-current', n === st ? 'step' : 'false'); });
+    $('#int-step2').classList.toggle('locked', st < 2);
+    $('#int-step3').classList.toggle('locked', st < 3);
+  }
+
+  /* ---------- 2. 검증·선택 ---------- */
+  const FIELD_COL = { payDate: 'payDate', y: 'payDate', m: 'payDate', d: 'payDate', belong: 'payDate', by: 'payDate', bm: 'payDate', period: 'period', rate: 'rate', pay: 'pay', taxRate: 'taxRate', corpTax: 'corpTax', localTax: 'localTax', taxStack: 'corpTax' };
+  function cellLevel(r, col) {
+    let L = '';
+    r.issues.forEach(i => { if (FIELD_COL[i.field] !== col) return; if (i.level === 'error') L = 'err'; else if (i.level === 'warn' && L !== 'err') L = 'warn'; else if (i.level === 'info' && !L) L = 'info'; });
+    return L ? ' c-' + L : '';
+  }
+  function docOf(id) { return S.docs.find(d => d.id === id); }
+  function rawOf(r) { const d = docOf(r.docId); return d && d.rawRows ? d.rawRows[r.idx] : null; }
+  function numShow(v, raw) { return Number.isFinite(v) ? won(v) : String(raw == null ? '' : raw).replace(/\s+/g, ' '); }
+  function rowCells(r) {
+    const raw = rawOf(r) || { fields: {} }, f = raw.fields;
+    const pd = U.isYmd(r.payDate) ? fmtYmd(r.payDate) : (f.payDate != null ? f.payDate : [f.y, f.m, f.d].filter(x => x != null && x !== '').join('.'));
+    const per = (U.isYmd(r.start) && U.isYmd(r.end)) ? fmtYmd(r.start) + ' ~ ' + fmtYmd(r.end) : (f.period || '');
+    const rate = r.rate != null && Number.isFinite(r.rate) ? String(r.rate) : (f.rate || '');
+    const tr = Number.isFinite(r.taxRate) ? String(r.taxRate) : (f.taxRate || '');
+    const SZ = { payDate: 10, period: 23, rate: 6, taxRate: 6 };
+    const ed = (fld, val, cls, lbl) => '<td class="' + cls + cellLevel(r, fld) + '"><input class="ed" size="' + (SZ[fld] || 9) + '" data-doc="' + esc(r.docId) + '" data-idx="' + r.idx + '" data-f="' + fld + '" value="' + esc(val) + '" aria-label="' + lbl + '"></td>';
+    return ed('payDate', pd, 'code', '지급일') + ed('period', per, 'code per', '대상기간') + ed('rate', rate, 'num rt', '이율') + ed('pay', numShow(r.pay, f.pay), 'num', '지급액') +
+      ed('taxRate', tr, 'num rt', '세율') + ed('corpTax', numShow(r.corpTax, f.corpTax), 'num', '법인세') + ed('localTax', numShow(r.localTax, f.localTax), 'num', '지방세') +
+      '<td class="num">' + (Number.isFinite(r.net) ? won(r.net) : '<span class="muted">—</span>') + '</td><td class="ctr">' + (r.nLines ? r.nLines : '<span class="muted">—</span>') + '</td>';
+  }
+  /* 검증 열: 행 판정 요약 알약 — 칩(오류·확인·참고 메시지)은 바로 아래 줄 전체 폭으로 */
+  function rowPill(r) {
+    const n = lv => r.issues.filter(i => i.level === lv).length;
+    if (r.level === 'error') return '<span class="pill err">오류 ' + n('error') + '</span>';
+    if (r.level === 'warn') return '<span class="pill warn">확인 ' + n('warn') + '</span>';
+    return '<span class="pill ok">정상</span>';
+  }
+  const FIX_NAME = { incomeTax: '소득세', ruralTax: '농특세', total: '계' };
+  function fixInputs(r) {
+    const raw = rawOf(r); if (!raw) return '';
+    const need = [...new Set(r.issues.filter(i => i.level === 'error' && FIX_NAME[i.field]).map(i => i.field))];
+    return need.map(k => '<label class="fix">' + FIX_NAME[k] + ' <input class="ed" data-doc="' + esc(r.docId) + '" data-idx="' + r.idx + '" data-f="' + k + '" size="9" value="' + esc(raw.fields[k] == null ? '' : raw.fields[k]) + '" aria-label="' + FIX_NAME[k] + '"></label>').join('');
+  }
+  function entryHead(e) {
+    const coChip = e.co ? '<span class="chip co" style="color:var(--c-' + e.co.toLowerCase() + ')">' + e.co + '</span>' : '<span class="pill mute">법인 미판별</span>';
+    const acct = e.acct ? esc(e.acct.dLabel) + ' <span class="muted">' + esc(e.acct.display) + '</span>' : (e.kind === 'txn' || e.kind === 'rcmsCert' ? esc(KIND[e.kind]) : '<span class="muted">계좌 미확정</span>');
+    const kind = e.kind === 'rcms' ? '<span class="pill ' + (e.isRcms ? 'ok' : 'err') + '">RCMS ' + (e.isRcms ? '3문서' : '번들 미완성') + '</span>' : e.kind === 'general' ? '<span class="pill mute">일반</span>' : '';
+    const stx = e.status === 'ok' ? (e.level === 'error' ? ['err', '오류 행 있음'] : e.level === 'warn' ? ['warn', '원본 대조'] : ['ok', '정상']) : e.status === 'needsAccount' ? ['warn', '계좌 선택 필요'] : ['err', '오류'];
+    return '<div class="ent-h">' + coChip + '<span class="acct">' + acct + '</span>' + kind + (e.workMonth ? '<span class="k">작업월 ' + esc(e.workMonth) + '</span>' : '') + (e.acctBy ? '<span class="k">계좌 판별: ' + esc(e.acctBy) + '</span>' : '') +
+      '<span class="sp"></span><span class="pill ' + stx[0] + '">' + stx[1] + '</span></div>' +
+      '<div class="files">' + e.files.map(n => '<span class="pill mute">' + esc(n) + '</span>').join('') + '</div>';
+  }
+  function renderEntries() {
+    const box = $('#int-entries'), es = S.res ? S.res.entries : [];
+    renderKpis(es);
+    if (S.res && S.res.fatal) { box.innerHTML = '<div class="det err">조립 중 오류: ' + esc(S.res.fatal) + '</div>'; return; }
+    if (!es.length) { box.innerHTML = '<div class="empty">PDF를 올리면 전표 단위로 표시됩니다.</div>'; return; }
+    box.innerHTML = es.map(e => {
+      const cls = e.status === 'ok' ? (e.level === 'error' ? 'err' : e.level === 'warn' ? 'warn' : 'ok') : e.status === 'needsAccount' ? 'warn' : 'err';
+      let sel = '';
+      if (e.status === 'needsAccount') {
+        const did = e.docIds[0];
+        sel = '<div class="fix" style="margin-top:8px"><b>계좌 선택</b> <select data-choose="' + esc(did) + '" aria-label="계좌 선택"><option value="">— 후보 ' + (e.candidates || []).length + '개 중 선택 —</option>' +
+          (e.candidates || []).map(c => '<option value="' + esc(c.digits) + '"' + (S.choice[did] === c.digits ? ' selected' : '') + '>' + esc((c.label || '(표기 없음)') + ' · ' + (c.num || c.digits)) + '</option>').join('') + '</select></div>';
+      }
+      const rows = e.rows || [];
+      const tbl = rows.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="ctr">지급일</th><th class="ctr">기간</th><th class="num">이율(%)</th><th class="num">지급액</th><th class="num">세율(%)</th><th class="num">법인세</th><th class="num">지방세</th><th class="num">입금액</th><th class="ctr">라인</th><th>검증</th></tr></thead><tbody>' +
+        rows.map(r => { const chips = issueChips(r.issues, { info: true }) + fixInputs(r), off = r.include ? '' : ' off';
+          return '<tr class="drow' + off + (chips ? ' has-msg' : '') + '" data-row="' + esc(r.id) + '">' + rowCells(r) + '<td>' + rowPill(r) + '</td></tr>' +
+            (chips ? '<tr class="msgrow' + off + '" data-row-msg="' + esc(r.id) + '"><td colspan="10" class="msgs">' + chips + '</td></tr>' : ''); }).join('') +
+        '</tbody></table></div>' : '';
+      return '<div class="ent ' + cls + '" data-ent="' + esc(e.id) + '">' + entryHead(e) + sel + issueChips(e.issues, { info: true }) + tbl + '</div>';
+    }).join('');
+    $$('#int-entries input.ed').forEach(el => el.addEventListener('change', () => editCell(el)));
+    $$('#int-entries select[data-choose]').forEach(el => el.addEventListener('change', () => { if (el.value) S.choice[el.dataset.choose] = el.value; else delete S.choice[el.dataset.choose]; recompute(); }));
+  }
+  function editCell(el) {
+    const doc = docOf(el.dataset.doc), idx = +el.dataset.idx, f = el.dataset.f, v = el.value.trim();
+    if (!doc || !doc.rawRows || !doc.rawRows[idx]) { modal('수정할 행을 찾지 못했습니다', '<p>문서가 빠졌거나 다시 판독되었습니다. 화면을 새로 그립니다.</p>', [{ t: '확인', p: true }]); recompute(); return; }
+    const raw = doc.rawRows[idx];
+    try {
+      if (f === 'payDate' && !('payDate' in raw.fields)) {
+        const dg = digits(v);
+        if (dg.length === 8) { IP.patchRaw(doc, idx, 'y', dg.slice(0, 4)); IP.patchRaw(doc, idx, 'm', dg.slice(4, 6)); IP.patchRaw(doc, idx, 'd', dg.slice(6, 8)); }
+        else { IP.patchRaw(doc, idx, 'y', v); IP.patchRaw(doc, idx, 'm', ''); IP.patchRaw(doc, idx, 'd', ''); }
+      } else if (f === 'payDate') {
+        const dg = digits(v); IP.patchRaw(doc, idx, 'payDate', dg.length === 8 ? dg.slice(0, 4) + '.' + dg.slice(4, 6) + '.' + dg.slice(6, 8) : v);
+      } else IP.patchRaw(doc, idx, f, v);
+    } catch (e) { modal('수정할 수 없습니다', '<p>' + esc((e && e.message) || e) + '</p>', [{ t: '확인', p: true }]); return; }
+    recompute();
+  }
+  function renderKpis(es) {
+    const ok = es.filter(e => e.status === 'ok');
+    const rowsIn = [].concat(...ok.map(e => e.rows.filter(r => r.include)));
+    const errN = es.filter(e => e.status !== 'ok' && e.status !== 'needsAccount').length + rowsIn.filter(r => r.level === 'error').length;
+    const warnN = es.filter(e => e.status === 'needsAccount').length + rowsIn.filter(r => r.level === 'warn').length;
+    const slips = S.built ? Object.keys(S.built.cos).reduce((a, k) => a + S.built.cos[k].balance.slips, 0) : 0;
+    const pay = S.built ? Object.keys(S.built.cos).reduce((a, k) => a + S.built.cos[k].rows.reduce((s, r) => s + r.pay, 0), 0) : 0;
+    const k = (l, v, c) => '<div class="kpi ' + (c || '') + '"><div class="l">' + l + '</div><div class="v">' + v + '</div></div>';
+    $('#int-kpis').innerHTML = k('올린 PDF', S.docs.length) + k('전표 단위', es.length) + k('생성 전표', slips, slips ? 'ok' : '') + k('이자수익 합계', won(pay)) + k('오류', errN, errN ? 'err' : '') + k('확인 필요', warnN, warnN ? 'warn' : '');
+  }
+
+  /* ---------- 3. 전표 다운로드 ---------- */
+  function entryCo(id) { const e = S.res && S.res.entries.find(x => x.id === id); return e ? e.co : null; }
+  function skippedHtml(list) {
+    if (!list.length) return '';
+    return '<div class="det warn" style="margin-top:10px"><b>전표에서 제외 ' + list.length + '건</b><ul>' + list.map(s => '<li>' + esc(s.files.join(' + ')) + ' — ' + esc(s.reason) + '</li>').join('') + '</ul></div>';
+  }
+  function renderOut() {
+    const box = $('#int-out');
+    const sk = S.built ? S.built.skipped : [];
+    const cos = S.built ? COS.filter(co => S.built.cos[co]) : [];
+    const totalSlips = cos.reduce((a, co) => a + S.built.cos[co].balance.slips, 0);
+    $('#int-slipcnt').textContent = totalSlips ? '법인 ' + cos.length + '곳 · 전표 ' + totalSlips + '건' : '';
+    if (S.buildErr) { box.innerHTML = '<div class="det err">전표를 만들 수 없습니다: ' + esc(S.buildErr) + '</div>'; return; }
+    if (!cos.length) { box.innerHTML = (S.docs.length ? '<div class="empty">아직 전표로 만들 수 있는 행이 없습니다 — 2단계의 빨간 칩을 확인하세요.</div>' : '<div class="empty">검증을 통과한 행이 있으면 법인별 KO 시트 미리보기가 표시됩니다.</div>') + skippedHtml(sk); return; }
+    box.innerHTML = cos.map(co => {
+      const b = S.built.cos[co], bal = b.balance;
+      let prev = '';
+      const body = b.lines.map(l => {
+        const c = l.cells, start = l.slip !== prev; prev = l.slip;
+        const mg = [c.CD_MNGD1, c.CD_MNGD2, c.CD_MNGD3, c.CD_MNGD4].filter(x => x != null && x !== '').join(' · ');
+        return '<tr class="' + (start ? 'slip-start' : '') + '"><td class="code">' + esc(l.slip) + '</td><td class="ctr">' + l.n + '</td><td class="code">' + fmtYmd(l.dt) + '</td><td class="ctr ' + (l.drcr === 1 ? 'dr' : 'cr') + '">' + (l.drcr === 1 ? '차' : '대') + '</td>' +
+          '<td class="code">' + esc(l.acct) + '</td><td>' + esc(l.acctName) + '</td><td class="num">' + (l.drcr === 1 ? won(l.amt) : '') + '</td><td class="num">' + (l.drcr === 2 ? won(l.amt) : '') + '</td><td>' + esc(l.note) + '</td><td class="muted">' + esc(mg) + '</td></tr>';
+      }).join('');
+      return '<div class="co-out" data-co="' + co + '"><div class="toolbar"><span class="chip co" style="color:var(--c-' + co.toLowerCase() + ')">' + co + '</span><b>' + esc(MP.COMPANIES[co].name) + '</b><span class="muted">전표 ' + bal.slips + '건 · ' + b.lines.length + '라인</span><span class="sp"></span>' +
+        '<button class="btn sm" type="button" data-dl="' + co + '" data-ext="xlsx">.xlsx</button><button class="btn sm primary" type="button" data-dl="' + co + '" data-ext="xls">⬇ KO 엑셀 (.xls)</button></div>' +
+        '<div class="bal ' + (bal.ok ? 'ok' : 'err') + '">' + (bal.ok ? '✔ 차·대변 일치' : '⛔ 차·대변 불일치 — 다운로드 차단') + ' · 차변 <span class="n">' + won(bal.dr) + '</span> · 대변 <span class="n">' + won(bal.cr) + '</span>' + (bal.ok ? '' : ' · ' + esc(bal.bad.slice(0, 3).join(' / '))) + '</div>' +
+        '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="ctr">전표번호</th><th class="ctr">라인</th><th class="ctr">회계일자</th><th class="ctr">차대</th><th class="ctr">계정코드</th><th>계정명</th><th class="num">차변</th><th class="num">대변</th><th>적요</th><th>관리항목</th></tr></thead><tbody>' + body + '</tbody>' +
+        '<tfoot><tr><td colspan="6">합계</td><td class="num">' + won(bal.dr) + '</td><td class="num">' + won(bal.cr) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>';
+    }).join('') + skippedHtml(sk);
+    $$('#int-out [data-dl]').forEach(btn => btn.addEventListener('click', () => download(btn.dataset.dl, btn.dataset.ext)));
+  }
+  function download(co, ext) {
+    recompute();
+    const b = S.built && S.built.cos[co];
+    if (!b) { modal('전표 없음', '<p>' + esc(co) + ' 전표가 없습니다. 2단계 오류를 확인하세요.</p>', [{ t: '확인', p: true }]); return; }
+    if (!b.balance.ok) { modal('⛔ 다운로드 차단 — 차·대변 불일치', '<p>회계 항등식 <b>이자수익(대변) = 법인세 + 지방세 + 예금 입금(차변)</b>이 성립하지 않습니다.</p><ul>' + b.balance.bad.slice(0, 10).map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>', [{ t: '확인', p: true }]); return; }
+    const warns = b.rows.filter(r => r.level === 'warn');
+    const sk = S.built.skipped.filter(s => { const c = entryCo(s.entryId); return c === co || c == null; });
+    const go = () => writeFile(co, ext);
+    if (warns.length || sk.length) {
+      const li = warns.slice(0, 8).map(r => '<li><b>' + fmtYmd(r.payDate) + '</b> — ' + esc(r.issues.filter(i => i.level === 'warn').map(i => i.msg).join(', ')) + '</li>').join('') +
+        sk.slice(0, 8).map(s => '<li>제외: ' + esc(s.files.join(' + ')) + ' — ' + esc(s.reason) + '</li>').join('');
+      modal('확인 필요 ' + (warns.length + sk.length) + '건', '<p>차·대변은 일치합니다. 아래 건은 원본 PDF와 대조하거나, 전표에서 빠진 것을 확인하세요.</p><ul>' + li + '</ul>', [{ t: '취소' }, { t: '원본 대조 완료 — 다운로드', p: true, fn: go }]);
+      return;
+    }
+    go();
+  }
+  function writeFile(co, ext) {
+    const b = S.built.cos[co], m = metaOf();
+    if (!window.XLSX) { modal('라이브러리 로드 실패', '<p>SheetJS(XLSX)를 불러오지 못했습니다. 네트워크 상태를 확인하세요.</p>', [{ t: '확인', p: true }]); return; }
+    let wb;
+    const files = [...new Set([].concat(...S.res.entries.filter(e => e.co === co && e.status === 'ok').map(e => e.files)))];
+    try { wb = IP.buildWorkbook(window.XLSX, co, b, { idWrite: m.idWrite, dtWrite: m.dtWrite, fileName: files.join(', ') }); }
+    catch (e) { modal('엑셀을 만들지 못했습니다', '<p>' + esc((e && e.message) || e) + '</p>', [{ t: '확인', p: true }]); return; }
+    const name = co + '_그외이자수익전표_' + m.dtWrite + '.' + ext;
+    const bin = window.XLSX.write(wb, { bookType: ext === 'xls' ? 'biff8' : 'xlsx', type: 'array' });
+    const blob = new Blob([bin], { type: ext === 'xls' ? 'application/vnd.ms-excel' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }
+
+  /* ---------- 모달 ---------- */
+  function modal(title, body, btns) {
+    $('#int-mh').textContent = title; $('#int-mb').innerHTML = body;
+    const mf = $('#int-mf'); mf.innerHTML = '';
+    btns.forEach(b => { const el = document.createElement('button'); el.type = 'button'; el.className = 'btn' + (b.p ? ' primary' : ''); el.textContent = b.t; el.onclick = () => { $('#int-modal').classList.remove('on'); if (b.fn) b.fn(); }; mf.appendChild(el); });
+    $('#int-modal').classList.add('on');
+  }
+
+  /* ---------- 새로 시작 · 진입 ---------- */
+  function reset() {
+    if (S.busy) { setStatus('판독 중에는 새로 시작할 수 없습니다 — 끝난 뒤 다시 누르세요.', true); return; }
+    S.docs = []; S.seen = new Set(); S.choice = {}; S.res = null; S.built = null; S.buildErr = '';
+    setStatus(''); setProg(null);
+    recompute();
+  }
+  $('#int-new').addEventListener('click', reset);
+  function show() { renderCoCfg(); recompute(); }
+
+  renderCoCfg(); recompute();
+  window.IntSlipApp = { state: S, show, handleFiles, recompute, reset, stage };
 })();
 </script>
 
