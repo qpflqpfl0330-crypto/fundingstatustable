@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v60 · 2026-10-15</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v61 · 2026-10-15</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -2180,6 +2180,7 @@ function categorize(c,row){
     if((row.deposit>0)===(IN_CATS.indexOf(v)>=0)) return {cat:v,auto:false};
   }
   var r=applyRules(row);
+  if(r && /^(시스코|델|오라클)$/.test(r.cat) && costVendorCat(c, row.client||row.summary)!==r.cat) r={cat:"하도급", auto:false};   // [v61] '(주)시스코프'·'델테크' 등은 하도급
   if(r) return r;
   if(row.deposit>0){
     if(!String(row.summary||"").trim() && !String(row.client||"").trim()) return {cat:"이자수익",auto:false};
@@ -2540,7 +2541,7 @@ function parseFxDetail(aoa){
 function parseReportWorkbook(ab){
   var wb=XLSX.read(ab,{type:"array",cellDates:true});
   var status=parseDailyStatus(wb);
-  var daily={};
+  var daily={}, rolled={};
   wb.SheetNames.forEach(function(sn){
     if(status && sn===status.sheet) return;
     if(!/^\d{1,2}[.\-]\d{1,2}$/.test(sn.trim())) return;
@@ -2550,10 +2551,19 @@ function parseReportWorkbook(ab){
     if(!one||!one.asOf) return;
     if(one.asOf > todayISO()) return;              // 미래 일자 시트 제외
     if(!one.accts.length && !one.txns.length) return;
+    /* [v61] 금일(H열) 날짜가 휴일·주말이면(26.03 보고서 03.03 시트: 금일 2026-03-02 = 삼일절 대체휴일) 그 시트 실적은 직전 영업일(02-27) 것이다.
+       H열 날짜 그대로 두면 같은 거래가 02-27(CMS)과 03-02(보고서)에 두 번 잡혀 시재표 1원 검증·전일실적·당월누계 항등식이 깨진다(차이 1,290,901,388). */
+    var h0=one.asOf, d0=h0, g0=0; while(!isBizDay(d0) && g0++<15) d0=isoAdd(d0,-1);
+    if(d0!==h0){
+      (one.txns||[]).forEach(function(t){ if(t.date>d0 && t.date<=h0) t.date=d0; });
+      one.asOf=d0; one.rolledFrom=h0; rolled[h0]=d0;
+      if(daily[d0]) return;                          // 같은 통합문서에 그 영업일 시트가 따로 있으면 그것을 쓴다
+    }
     daily[one.asOf]=one;
   });
+  if(status && status.days) Object.keys(rolled).forEach(function(h){ delete status.days[h]; });   // [v61] 일별현황의 그 휴일 열도 같은 실적 — 쓰지 않는다
   if(!status && !Object.keys(daily).length) return null;
-  return {sheet:status?status.sheet:"일자별 시트", status:status?status.days:{}, daily:daily, hint:workbookHint(wb)};
+  return {sheet:status?status.sheet:"일자별 시트", status:status?status.days:{}, daily:daily, hint:workbookHint(wb), rolled:rolled};
 }
 function parseDailySheet(ab){ return parseReportWorkbook(ab); }
 
@@ -3112,6 +3122,7 @@ function slipFxSellFix(c, sl){
 var FIXED_OUT_CATS=[{re:/사회보험/, cat:"급여성"},{re:/사원경비/, cat:"사원경비"}];
 function fixedOutCat(row){
   if(!(+row.withdraw>0)) return null;
+  var me=monthEndCardCat(row); if(me) return me;   // [v61]
   var h=String(row.client||"")+" "+String(row.summary||"");
   for(var i=0;i<FIXED_OUT_CATS.length;i++) if(FIXED_OUT_CATS[i].re.test(h)) return FIXED_OUT_CATS[i].cat;
   return null;
@@ -3119,7 +3130,7 @@ function fixedOutCat(row){
 function applyFixedCats(c){
   var n=0;
   Object.keys(c.days).forEach(function(d){ var r=c.days[d]; if(!r || r.source!=="cms") return;
-    (r.txns||[]).forEach(function(t){ if(t.kind!=="지출" || t.catManual || t.slip) return; var k=fixedOutCat(t); if(k && (t.cat!==k || t.auto)){ t.cat=k; t.auto=false; n++; } }); });   // [v55] 사용자·전표 구분 우선
+    (r.txns||[]).forEach(function(t){ if(t.kind!=="지출" || t.catManual || (t.slip && !monthEndCardCat(t))) return; var k=fixedOutCat(t); if(k && (t.cat!==k || t.auto)){ t.cat=k; t.auto=false; n++; } }); });   // [v55] 사용자·전표 구분 우선 · [v61] 월말 삼성카드는 전표보다 우선
   return n;
 }
 /* [v57] 저장된 CMS 자금이동 행 재분류 — 기일출금(대출 이자) · 숫자만 있는 짧은 거래처/적요 때문에 자금이동으로 잡힌 행만 */
@@ -3160,7 +3171,7 @@ function fxPostAll(){
   var r={trade:0, slip:0, fixed:0, match:0, kfix:0, lotInf:0};
   (D.companies||[]).forEach(function(c){ fxInferRevert(c); });   // [v58]
   (D.companies||[]).forEach(function(c){
-    Object.keys(c.slips||{}).forEach(function(d){ r.slip+=slipFxSellFix(c, c.slips[d]); r.slip+=slipKindFix((c.slips[d]||{}).lines); });   // v53 이전 저장 전표 · [v58] 줄 종류 보정
+    Object.keys(c.slips||{}).forEach(function(d){ r.slip+=slipFxSellFix(c, c.slips[d]); r.slip+=slipKindFix((c.slips[d]||{}).lines); r.slip+=slipRecat(c, c.slips[d]); });   // v53 이전 저장 전표 · [v58] 줄 종류 보정 · [v61] 구분 다시 판정
     Object.keys(c.days||{}).forEach(function(d){ r.trade+=linkFxTrades(c, d); });          // [v54] 매도·매수 연결
     r.kfix+=fixMoveKinds(c);     // [v57]
     r.kfix+=fixSheetAccts(c);    // [v58]
@@ -6108,7 +6119,8 @@ function handleFiles(files){
           Object.keys(daily.daily||{}).forEach(function(d){ result.sheet[c2.id][d]=buildSheetDay(c2, daily.daily[d]); });
           var how = (daily.hint&&daily.hint.best) ? "계좌·법인명 일치" : "파일명";
           var nS=Object.keys(daily.status||{}).length, nD=Object.keys(daily.daily||{}).length;
-          log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip nv">보고서</span><span class="mini">'+esc(c2.name)+' ('+how+') · 일별현황 '+nS+'일 · 일자별 시트 '+nD+'일(시재표·입출금 포함)</span></div>');
+          var rk=Object.keys(daily.rolled||{}).sort();   // [v61]
+          log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip nv">보고서</span><span class="mini">'+esc(c2.name)+' ('+how+') · 일별현황 '+nS+'일 · 일자별 시트 '+nD+'일(시재표·입출금 포함)'+(rk.length?' · 금일이 휴일인 시트 '+rk.length+'개 → 직전 영업일 실적으로 반영('+esc(rk.map(function(h){ return h.slice(5)+"→"+daily.rolled[h].slice(5); }).join(", "))+')':'')+'</span></div>');
           return;
         }
         /* [v26] 건별반제정리현황(외상매출금·외화외상매출금·미수금) → 매출채권관리 */
@@ -6335,6 +6347,7 @@ function migrate(){
   if(!Array.isArray(D.contacts) || !D.contacts.length) D.contacts=mkContacts();
   D.contacts.forEach(function(k,i){ if(!k.id) k.id="K"+(i+1); if(!Array.isArray(k.history)) k.history=[]; });
   if(!Array.isArray(D.holidays) || !D.holidays.length) D.holidays=mkHolidays();
+  D.companies.forEach(function(c){ try{ rollHolidaySheets(c); }catch(e){ console.warn("rollHolidaySheets", e); } });   // [v61] 휴일 금일 보고서 시트 이중 반영 정리
   try{ fxPostAll(); }catch(e){ console.warn("fxPostAll", e); }      // [v53] 저장된 데이터에 외화매도 연결·전표 정리·고정 구분 규칙
   purgeFuture();
   D.v=3;
@@ -6377,6 +6390,34 @@ function loadData(){
       });
     });
   }).catch(function(e){ showAuth("login","데이터를 불러오지 못했습니다: "+((e&&e.message)||e),"err"); });
+}
+/* [v61] 휴일·주말 날짜로 저장된 보고서 일자별 시트(source "sheet") → 직전 영업일로 옮긴다.
+   (26.03 보고서 03.03 시트 금일 2026-03-02 = 삼일절 대체휴일 → 실제 02-27 실적 47행. 02-27 CMS 270건과 겹쳐 03-03 자금일보 시재표 1원 검증·전일실적이 1,290,901,388원 어긋났다)
+   옮길 영업일이 비었거나 일별현황 집계뿐이면 그대로 옮기고, CMS가 있으면 업로드 때와 같은 규칙으로 보고서 값(외화·현금·계좌별 마감·증권 행)만 합친다
+   (그 영업일에 보고서 값이 이미 있으면 그대로 둔다). 여러 번 실행해도 결과가 같다. */
+function rollHolidaySheets(c){
+  var n=0;
+  Object.keys(c.days||{}).sort().forEach(function(h){
+    var r=c.days[h]; if(!r || r.source!=="sheet" || isBizDay(h)) return;
+    var d=h, g=0; while(!isBizDay(d) && g++<15) d=isoAdd(d,-1);
+    if(d===h) return;
+    var redate=function(arr){ (arr||[]).forEach(function(t){ if(t && t.date>d && t.date<=h) t.date=d; }); };
+    var ex=c.days[d];
+    if(!ex || ex.source==="xlsm"){ redate(r.txns); r.asOf=d; c.days[d]=r; }
+    else if(ex.source==="cms" && !ex.asOf){
+      if(r.fxState && Object.keys(r.fxState).length && !ex.fxLedgerSrc){ ex.fxState=r.fxState; ex.fxDetail=r.fxDetail; }
+      if(r.cash) ex.cash=r.cash;
+      if(r.plan && Object.keys(r.plan).length) ex.plan=r.plan;
+      if(r.loanSnap) ex.loanSnap=r.loanSnap;
+      if(r.accts && r.accts.length) ex.repAccts=repAcctsOf(r.accts);
+      ex.asOf=d; redate(r.txns);
+      ex.txns=(ex.txns||[]).filter(function(t){ return !t.fromSheet; }).concat((r.txns||[]).filter(function(t){ return SEC_ACCT_RE.test(String(t.acct||"")); }));
+    }
+    delete c.days[h];
+    if(c.sheetRef && c.sheetRef[h]){ if(!c.sheetRef[d]){ redate(c.sheetRef[h].txns); c.sheetRef[d]=c.sheetRef[h]; } delete c.sheetRef[h]; }
+    n++;
+  });
+  return n;
 }
 function buildAll(){ var m=buildDocs(); lastDocs={}; Object.keys(m).forEach(function(p){ lastDocs[p]=JSON.stringify(m[p]); }); }
 /* [v59] 계좌 목록 읽기 전용 브리지 — 「그 외 이자수익전표」(int-core)용.
@@ -6904,9 +6945,9 @@ function slipCategory(c, cashLine, cps, isIn){
   var hay=[memo].concat(vendors).join(" ");
   var codes=cps.map(function(x){return x.code});
   if(!isIn){
-    if(/시스코|cisco/i.test(hay)) return {cat:"시스코",auto:false};
-    if(/델인터내셔널|델테크|\bdell\b/i.test(hay)) return {cat:"델",auto:false};
-    if(/오라클|oracle/i.test(hay)) return {cat:"오라클",auto:false};
+    var vcs=vendors.map(function(v){ return costVendorCat(c, v); });   // [v61] 거래처가 모두 그 회사일 때만
+    if(vcs.length && vcs.every(function(k){ return k && k===vcs[0]; })) return {cat:vcs[0],auto:false};
+    if(!vendors.length){ if(/시스코시스템즈|시스코\s*내자재/.test(memo)) return {cat:"시스코",auto:false}; if(/델인터내셔널/.test(memo)) return {cat:"델",auto:false}; }
     if(codes.length && codes.every(function(k){ return /^2115/.test(k); })) return {cat:"하도급",auto:false};      // 외상매입금 지급
     if(cps.some(function(x){ return /차입금/.test(x.account); }) && !cps.some(function(x){ return /이자/.test(x.account); })) return {cat:"상환",auto:false};
     if(cps.some(function(x){ return /이자비용|지급이자/.test(x.account); })) return {cat:"이자비용",auto:false};
@@ -6989,7 +7030,7 @@ function buildSlip(c, lines){
       if(cash){ base.kind=isIn?"cash-in":"cash-out"; base.cat=isIn?"현금입금":"현금지출"; base.auto=false; }
       else {
         base.kind=isIn?"in":"out";
-        var cc=slipCpCat(seg.length?seg:cps, isIn, slipMemo(L.memo)+" "+base.pnames.join(" "));   // [v55] 상대계정 우선 구분표
+        var cc=slipCpCat(seg.length?seg:cps, isIn, slipMemo(L.memo)+" "+base.pnames.join(" "), c, L.memo);   // [v55] 상대계정 우선 구분표 · [v61] 법인·적요
         if(cc && isIn && cc.cat==="이자수익" && /증권|금융투자|미래에셋|선물/.test(acct)){ cc.cat="기타"; cc.why+=" (증권 예탁금 이용료 → 입금 기타)"; }   // 정답지 10.13
         if(cc){ base.cat=cc.cat; base.auto=false; base.catWhy=cc.why; if(cc.mixed) base.mixed=true; }
         else { var k=slipCategory(c, L, cps, isIn); base.cat=k.cat; base.auto=!!k.auto; }
@@ -7167,7 +7208,15 @@ function slipText(raw, parties, own){
   }
   return s||txt(raw);
 }
-function slipLineText(L){ return (L && (L.textManual || L.text)) || slipText((L&&(L.rawMemo||L.memo))||""); }
+/* [v61] 자금일보 문구에 계좌번호를 싣지 않는다 — '(하나 25089000633507)'·'/신한은행 562-17-…(예금주 : …)'·'(SC은행 가상계좌 : 471-16-…)' */
+function slipNoAcct(s){
+  var o=String(s||"");
+  o=o.replace(/\s*\/?\s*[가-힣A-Za-z]*(은행|증권|생명|보험|금고|농협|우체국)\s*:?\s*\d[\d\-]{9,}\d(\s*\(\s*예금주[^)]*\))?/g,"");
+  o=o.replace(/\s*\(([^()]*)\)/g, function(m, inner){ return (inner.replace(/\D/g,"").length>=8 && !/~/.test(inner)) ? "" : m; });
+  o=o.replace(/\s*\(\s*예금주[^)]*\)/g,"");
+  return txt(o)||txt(s);
+}
+function slipLineText(L){ return (L && L.textManual) || slipNoAcct((L && L.text) || slipText((L&&(L.rawMemo||L.memo))||"")); }
 /* 현금성 줄 L에 붙는 상대 줄 구간 */
 function slipSegOf(srt, money, L){
   var opp=function(x){ return money.indexOf(x)<0 && x.side!==L.side; };
@@ -7177,20 +7226,53 @@ function slipSegOf(srt, money, L){
   if(!seg.length) for(var q=i+1;q<srt.length && money.indexOf(srt[q])<0;q++) if(opp(srt[q])) seg.push(srt[q]);
   return seg;
 }
+/* [v61] 원가 구분 거래처 — 사용자 지정(2026-10-15): 시스코 = 시스코시스템즈코리아유한회사(CMS 표기 CISCO SYST…)만, 델 = 델인터내셔널 주식회사만.
+   그 외 외상매입금(외상매입금(자동결제) 포함)은 하도급. 오라클은 자금일보 양식에 오라클 행이 있는 법인(GD)만, 다른 법인은 하도급(SN 보고서 기준) */
+function costVendorCat(c, name){
+  var k=String(name||"").replace(/\s+외\s*\d+.*$/,"").replace(/\s|\(주\)|㈜|주식회사|유한회사|\(유\)/g,"").toLowerCase();
+  if(!k) return null;
+  if(/^시스코시스템즈|^ciscosyst/.test(k)) return "시스코";
+  if(/^델인터내셔널|^dellinternational/.test(k)) return "델";
+  if(/^(한국)?오라클|^oracle/.test(k) && c && ilboForm(c).oracle) return "오라클";
+  return null;
+}
+/* [v61] 적요 우선 구분 — 보고서(정답지 26.01~26.10 일자별 시트) 기준. 상대계정보다 먼저 본다(출금만) */
+var SLIP_TAX_RE=/법인세|법인지방소득세|법인소득|부가세|부가가치세|관부가세|관세|추징세액|중간예납|농어촌특별세|재산세|종합부동산세|인지세|면허세|주민세|증권거래세|자동차세/;
+function slipMemoCat(memo, isIn){
+  if(isIn) return null;
+  var m=String(memo||"").replace(/법인개인카드|법인카드|부가세대급금|부가세예수금/g,"");
+  if(SLIP_TAX_RE.test(m)) return {cat:"세금과공과", why:"적요 세금(법인세·부가세·주민세 등)"};
+  if(/소득세|원천세|지방세/.test(m)) return {cat:"급여성", why:"적요 원천세·지방세"};
+  if(/급여|상여|퇴직|퇴사자|사업소득|인센티브|시상금|DC전환|실습지원비|현장실습|고용.{0,3}산재|산재.{0,3}고용|4대보험|국민연금|건강보험료|고용보험|산재보험/.test(m)) return {cat:"급여성", why:"적요 급여·퇴직·사업소득"};
+  if(/배당금/.test(m)) return {cat:"기타", why:"적요 배당금"};
+  return null;
+}
+/* [v61] 매월 마지막 영업일 '에스넷시스 삼성카드' 출금(삼성법인카드 지방세) = 급여성 — 사용자 지정(2026-10-15) */
+function isLastBizOfMonth(iso){ if(!iso || !isBizDay(iso)) return false; var n=isoAdd(iso,1), g=0; while(!isBizDay(n) && g++<15) n=isoAdd(n,1); return n.slice(0,7)!==iso.slice(0,7); }
+function monthEndCardCat(t){
+  if(!t || !(+t.withdraw>0)) return null;
+  var h=String(t.client||"")+" "+String(t.summary||"");
+  return (/에스넷시스.{0,3}삼성카드/.test(h.replace(/\s+/g," ")) && isLastBizOfMonth(t.date)) ? "급여성" : null;
+}
 /* 상대계정 1줄 → 구분 (null = 판단 보류: 외환차손익·자산 계정 등) */
 function slipCpCatOf(x, isIn){
   var a=String(x.account||"").replace(/\s/g,""), v=String(x.branch||x.vendor||""), code=String(x.code||"");
   if(isIn){
     if(/외환차/.test(a)) return null;
-    if(/외상매출금|매출/.test(a)) return "판매대";
+    if(/외상매출금|매출|받을어음/.test(a)) return "판매대";
     if(/미수금\(인사\)/.test(a)) return "미수금";      // 직원 정산(10-12 홍진수) → 미수금
+    if(/예수금|선수금|보증금|장기금융상품|대여금|대손충당금환입|미지급금/.test(a)) return "미수금";   // [v61] 보고서: 연말정산 환급·보증금 반환·보험 해약·대여금 회수·선수금·복지포인트 환수 → 미수금
+    if(/미수금/.test(a) && /시스코|cisco/i.test(v)) return "기타";                      // [v61] 보고서: 시스코 미수금(리베이트) 입금 → 기타
+    if(/미수금/.test(a) && /세무서|구청|시청|군청|지방소득|보험|공단/.test(v)) return "미수금";       // [v61] 보고서: 세금 환급·보험금·공단 환급 → 미수금
     if(/미수금/.test(a)) return "판매대";               // [v56] 거래처 미수금 회수(01-15 델 4,542,827 · 2,750,000) → 정답지 판매대
     if(/이자수익/.test(a)) return "이자수익";
     if(/차입금/.test(a)) return "차입";
-    return /^1/.test(code) ? null : "기타";
+    return (!code || /^1/.test(code)) ? null : "기타";      // [v61] 계정코드 없는 재판정(저장 전표 상대 줄)은 판단 보류 — 종전 구분 유지
   }
   if(/외환차/.test(a)) return null;                         // 외환차손은 현금 흐름이 아니다(채무 환율 − 예금 장부환율)
   if(/부가세|법인세|지방세|선납세금|세금과공과/.test(a)) return "세금과공과";
+  if(/급여|상여|퇴직|제수당/.test(a)) return "급여성";     // [v61] 제)급여·판)상여금·미지급금(퇴직금) — 보고서 급여성(종전엔 '제)'·'판)' 접두로 운영경비)
+  if(/경조금|경조사/.test(a)) return "사원경비";          // [v61] 복리후생비(경조금) — 보고서 사원경비
   if(/외상매입금/.test(a)) return "하도급";
   if(/미지급금\(급여\)|예수금/.test(a)) return "급여성";
   if(/미지급금\(자동이체\)/.test(a)) return /공단/.test(v) ? "급여성" : "운영경비";
@@ -7201,7 +7283,8 @@ function slipCpCatOf(x, isIn){
   return null;
 }
 /* 상대계정 구분표(상대계정 우선) — 여러 종류면 금액이 가장 큰 구분 + mixed */
-function slipCpCat(cps, isIn, hay){
+function slipCpCat(cps, isIn, hay, c, memo){
+  var mc=slipMemoCat(memo, isIn); if(mc) return {cat:mc.cat, why:mc.why, mixed:false};   // [v61] 적요 우선(세금·급여·퇴직·사업소득·배당)
   /* [v56] 법인카드 결제(적요 '법인카드' + 상대 미지급금(법인카드)·외상매입금(자동결제)) → 사원경비 (01-15 삼성법인카드_통신료 14,831,336) */
   if(!isIn && /법인카드/.test(hay||"") && (cps||[]).some(function(x){ return /법인카드|자동결제/.test(String(x.account||"")); })) return {cat:"사원경비", why:"법인카드 결제", mixed:false};
   var by={}, why={};
@@ -7213,8 +7296,43 @@ function slipCpCat(cps, isIn, hay){
   if(!ks.length) return null;
   ks.sort(function(a,b){ return by[b]-by[a]; });
   var cat=ks[0];
-  if(!isIn && cat==="하도급"){ if(/시스코|cisco/i.test(hay)) cat="시스코"; else if(/델인터내셔널|델테크|\bdell\b/i.test(hay)) cat="델"; else if(/오라클|oracle/i.test(hay)) cat="오라클"; }
+  if(!isIn && cat==="하도급"){   // [v61] 줄 적요·거래처 묶음(hay)이 아니라 외상매입금 상대 줄의 거래처가 모두 그 회사일 때만 시스코·델·오라클
+    var vc=(cps||[]).filter(function(x){ return x.amount>0 && /외상매입금/.test(String(x.account||"")); }).map(function(x){ return costVendorCat(c, x.branch||x.vendor||""); });
+    if(vc.length && vc.every(function(k){ return k && k===vc[0]; })) cat=vc[0];
+  }
   return {cat:cat, why:"상대계정 "+why[ks[0]].acct, mixed:ks.length>1};
+}
+/* [v61] 저장된 전표 줄 구분 다시 판정 — 규칙이 바뀌어도 전표를 다시 올릴 필요 없게(직접 고친 구분 · 수수료 줄 · 자금이동 줄은 그대로).
+   상대 줄(parts)이 있으면 금액 가중, 없으면 상대계정이 하나일 때만 다시 보고, 여럿이면 종전 구분에 적요·거래처 규칙만 다시 적용 */
+function slipLineCat(c, L){
+  var k=L.kind||"";
+  if(!/^(in|out)$/.test(k) || L.userSet || L.feeLine || L.fxTrade || L.fxTradeSyn || L.fxSell || L.fxSellSyn) return null;
+  var isIn=k==="in", memo=String(L.rawMemo||L.memo||"");
+  var cps=(L.parts||[]).length ? L.parts.map(function(p){ return {account:p.acct, amount:+p.amt||0, branch:p.name}; }) : null;
+  var accs=String(L.cpAccount||"").split(/,\s*/).filter(function(x){ return x && !/외환차/.test(x); });   // 외환차손익은 현금 흐름이 아니다
+  if(!cps && accs.length===1) cps=[{account:accs[0], amount:+L.amount||1, branch:String(L.vendor||"").replace(/\s+외\s*\d+$/,"")}];
+  var cc=null;
+  if(cps) cc=slipCpCat(cps, isIn, slipMemo(memo)+" "+(L.pnames||[]).join(" "), c, memo);
+  else {
+    var mc=slipMemoCat(memo, isIn); if(mc) cc={cat:mc.cat, why:mc.why, mixed:false};
+    else if(!isIn && /^(시스코|델|오라클)$/.test(L.cat||"")){ var vk=costVendorCat(c, L.vendor||""); cc={cat:vk||"하도급", why:L.catWhy||"", mixed:!!L.mixed}; }
+  }
+  if(!cc) return null;
+  if(isIn && cc.cat==="이자수익" && SEC_ACCT_RE.test(String(L.acct||""))){ cc.cat="기타"; cc.why+=" (증권 예탁금 이용료 → 입금 기타)"; }
+  return cc;
+}
+function slipRecat(c, sl){
+  var n=0;
+  ((sl&&sl.lines)||[]).forEach(function(L){ var cc=slipLineCat(c, L); if(!cc) return;
+    if(L.cat!==cc.cat || L.auto){ n++; } L.cat=cc.cat; L.auto=false; L.catWhy=cc.why; if(cc.mixed) L.mixed=true; else delete L.mixed; });
+  return n;
+}
+/* [v61] 1:N 매칭에서 CMS 1건이 붙은 상대 줄(거래처·계정)로 구분 — 한 줄에 시스코와 다른 거래처가 섞여도 거래처별로 */
+function slipPartCat(c, L, p){
+  if(!p || !p.acct || !/^(in|out)$/.test(L.kind||"") || L.userSet) return null;
+  var isIn=L.kind==="in", memo=String(L.rawMemo||L.memo||"");
+  var cc=slipCpCat([{account:p.acct, amount:+p.amt||1, branch:p.name}], isIn, slipMemo(memo)+" "+p.name, c, memo);
+  return cc ? cc.cat : null;
 }
 function slipIsIns(L){ return !!(L.ins || /4대보험/.test(String(L.fund||""))); }
 /* 전표 현금성 줄 추출 — 매도·매수(v54)·합성 줄은 제외 */
@@ -7310,6 +7428,10 @@ function matchSlipCms(c, iso){
       var sc=GL.map(function(L){ return C.map(function(i){ return score(i, L.pnames.concat([L.text])); }); });
       var pr=slipAssign(GL.length, C.length, sc);
       pr.forEach(function(p){ add(GL[p[0]],[C[p[1]]],type); });
+      /* [v61] 이름으로 못 가린 나머지 — 금액이 같고 구분도 모두 같으면 어느 CMS와 짝지어도 금액·구분 결과가 같다 → 순서대로 배정(02-27 퇴직정산 610 ×3 · 자동이체 40,000) */
+      var restL=GL.filter(function(L){ return !usedL[L.key]; }), restC=C.filter(function(i){ return !usedT[i]; });
+      if(restL.length && restC.length && restL.every(function(L){ return L.cat===restL[0].cat; }))
+        restL.forEach(function(L,q){ if(q<restC.length) add(L,[restC[q]],type,{tie:true}); });
       GL.forEach(function(L){ if(!usedL[L.key]) amb.push(L); });
     });
   };
@@ -7540,10 +7662,15 @@ function matchSlipCms(c, iso){
     add(main, C, "1:N합계", {adj:GL.filter(function(L){ return L!==main; })});
   });
   /* 증권 계좌 — CMS에 없는 계좌의 전표 입·출금은 전표값으로 실적 행을 만든다(파일 끝에 붙여 기존 행 번호 유지) */
-  var SEC_RE=/증권|금융투자|미래에셋|선물/;
+  var SEC_RE=/증권|금융투자|미래에셋|선물/, secPrior=0;
   lines.forEach(function(L){
     if(usedL[L.key] || L.kind==="cash" || L.fx || !SEC_RE.test(String(L.acct||""))) return;   // [v58] 자금이동 줄도
     if(T.some(function(t){ return t.acct===L.acct && !t.fromSlip && smDir(t)===L.dir && Math.abs(smAmt(t)-L.amt)<0.5; })) return;   // [v58] 같은 방향·금액 행이 있을 때만 생략
+    /* [v61] 월말 일괄 전표(08-31 인성정보 주식매수 KB 997,450,507 · 삼성 177,307,217)의 실제 거래가 이미 그달 보고서·CMS(08-19~08-27)에 있으면 다시 만들지 않는다
+       — 종전엔 08-31에 한 번 더 출금돼 09-01 시재표 1원 검증·08월 월간실적이 1,174,757,724원 어긋났다 */
+    if(L.kind!=="move"){ var prior=0;
+      for(var dd=iso.slice(0,8)+"01"; dd<=iso; dd=isoAdd(dd,1)) txnsOf(c,dd).forEach(function(t){ if(t.acct===L.acct && !t.fromSlip && smDir(t)===L.dir && (t.kind==="수입"||t.kind==="지출")) prior+=smAmt(t); });
+      if(Math.abs(prior-L.amt)<0.5){ secPrior++; return; } }
     var isIn=L.dir==="in", mvS=L.kind==="move";
     T.push({date:iso, at:"", acct:L.acct, bank:String(L.acct).split(" ")[0], acctNum:L.L.acctNum||"", summary:L.text, client:"", txType:"전표",
       deposit:isIn?L.amt:0, withdraw:isIn?0:L.amt, after:null, hasAfter:false, kind:mvS?(isIn?"자금이동(입금)":"자금이동(출금)"):(isIn?"수입":"지출"), cat:mvS?"자금이동":(L.cat||"기타"), auto:false, fromSlip:true, catSrc:"전표"});
@@ -7555,10 +7682,13 @@ function matchSlipCms(c, iso){
     var Ls=r.lines||[r.L], L=Ls[0], n=r.ids.length, bund=r.type==="묶음";
     var lineInfo=Ls.map(function(x){ return {key:x.key, slipNo:x.slipNo, line:x.line, text:x.text, amt:x.amt, cat:x.cat}; });
     r.ids.forEach(function(i,k){ var t=T[i], part="", split=false;
-      (r.ps||[]).forEach(function(o){ if(o.ids && o.ids.indexOf(i)>=0){ part=o.p.name; split=o.split; } });
+      var pCat=null;
+      (r.ps||[]).forEach(function(o){ if(o.ids && o.ids.indexOf(i)>=0){ part=o.p.name; split=o.split; pCat=slipPartCat(c, L.L, o.p); } });   // [v61] 상대 줄 구분
       var cashW=r.type==="현금인출", lsum=Ls.reduce(function(a,x){ return a+x.amt; },0);
       var s={key:r.group||L.key, slipNo:Ls.map(function(x){ return x.slipNo; }).filter(function(x,j,a){ return a.indexOf(x)===j; }).join(","), type:r.type,
         text:bund?"4대보험 묶음":(cashW?(/수표/.test(L.text)?"수표인출":"현금인출"):L.text), cat:bund?"급여성":(cashW?"운영경비":L.cat), part:part, n:n, k:k+1, lineAmt:bund?null:(Ls.length>1?lsum:L.amt), dir:L.dir};   // [v58] 현금인출
+      if(pCat && !bund && !cashW && r.type!=="자금이동" && L.kind!=="move") s.cat=pCat;
+      var meCat=monthEndCardCat(t); if(meCat && !bund) s.cat=meCat;   // [v61] 월말 에스넷시스 삼성카드 = 급여성
       if(r.adj){ s.adj=r.adj.map(function(x){ return x.slipNo+" "+fmt(x.amt); }); s.lineAmt=L.amt+r.adj.reduce(function(a,x){ return a+x.amt; },0); }
       if(r.fee){ s.fee=r.fee; s.lineAmt=L.amt+r.fee; }
       if(Ls.length>1 && !bund) s.lines=lineInfo;
@@ -7681,7 +7811,7 @@ function ilboModel(c, iso){
         return;
       }
       if(isFxK && fxNeedsRate(t, dsrc)) unconfN++;
-      var fx=isFxK && (t.fxConfirmed || dSheet) && !fxIsInternal(t);
+      var fx=isFxK && (t.fxConfirmed || dSheet) && !fxIsInternal(t) && !t.fxInternal;   // [v61] 외화 계좌간 이체(전표 자금이동 짝)는 입출금 내역이 아니다 — 1p·3p에서 자금이동으로 처리
       if(t.kind!=="수입" && t.kind!=="지출" && !fx) return;
       var isIn=t.kind==="수입"||t.kind==="외화(입금)";
       var fxAmt=dSheet ? (isIn?t.deposit:t.withdraw) : (t.fxKrw||0);
@@ -7717,6 +7847,16 @@ function ilboModel(c, iso){
     });
     return out; };
   aIn=slipExpand(aIn); aOut=slipExpand(aOut);
+  /* [v61] 자금이동 입·출 차액(타행이체 수수료)은 1p 자금수지 운영경비에 이미 들어가 있다(dayAgg) — 2p 출금 내역에도 한 줄로
+     (보고서 '부산 103 타행이체 시 수수료 500 운영경비' · 26.01~26.10 26일분. 종전엔 2p에 없어 2p 출금 계가 1p보다 500원 적었다) */
+  rdays.forEach(function(d){ var dr=dayRec(c,d); if(!dr || dr.source!=="cms") return;
+    var ag=dayAgg(c,d), fee=Math.abs(ag.fee||0); if(!(fee>=1)) return;
+    var TT=txnsOf(c,d), fa="";
+    TT.forEach(function(t){ if(!fa && t.slip && t.slip.fee) fa=t.acct; });
+    if(!fa) TT.forEach(function(o){ if(fa || String(o.kind)!=="자금이동(출금)") return;
+      if(TT.some(function(i){ return String(i.kind)==="자금이동(입금)" && i.acct!==o.acct && Math.abs((o.withdraw-i.deposit)-fee)<0.5; })) fa=o.acct; });
+    aOut.push({d:d, acct:fa||"자금이동", memo:"타행이체 시 수수료", cat:"운영경비", amt:fee, auto:false, feeRow:true});
+  });
   /* [v55] 매칭 안 된 CMS 입금 — 계좌 + 적요 + 구분이 같으면 1행 (쿠팡로지스틱 3건 → 1행) */
   (function(){ var mg={}, out=[];
     aIn.forEach(function(x){
