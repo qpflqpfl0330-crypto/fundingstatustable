@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v58 · 2026-10-14</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v59 · 2026-10-14</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -6201,6 +6201,19 @@ function loadData(){
   }).catch(function(e){ showAuth("login","데이터를 불러오지 못했습니다: "+((e&&e.message)||e),"err"); });
 }
 function buildAll(){ var m=buildDocs(); lastDocs={}; Object.keys(m).forEach(function(p){ lastDocs[p]=JSON.stringify(m[p]); }); }
+/* [v59] 계좌 목록 읽기 전용 브리지 — 「그 외 이자수익전표」(int-core)용.
+   window.__acctDirectory.get(법인코드) → [{num, digits, label, bank, note, isMMT}] 동결 복사본 배열 (D 객체·참조 노출 없음)
+   D 미로드·법인 없음 → null (호출부가 error 처리). 저장·전송·로그 없음. isMMT는 기존 isMMT() 결과 그대로 */
+window.__acctDirectory = Object.freeze({
+  get: function(coCode){
+    if(!D || !Array.isArray(D.companies)) return null;
+    var c=null; for(var i=0;i<D.companies.length;i++) if(D.companies[i] && D.companies[i].id===coCode){ c=D.companies[i]; break; }
+    if(!c || !Array.isArray(c.accounts)) return null;
+    return Object.freeze(c.accounts.map(function(a){
+      return Object.freeze({ num:String(a.num==null?"":a.num), digits:digitsOnly(a.num), label:String(a.label==null?"":a.label), bank:String(a.bank==null?"":a.bank), note:String(a.note==null?"":a.note), isMMT:!!isMMT(c, a.num, a.label) });
+    }));
+  }
+});
 
 /* ===================== 이벤트 ===================== */
 $("#btnMigrate").onclick=function(){
@@ -13184,6 +13197,1132 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
   }
 
   root.MMTParser = { COMPANIES, ACCTS, HDR, COL, NCOL, C, Img, U, readText, parseImagePage, readHeaderInfo, detectCompany, parseTextLayer, normalize, validate, buildSlips, checkBalance, buildWorkbook, loadPdf, extract, finalize };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script id="int-core">
+(function (root) {
+  'use strict';
+  /* =====================================================================
+     「그 외 이자수익전표」 IntParser — 비MMT 계좌(신한·우리·부산·하나 일반·씨티 MMDA) + RCMS 번들
+     · MMT 이자수익전표(mmt-core / #mmt-app / MMTSlipApp)와 완전 분리. MMTParser는 읽기 전용 참조만:
+       HDR · COL · NCOL · U · buildWorkbook · COMPANIES (그 외 멤버는 쓰지 않는다 — 복제도 하지 않는다)
+     · 핵심 로직은 DOM 비의존. 렌더링·OCR만 env 어댑터(browserEnv)로 분리
+     · 조용한 실패 금지: 판독 불가·계좌 미등록·문서 누락 → 해당 행/번들 error. 0·빈값으로 대체하지 않는다
+     ===================================================================== */
+  const MP = root.MMTParser;
+  const NEED = ['HDR', 'COL', 'NCOL', 'U', 'buildWorkbook', 'COMPANIES'];
+  const MISSING = !MP ? NEED.slice() : NEED.filter(k => MP[k] == null);
+  if (MISSING.length) {
+    const msg = 'IntParser 중단: MMTParser 참조 불가(' + MISSING.join(', ') + ') — mmt-core가 먼저 로드되어야 합니다.';
+    root.IntParser = Object.freeze({ ready: false, error: msg });
+    throw new Error(msg);
+  }
+  const HDR = MP.HDR, COL = MP.COL, NCOL = MP.NCOL, U = MP.U, COMPANIES = MP.COMPANIES;
+
+  /* ---------- 1. 상수 (운영 정책은 상수로만 분리) ---------- */
+  const VERSION = 'int-core v59';
+  const ACTIVE_COS = Object.freeze(['SN', 'GD', 'GS']);   // 활성 법인 (layout은 COMPANIES[co].layout 참조)
+  const SLIP_PREFIX = 'BM';                              // 전표번호 접두어 (BM+일자+순번5)
+  const SLIP_SEQ_START = 1;                              // 일자별 시작 순번
+  const TEXT_SCALE = 3;                                  // 텍스트 경로 격자 탐지 렌더 배율
+  const OCR_SCALE = 4;                                   // OCR 경로 렌더 배율 (≥3)
+  const TESS_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; // MMT UI와 동일 URL·버전
+  const CMAP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/';         // 대시보드 pdf.js와 같은 버전의 CMap(OZ 뷰어 CID 글꼴 텍스트용)
+  const PAY_GAP_MAX = 5;                                 // 0 < 지급일 − 종료일 ≤ 5일이면 정상
+  const OCR_WL = { num: '0123456789,', dec: '0123456789.,', date: '0123456789.-~ ', id: '0123456789-*', any: '0123456789-.,~*:' };
+
+  const ACCT = Object.freeze({
+    INT: { code: '4410100', name: '이자수익(예적금)', drcr: 2 },
+    CORP: { code: '1160110', name: '선납세금(원천세)', drcr: 1 },
+    LOCAL: { code: '1160130', name: '선납세금(지방세)', drcr: 1 }
+  });
+  const DEP_NAME = Object.freeze({ '1110400': '보통예금', '1110600': '기타제예금' });
+
+  /* 징수의무자 사업자번호(digits) → 은행. 확장 가능. 미등록 번호는 error. ERP 거래처 코드 = 번호 digits */
+  const WITHHOLDERS = {
+    '1208527498': { bank: '신한' },
+    '1208513413': { bank: '우리', branch: '포스코금융센터' },
+    '1208525715': { bank: '우리', branch: '선릉역' },
+    '6068514385': { bank: '부산' },
+    '1208504063': { bank: '하나' },
+    '3058516947': { bank: '기업' },
+    '1028114717': { bank: '씨티' }
+  };
+  /* 거래처·은행 표기(표시용) — 법인·코드별. 없으면 PDF 표기 사용, 코드가 같으면 표기 차이는 info */
+  const BANK_NAME = {
+    SN: { '1208504063': '(주)하나은행 선릉역', '1208527498': '신한은행 선릉중앙금융센터', '7588500412': '신한은행 선릉중앙기업금융센터', '1208513413': '우리은행 포스코금융센터', '6068514385': '부산은행 구남지점', '3058516947': '중소기업은행 충청지역본부기관영업' },
+    GD: { '1208504063': '하나은행 선릉역지점', '1208525715': '우리은행 선릉역금융센터', '1028114717': '한국씨티은행 강남대기업업무센터' },
+    GS: { '1208527498': '신한은행 선릉중앙금융센터', '7588500412': '신한은행 선릉중앙기업금융센터' }
+  };
+  /* ERP 예금 라인 정보. 키 = 계좌번호 digits — 코드에 직접 적지 않는다.
+     담당자가 로컬에서 FILL_LOCALLY_* 자리표시자를 해당 계좌의 숫자(하이픈 없이)로 바꾼다. 미설정 키는 매칭되지 않아 '계좌 미등록' error가 된다.
+     label은 안내용(대시보드 계좌 표기)이며 판정에는 쓰지 않는다. */
+  const ERP_ACCT_MAP = {
+    SN: {
+      FILL_LOCALLY_SN_HANA_00104: { label: '하나 00104', depAcct: '1110400', depCd: '081-001', bank: { code: '1208504063', name: '(주)하나은행 선릉역' }, noteStyle: 'std' },
+      FILL_LOCALLY_SN_SHINHAN_590348: { label: '신한 590348', depAcct: '1110400', depCd: '088-001', bank: { code: '7588500412', name: '신한은행 선릉중앙기업금융센터' }, noteStyle: 'std' },
+      FILL_LOCALLY_SN_WOORI_143951: { label: '우리 143951', depAcct: '1110400', depCd: '020-001', bank: { code: '1208513413', name: '우리은행 포스코금융센터' }, noteStyle: 'std_nospace' },
+      FILL_LOCALLY_SN_BUSAN_103: { label: '부산 103', depAcct: '1110400', depCd: '032-001', bank: { code: '6068514385', name: '부산은행 구남지점' }, noteStyle: 'std' }
+    },
+    GD: {
+      FILL_LOCALLY_GD_HANA_13104: { label: '하나 13104', depAcct: '1110400', depCd: '081-000', bank: { code: '1208504063', name: '하나은행 선릉역지점' }, noteStyle: 'std' },
+      FILL_LOCALLY_GD_WOORI_572706: { label: '우리 572706', depAcct: '1110400', depCd: '020-001', bank: { code: '1208525715', name: '우리은행 선릉역금융센터' }, noteStyle: 'std' },
+      FILL_LOCALLY_GD_CITI_MMDA: { label: '씨티 824', depAcct: '1110600', depCd: '027-0010', bank: { code: '1028114717', name: '한국씨티은행 강남대기업업무센터' }, noteStyle: 'mmda', noteLabel: '씨티 MMDA', cc: { code: 'DE2001-0004', name: '[공통] 경영지원실' } }
+    },
+    GS: {
+      FILL_LOCALLY_GS_SHINHAN_430011: { label: '신한 430011', depAcct: '1110400', depCd: '088-001', bank: { code: '7588500412', name: '신한은행 선릉중앙기업금융센터' }, noteStyle: 'std' }
+    }
+  };
+
+  /* ---------- 2. 유틸 ---------- */
+  const nfkc = s => String(s == null ? '' : s).normalize('NFKC');
+  const digits = s => nfkc(s).replace(/[^\d]/g, '');
+  const squash = s => nfkc(s).replace(/\s+/g, '');
+  const isYmd = s => U.isYmd(s);
+  const ymOf = s => (isYmd(s) ? s.slice(0, 4) + '-' + s.slice(4, 6) : '');
+  const fmtYmd = s => U.fmtYmd(s);
+  const won = n => U.won(n);
+  /* 금액: '1,067' · '948,500' · '3070'(쉼표 없음) · '0'. 공란 → null, 판독 불가 → NaN (0으로 바꾸지 않는다) */
+  function amt(s) {
+    const t = squash(s).replace(/원$/, '').replace(/\(원\)$/, '');
+    if (t === '') return null;
+    if (/^\d{1,3}(,\d{3})+$/.test(t) || /^\d+$/.test(t)) return parseInt(t.replace(/,/g, ''), 10);
+    return NaN;
+  }
+  /* 이율·세율: '0.10' · '00.00000' · '14.0000' · '14,00' · '14.\n00' */
+  function rateNum(s) {
+    let t = squash(s);
+    if (t === '') return null;
+    if (/^\d+,\d{1,4}$/.test(t)) t = t.replace(',', '.');
+    if (/^\d+(\.\d+)?$/.test(t)) return parseFloat(t);
+    return NaN;
+  }
+  /* 기간: 숫자만 16자리 → 시작·종료 */
+  function period(s) {
+    const d = digits(s);
+    if (d.length !== 16) return null;
+    const a = d.slice(0, 8), b = d.slice(8);
+    return isYmd(a) && isYmd(b) ? { start: a, end: b } : null;
+  }
+  function ymd(y, m, d) {
+    const s = digits(y) + digits(m).padStart(2, '0') + digits(d).padStart(2, '0');
+    return isYmd(s) ? s : '';
+  }
+  const issue = (level, field, msg) => ({ level, field, msg });
+  const RANK = { info: 1, warn: 2, error: 3 };
+  function levelOf(iss) { let L = 'ok'; iss.forEach(i => { if (L === 'ok' || RANK[i.level] > RANK[L]) L = i.level; }); return L === 'info' ? 'ok' : L; }
+  class IntError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+
+  /* ---------- 3. 계좌 브리지 · ERP 매핑 ---------- */
+  function dirList(coCode) {
+    const dir = root.__acctDirectory;
+    if (!dir || typeof dir.get !== 'function') throw new IntError('NO_BRIDGE', '계좌 목록 브리지(__acctDirectory)가 없습니다 — 대시보드 본체 로드를 확인하세요');
+    const list = dir.get(coCode);
+    if (!list) throw new IntError('D_NOT_LOADED', '대시보드 데이터가 아직 로드되지 않았습니다(계좌 목록 없음) — 로그인·데이터 로드 후 다시 처리하세요');
+    return list;
+  }
+  /* 법인 범위 안에서만 digits 일치 계좌 → { label, acctNoDisplay, isMMT, bank } · 없으면 null */
+  function lookupAccountMeta(coCode, dg) {
+    const a = dirList(coCode).find(x => x.digits === dg);
+    return a ? { label: a.label, acctNoDisplay: a.num, isMMT: a.isMMT, bank: a.bank, digits: a.digits } : null;
+  }
+  function erpEntry(coCode, dg) { const m = ERP_ACCT_MAP[coCode]; return (m && Object.prototype.hasOwnProperty.call(m, dg) && /^\d+$/.test(dg)) ? m[dg] : null; }
+  function mapStatus() {
+    const out = [];
+    Object.keys(ERP_ACCT_MAP).forEach(co => Object.keys(ERP_ACCT_MAP[co]).forEach(k => out.push({ co, key: /^\d+$/.test(k) ? '(설정됨)' : k, filled: /^\d+$/.test(k), label: ERP_ACCT_MAP[co][k].label, depAcct: ERP_ACCT_MAP[co][k].depAcct })));
+    return { total: out.length, unfilled: out.filter(x => !x.filled).length, entries: out };
+  }
+  function mmtAcctOwner(dg) { const hit = Object.keys(COMPANIES).find(k => digits(COMPANIES[k].acct) === dg); return hit || null; }
+  /* 적요 라벨: noteLabel 우선, 아니면 D 라벨 '은행 숫자' → 공백 제거 */
+  function noteLabelOf(meta, entry) {
+    if (entry.noteLabel) return entry.noteLabel;
+    const m = /^(\S+)\s+(\d+)$/.exec(meta.label || '');
+    return m ? m[1] + m[2] : null;
+  }
+  function bankName(coCode, code, pdfName) {
+    const t = BANK_NAME[coCode] && BANK_NAME[coCode][code];
+    return t || pdfName || '';
+  }
+
+  /* ---------- 4. 이미지 · 표 격자 (회색조 {w,h,d}) ---------- */
+  const Img = {
+    fromRGBA(rgba, w, h) {
+      const d = new Uint8ClampedArray(w * h);
+      for (let i = 0, j = 0; i < d.length; i++, j += 4) { const a = rgba[j + 3] / 255; d[i] = Math.round((0.299 * rgba[j] + 0.587 * rgba[j + 1] + 0.114 * rgba[j + 2]) * a + 255 * (1 - a)); }
+      return { w, h, d };
+    },
+    crop(img, x0, y0, x1, y1) {
+      x0 = Math.max(0, Math.round(x0)); y0 = Math.max(0, Math.round(y0)); x1 = Math.min(img.w, Math.round(x1)); y1 = Math.min(img.h, Math.round(y1));
+      const w = Math.max(0, x1 - x0), h = Math.max(0, y1 - y0), d = new Uint8ClampedArray(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) d[y * w + x] = img.d[(y + y0) * img.w + x + x0];
+      return { w, h, d };
+    },
+    scale(img, f) {
+      const w = Math.max(1, Math.round(img.w * f)), h = Math.max(1, Math.round(img.h * f)), d = new Uint8ClampedArray(w * h), p = img.d, W = img.w;
+      for (let y = 0; y < h; y++) {
+        const sy = Math.min(img.h - 1.001, Math.max(0, (y + 0.5) / f - 0.5)), y0 = Math.floor(sy), fy = sy - y0, y1 = Math.min(img.h - 1, y0 + 1);
+        for (let x = 0; x < w; x++) {
+          const sx = Math.min(img.w - 1.001, Math.max(0, (x + 0.5) / f - 0.5)), x0 = Math.floor(sx), fx = sx - x0, x1 = Math.min(img.w - 1, x0 + 1);
+          d[y * w + x] = p[y0 * W + x0] * (1 - fx) * (1 - fy) + p[y0 * W + x1] * fx * (1 - fy) + p[y1 * W + x0] * (1 - fx) * fy + p[y1 * W + x1] * fx * fy;
+        }
+      }
+      return { w, h, d };
+    },
+    /* 셀 내부 잉크만 남겨 이진화·여백. 셀 배경(밝은 쪽 분위수)보다 충분히 어두운 화소 = 잉크 */
+    inkBox(img, pad) {
+      const vals = Array.from(img.d).sort((a, b) => a - b);
+      if (!vals.length) return null;
+      const bg = vals[Math.floor(vals.length * 0.9)];
+      const thr = Math.min(185, bg - 55);
+      let x0 = img.w, y0 = img.h, x1 = -1, y1 = -1, n = 0;
+      for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) if (img.d[y * img.w + x] < thr) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (x1 < 0 || n < 6) return null;
+      const w = x1 - x0 + 1 + pad * 2, h = y1 - y0 + 1 + pad * 2, d = new Uint8ClampedArray(w * h).fill(255);
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) d[(y - y0 + pad) * w + x - x0 + pad] = img.d[y * img.w + x] < thr ? 0 : 255;
+      return { w, h, d, ink: n, thr };
+    },
+    /* 잉크 가로 투영으로 텍스트 줄 수 */
+    lineCount(bin) {
+      let lines = 0, on = false, gap = 0;
+      for (let y = 0; y < bin.h; y++) {
+        let k = false; for (let x = 0; x < bin.w; x++) if (bin.d[y * bin.w + x] === 0) { k = true; break; }
+        if (k) { if (!on) { lines++; on = true; } gap = 0; } else { gap++; if (gap >= 3) on = false; }
+      }
+      return lines;
+    }
+  };
+
+  const Grid = {
+    ridge(img, dir, K, delta) {
+      const { w, h, d } = img, m = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = d[y * w + x]; if (v > 245) continue;
+        for (let k = 1; k <= K; k++) {
+          let a, b;
+          if (dir === 'h') { if (y - k < 0 || y + k >= h) break; a = d[(y - k) * w + x]; b = d[(y + k) * w + x]; }
+          else { if (x - k < 0 || x + k >= w) break; a = d[y * w + x - k]; b = d[y * w + x + k]; }
+          if (a - v >= delta && b - v >= delta) { m[y * w + x] = 1; break; }
+        }
+      }
+      return m;
+    },
+    /* 가로선: 같은 행의 능선 화소를 gap 이내로 이어 minLen 이상. 실선(채움 85%↑) 또는 규칙적 점선(짧은 점 반복)만 인정
+       — 글자 획이 이어진 가짜 선(숫자 줄의 위·아래 획)은 점 길이가 길고 불규칙해 제외 */
+    hLines(img, m, minLen, gap, joinGap, dotMax) {
+      const { w, h } = img, segs = [];
+      for (let y = 0; y < h; y++) {
+        let s = -1, last = -99, on = 0, runs = [], cur = 0;
+        const flush = () => {
+          if (cur) runs.push(cur);
+          if (s >= 0 && last - s + 1 >= minLen) {
+            const fill = on / (last - s + 1);
+            const sorted = runs.slice().sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)] || 0, mx = sorted[sorted.length - 1] || 0;
+            const dotted = fill >= 0.3 && runs.length >= 10 && mx <= dotMax && med <= Math.ceil(dotMax * 0.6);
+            if (fill >= 0.85 || dotted) segs.push({ y, x0: s, x1: last });
+          }
+          runs = []; cur = 0;
+        };
+        for (let x = 0; x < w; x++) {
+          if (m[y * w + x]) { if (s < 0 || x - last > gap + 1) { flush(); s = x; on = 0; } else if (x - last > 1) { runs.push(cur); cur = 0; } last = x; on++; cur++; }
+        }
+        flush();
+      }
+      const out = [];
+      segs.forEach(s => {
+        const o = out.find(L => s.y >= L.y1 && s.y - L.y1 <= 1 && s.x0 <= L.x1 + 3 && s.x1 >= L.x0 - 3);
+        if (o) { o.y1 = s.y; o.x0 = Math.min(o.x0, s.x0); o.x1 = Math.max(o.x1, s.x1); } else out.push({ y0: s.y, y1: s.y, x0: s.x0, x1: s.x1 });
+      });
+      // 워터마크 등으로 끊긴 같은 높이의 선 조각 잇기
+      out.sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
+      const merged = [];
+      out.forEach(L => {
+        const o = merged.find(M => Math.abs(M.y0 - L.y0) <= 2 && L.x0 > M.x1 && L.x0 - M.x1 <= joinGap);
+        if (o) { o.x1 = Math.max(o.x1, L.x1); o.y0 = Math.min(o.y0, L.y0); o.y1 = Math.max(o.y1, L.y1); } else merged.push(Object.assign({}, L));
+      });
+      return merged.map(L => ({ y0: L.y0, y1: L.y1, x0: L.x0, x1: L.x1, len: L.x1 - L.x0 + 1 }));
+    },
+    vCover(img, mv, x, y0, y1) { let c = 0; for (let y = y0; y <= y1; y++) if (mv[y * img.w + x]) c++; return c / Math.max(1, y1 - y0 + 1); },
+    /* 띠(band) = 위·아래 주요 가로선 사이. 아래 선이 일부 구간만 덮으면 남은 구간은 그 아래 선까지 이어 별도 띠로 만든다 */
+    detect(img, scale) {
+      const K = Math.max(3, Math.round(scale * 1.6)), delta = 10;
+      const mh = Grid.ridge(img, 'h', K, delta), mv = Grid.ridge(img, 'v', K, delta);
+      const lines = Grid.hLines(img, mh, Math.round(12 * scale), Math.round(2 * scale), Math.round(45 * scale), Math.round(3 * scale));
+      const maxLen = Math.max(0, ...lines.map(l => l.len));
+      const major = lines.filter(l => l.len >= maxLen * 0.25).sort((a, b) => a.y0 - b.y0);
+      const minH = Math.round(5 * scale), maxH = Math.round(130 * scale), minOv = Math.round(10 * scale);
+      const bands = [];
+      major.forEach((A, i) => {
+        let rem = [[A.x0, A.x1]];
+        for (let j = i + 1; j < major.length && rem.length; j++) {
+          const B = major[j]; if (B.y0 - A.y1 > maxH) break;
+          const next = [];
+          rem.forEach(([a, b]) => {
+            const x0 = Math.max(a, B.x0), x1 = Math.min(b, B.x1);
+            if (x1 - x0 < minOv) { next.push([a, b]); return; }
+            const top = A.y1 + 1, bot = B.y0 - 1;
+            if (bot - top >= minH) bands.push({ top, bot, x0, x1 });
+            if (x0 - a >= minOv) next.push([a, x0 - 1]);
+            if (b - x1 >= minOv) next.push([x1 + 1, b]);
+          });
+          rem = next;
+        }
+      });
+      bands.forEach(b => {
+        const ins = Math.max(2, Math.round((b.bot - b.top) * 0.08));
+        const ys = b.top + ins, ye = b.bot - ins, xs = [];
+        for (let x = b.x0; x <= b.x1; x++) if (Grid.vCover(img, mv, x, ys, ye) >= 0.85) xs.push(x);
+        const cl = []; xs.forEach(x => { const l = cl[cl.length - 1]; if (l && x - l.b <= 2) l.b = x; else cl.push({ a: x, b: x }); });
+        const seps = [{ a: b.x0 - 1, b: b.x0 - 1 }].concat(cl.filter(c => c.a > b.x0 + 3 && c.b < b.x1 - 3)).concat([{ a: b.x1 + 1, b: b.x1 + 1 }]);
+        b.cells = [];
+        for (let k = 1; k < seps.length; k++) { const x0 = seps[k - 1].b + 1, x1 = seps[k].a - 1; if (x1 - x0 >= Math.round(2 * scale)) b.cells.push({ x0, x1, top: b.top, bot: b.bot }); }
+      });
+      bands.sort((a, b) => a.top - b.top || a.x0 - b.x0);
+      return { bands, scale };
+    }
+  };
+
+  /* ---------- 5. 텍스트 레이어 → 토큰(이미지 좌표) → 셀 텍스트 ---------- */
+  function tokensOf(items, vp) {
+    const out = [];
+    items.forEach(t => {
+      let s = nfkc(t.str); if (!s.trim()) return;
+      const tr = t.transform, h = Math.abs(t.height || tr[3] || 8);
+      const r = vp.convertToViewportRectangle([tr[4], tr[5], tr[4] + (t.width || 0), tr[5] + h]);
+      const x0 = Math.min(r[0], r[2]), x1 = Math.max(r[0], r[2]), y0 = Math.min(r[1], r[3]), y1 = Math.max(r[1], r[3]);
+      // 이율과 지급액이 한 조각으로 붙어 나온 경우('00.00000' + '6,775,059') 분리
+      // 공백·붙은 숫자 경계로 나눈 조각에 원문 글자 위치 비례 x를 준다(공백 폭 포함)
+      const parts = []; const m = /^(\d{1,3}\.\d{2,5})(\d{1,3}(?:,\d{3})+)$/.exec(s.trim());
+      if (m) { const o = s.indexOf(m[1]); parts.push([m[1], o], [m[2], o + m[1].length]); }
+      else { const re = /\S+/g; let mm; while ((mm = re.exec(s))) parts.push([mm[0], mm.index]); }
+      const total = s.length || 1;
+      parts.forEach(([p, o]) => {
+        const a = x0 + (x1 - x0) * o / total, b = x0 + (x1 - x0) * (o + p.length) / total;
+        out.push({ s: p, x0: a, x1: b, y0, y1, cx: (a + b) / 2, cy: (y0 + y1) / 2, h: Math.max(1, y1 - y0) });
+      });
+    });
+    return out;
+  }
+  function joinTokens(toks) {
+    if (!toks.length) return '';
+    const s = toks.slice().sort((a, b) => a.cy - b.cy);
+    const lines = [];
+    s.forEach(t => { const L = lines.find(l => Math.abs(l.cy - t.cy) <= Math.max(2, t.h * 0.45)); if (L) { L.t.push(t); L.cy = (L.cy * (L.t.length - 1) + t.cy) / L.t.length; } else lines.push({ cy: t.cy, t: [t] }); });
+    lines.sort((a, b) => a.cy - b.cy);
+    return lines.map(L => { const r = L.t.sort((a, b) => a.x0 - b.x0); let out = ''; r.forEach((t, i) => { if (i && t.x0 - r[i - 1].x1 > t.h * 0.35) out += ' '; out += t.s; }); return out; }).join('\n');
+  }
+  function cellTextFromTokens(cell, toks) { return joinTokens(toks.filter(t => t.cx >= cell.x0 && t.cx <= cell.x1 && t.cy >= cell.top && t.cy <= cell.bot)); }
+
+  /* ---------- 6. 렌더·OCR 어댑터 (브라우저 기본) ---------- */
+  function browserEnv() {
+    if (typeof document === 'undefined') throw new IntError('NO_ENV', '브라우저 환경이 아닙니다 — readPdf(…, { env })로 렌더·OCR 어댑터를 넘기세요');
+    let worker = null, loading = null;
+    async function getWorker() {
+      if (worker) return worker;
+      if (!loading) loading = (async () => {
+        if (!root.Tesseract) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = TESS_URL; s.onload = res; s.onerror = () => rej(new IntError('OCR_LOAD', 'Tesseract.js CDN 로드 실패 — 네트워크(사내 방화벽) 확인')); document.head.appendChild(s); });
+        worker = await root.Tesseract.createWorker('eng');
+        return worker;
+      })();
+      return loading;
+    }
+    return {
+      async render(page, scale) {
+        const vp = page.getViewport({ scale });
+        const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        return Img.fromRGBA(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+      },
+      async ocr(bin, opt) {
+        const w = await getWorker();
+        await w.setParameters({ tessedit_char_whitelist: opt.whitelist, tessedit_pageseg_mode: String(opt.psm || 7) });
+        const c = document.createElement('canvas'); c.width = bin.w; c.height = bin.h;
+        const ctx = c.getContext('2d'); const id = ctx.createImageData(bin.w, bin.h);
+        for (let i = 0; i < bin.d.length; i++) { id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = bin.d[i]; id.data[i * 4 + 3] = 255; }
+        ctx.putImageData(id, 0, 0);
+        const r = await w.recognize(c);
+        const sym = [];
+        (r.data.words || []).forEach(wd => (wd.symbols || []).forEach(sy => sym.push({ t: sy.text, x0: sy.bbox.x0, x1: sy.bbox.x1 })));
+        return { text: String(r.data.text || '').trim(), conf: r.data.confidence, symbols: sym };
+      },
+      async dispose() { if (worker) { const w = worker; worker = null; loading = null; await w.terminate(); } }
+    };
+  }
+
+  /* ---------- 7. 서식 정의 (지급내역 데이터 띠: 셀 개수 · 열 순서 · 텍스트 경로 라벨 검증) ----------
+     열 번호는 격자로 잘린 데이터 띠의 셀 순서. 텍스트 경로는 각 열 위 머리글 텍스트로 라벨을 확인(불일치 = error),
+     OCR 경로는 한글 머리글을 읽을 수 없으므로 열 순서 + 값 형식으로만 판정하고 '확인' 플래그를 단다. */
+  const L_ = {
+    period: /지급대상기간|대상기간|지급기간/, rate: /이자율/, pay: /지급액/, taxRate: /세율/,
+    incomeTax: /(^|[^방])소득세/, corpTax: /법인세/, localTax: /지방소득세/, ruralTax: /농어촌특별세/, total: /계/
+  };
+  const STD20 = { cells: 20, first: 'year', cols: { y: 0, m: 1, d: 2, by: 3, bm: 4, period: 11, rate: 12, pay: 13, taxRate: 14, incomeTax: 15, corpTax: 16, localTax: 17, ruralTax: 18, total: 19 } };
+  const FORMS = {
+    '하나': { id: 'HANA', cells: 18, first: 'year', cols: { y: 0, m: 1, d: 2, belong: 3, period: 10, rate: 11, pay: 12, taxRate: 13, incomeTax: 14, corpTax: 15, localTax: 16 } },
+    '우리': { id: 'WOORI', cells: 21, first: 'year', cols: { y: 0, m: 1, d: 2, by: 3, bm: 4, period: 13, pay: 14, taxRate: 15, incomeTax: 16, corpTax: 17, localTax: 18, ruralTax: 19, total: 20 }, noRate: true },
+    '부산': { id: 'BUSAN', cells: 13, first: 'year', cols: { y: 0, m: 1, d: 2, by: 3, bm: 4, period: 7, rate: 8, pay: 9, taxRate: 10, taxStack: 11, totalStack: 12 }, stack: { taxStack: ['corpTax', 'localTax', 'ruralTax'], totalStack: ['total'] }, noIncomeTax: true,
+      labels: { taxStack: /법인세/, totalStack: /계/ } },
+    '신한': { id: 'SHINHAN', pair: true, cells: 11, first: 'dateDot', colsA: { payDate: 0, period: 8 }, colsB: { belong: 0, pay: 1, taxRate: 2, incomeTax: 3, corpTax: 4, localTax: 5, ruralTax: 6, total: 7, rate: 8 }, check: { cells: 9, label: /^정상$/, col: 1 } },
+    '씨티': Object.assign({ id: 'STD20' }, STD20),
+    '기업': Object.assign({ id: 'STD20' }, STD20)
+  };
+  const FIRST = { year: /^20\d{2}$/, dateDot: /^20\d{2}\.\d{2}\.\d{2}$/ };
+  const FIELD_WL = { y: 'num', m: 'num', d: 'num', by: 'num', bm: 'num', belong: 'date', payDate: 'date', period: 'date', rate: 'dec', pay: 'num', taxRate: 'dec', incomeTax: 'num', corpTax: 'num', localTax: 'num', ruralTax: 'num', total: 'num', taxStack: 'num', totalStack: 'num' };
+
+  /* ---------- 8. PDF 읽기 (텍스트 우선 · 본문 마커 없으면 OCR) ---------- */
+  const BIZ_HY = /\d{3}-\d{2}-[\d*]{5}/g;
+  function textMarkers(tokens, knownBiz) {
+    const flat = tokens.map(t => t.s).join(' ');
+    const hy = (flat.match(BIZ_HY) || []).length;
+    const plain = tokens.filter(t => /^\d{10}$/.test(t.s) && knownBiz.has(t.s)).length; // 하이픈 없는 등록 사업자번호(부산·RCMS 표기)
+    const bizCount = hy + plain;
+    const hasTaxRate = tokens.some(t => /^14([.,]0+)?$/.test(t.s)) || /(^|\s)1\s?4\s?\.\s?0/.test(flat);
+    const hasAmount = tokens.some(t => /^\d{1,3}(,\d{3})+$/.test(t.s) || /^\d+$/.test(t.s));
+    return { bizCount, payDigits: hasTaxRate && hasAmount, text: bizCount >= 2 && hasTaxRate && hasAmount };
+  }
+  function knownBizSet() {
+    const s = new Set(Object.keys(WITHHOLDERS));
+    ACTIVE_COS.forEach(c => { if (COMPANIES[c] && COMPANIES[c].bizNo) s.add(digits(COMPANIES[c].bizNo)); });
+    return s;
+  }
+  function charTokens(tokens) {
+    // 한 글자씩 나오는 텍스트 레이어(신한·우리 PDF) → 같은 줄 인접 글자를 이어 단어로 (마커·키-값 판독용)
+    const lines = []; tokens.slice().sort((a, b) => a.cy - b.cy || a.x0 - b.x0).forEach(t => { const L = lines.find(l => Math.abs(l.cy - t.cy) <= Math.max(2, t.h * 0.4)); if (L) L.t.push(t); else lines.push({ cy: t.cy, t: [t] }); });
+    const out = [];
+    lines.forEach(L => { const r = L.t.sort((a, b) => a.x0 - b.x0); let cur = null; r.forEach(t => { if (cur && t.x0 - cur.x1 <= t.h * 0.3) { cur.s += t.s; cur.x1 = t.x1; cur.cx = (cur.x0 + cur.x1) / 2; } else { cur = Object.assign({}, t); out.push(cur); } }); });
+    return out;
+  }
+
+  let _docSeq = 0;
+  /* PDF 1개 판독. 내부 오류(브리지·D 미로드·OCR 로드 실패 등)는 문서 error로 돌려준다 — 예외로 흘려보내지 않고, 조용히 넘기지도 않는다 */
+  async function readPdf(pdfjsLib, data, opt) {
+    const doc0 = { id: '', fileName: (opt && opt.fileName) || '', issues: [] };
+    try { return await readPdfInner(pdfjsLib, data, opt || {}, doc0); }
+    catch (e) {
+      const d = doc0.ref || Object.assign(doc0, { id: 'd' + (++_docSeq), kind: 'error' });
+      d.issues.push(issue('error', 'file', (e && e.code ? '[' + e.code + '] ' : '') + (e && e.message || String(e))));
+      d.status = 'error'; if (d.kind === 'wht' || d.kind === 'unknown') d.kind = 'error';
+      return d;
+    }
+  }
+  async function readPdfInner(pdfjsLib, data, opt, doc0) {
+    const env = opt.env || browserEnv();
+    const prog = opt.onProgress || (() => {});
+    const doc = { id: 'd' + (++_docSeq), fileName: opt.fileName || '', kind: 'unknown', mode: '', pages: 0, issues: [], text: '' };
+    doc0.ref = doc;
+    let pdf;
+    try { pdf = await pdfjsLib.getDocument({ data, cMapUrl: opt.cMapUrl || CMAP_URL, cMapPacked: true }).promise; }
+    catch (e) { doc.issues.push(issue('error', 'file', 'PDF를 열 수 없습니다: ' + (e && e.message || e))); doc.kind = 'error'; return doc; }
+    doc.pages = pdf.numPages;
+    if (pdf.numPages > 1) doc.issues.push(issue('info', 'file', pdf.numPages + '쪽 PDF — 1쪽만 판독합니다(증빙 서식은 1쪽)'));
+    const page = await pdf.getPage(1);
+    const tc = await page.getTextContent();
+    const known = knownBizSet();
+    const vpT = page.getViewport({ scale: TEXT_SCALE });
+    const toks = tokensOf(tc.items, vpT);
+    const words = charTokens(toks);
+    doc.text = joinTokens(toks);
+    const sq = squash(doc.text);
+    if (/거래내역확인증/.test(sq)) doc.kind = 'txn';
+    else if (/이자지급증명서/.test(sq)) doc.kind = 'rcmsCert';
+    else doc.kind = 'wht';
+    const mk = textMarkers(words, known);
+    doc.markers = { bizCount: mk.bizCount, payDigits: mk.payDigits };
+    if (doc.kind !== 'wht') {
+      doc.mode = 'text';
+      prog('표 구조 분석', 0.5);
+      const img = await env.render(page, TEXT_SCALE);
+      const grid = Grid.detect(img, TEXT_SCALE);
+      grid.bands.forEach(b => b.cells.forEach(c => { c.text = cellTextFromTokens(c, toks); }));
+      if (opt.debug) doc._grid = grid;
+      if (doc.kind === 'txn') parseTxn(doc, grid); else parseRcmsCert(doc, grid);
+      return doc;
+    }
+    if (mk.text) {
+      doc.mode = 'text';
+      prog('표 구조 분석(텍스트)', 0.4);
+      const img = await env.render(page, TEXT_SCALE);
+      const grid = Grid.detect(img, TEXT_SCALE);
+      grid.bands.forEach(b => b.cells.forEach(c => { c.text = cellTextFromTokens(c, toks); c.lines = c.text ? c.text.split('\n') : []; }));
+      if (opt.debug) doc._grid = grid;
+      await extractWht(doc, grid, words, null);
+    } else {
+      doc.mode = 'ocr';
+      try { const ops = await page.getOperatorList(); const O = pdfjsLib.OPS || {}; const hasText = ops.fnArray.some(f => f === O.showText || f === O.showSpacedText);
+        if (hasText && toks.length < 10) doc.issues.push(issue('warn', 'file', '글자 레이어가 있으나 읽지 못해 OCR로 판독합니다(글꼴 문자표 CMap 로드 실패 의심 — 네트워크 확인 후 다시 올리면 정확도가 올라갑니다)')); } catch (e) { /* 안내용 — 판독에는 영향 없음 */ }
+      prog('이미지 판독(OCR) 준비', 0.2);
+      const img = await env.render(page, OCR_SCALE);
+      const grid = Grid.detect(img, OCR_SCALE);
+      if (opt.debug) doc._grid = grid;
+      await ocrGrid(doc, img, grid, env, prog);
+      await extractWht(doc, grid, null, { img, env });
+    }
+    return doc;
+  }
+
+  /* 셀 잘라내기: 경계선 바로 안쪽까지(inset 1px) 자르고, 가장자리에 남은 표 선(세로·가로로 60% 이상 어두운 열·행)만 지운다
+     — 숫자가 칸 경계에 붙어 있어도 잘리지 않게(예: 오른쪽 정렬 '670') */
+  function cellCrop(img, cell, scale) {
+    const raw = Img.crop(img, cell.x0 + 1, cell.top + 1, cell.x1, cell.bot);
+    const vals = Array.from(raw.d).sort((a, b) => a - b); const bg = vals[Math.floor(vals.length * 0.9)] || 255; const thr = Math.min(185, bg - 55);
+    const edge = Math.max(3, Math.round(scale * 2.5));
+    for (let x = 0; x < raw.w; x++) { if (x >= edge && x < raw.w - edge) continue; let n = 0; for (let y = 0; y < raw.h; y++) if (raw.d[y * raw.w + x] < thr) n++; if (n >= raw.h * 0.6) for (let y = 0; y < raw.h; y++) raw.d[y * raw.w + x] = 255; }
+    for (let y = 0; y < raw.h; y++) { if (y >= edge && y < raw.h - edge) continue; let n = 0; for (let x = 0; x < raw.w; x++) if (raw.d[y * raw.w + x] < thr) n++; if (n >= raw.w * 0.6) for (let x = 0; x < raw.w; x++) raw.d[y * raw.w + x] = 255; }
+    return raw;
+  }
+  /* 글자 높이가 작으면 2배 확대(Tesseract 권장 크기) */
+  function ocrReady(bin) { return bin.h - 28 < 34 ? Img.inkBox(Img.scale(bin, 2), 16) || bin : bin; }
+  async function ocrCell(env, img, cell, wl, scale) {
+    const raw = cellCrop(img, cell, scale);
+    let bin = Img.inkBox(raw, 14);
+    if (!bin) return { text: '', blank: true, lines: [] };
+    const nL = Img.lineCount(bin);
+    bin = ocrReady(bin);
+    const r = await env.ocr(bin, { whitelist: OCR_WL[wl] || OCR_WL.any, psm: nL >= 2 ? 6 : 7 });
+    return { text: r.text, blank: false, lines: r.text.split(/\n+/).map(s => s.trim()).filter(Boolean), conf: r.conf };
+  }
+  /* 셀 안 텍스트 줄 이미지(이진, 여백 없음) — 칸 안 짧은 구분선은 제외 */
+  function cellLineImgs(img, cell, scale) {
+    const raw = cellCrop(img, cell, scale);
+    const vals = Array.from(raw.d).sort((a, b) => a - b); const bg = vals[Math.floor(vals.length * 0.9)] || 255; const thr = Math.min(185, bg - 55);
+    const dark = (x, y) => raw.d[y * raw.w + x] < thr;
+    const rowN = []; for (let y = 0; y < raw.h; y++) { let n = 0; for (let x = 0; x < raw.w; x++) if (dark(x, y)) n++; rowN.push(n >= raw.w * 0.7 ? 0 : n); }
+    const spans = []; let st = -1, gap = 0;
+    for (let y = 0; y <= raw.h; y++) { const on = y < raw.h && rowN[y] > 0; if (on) { if (st < 0) st = y; gap = 0; } else if (st >= 0) { gap++; if (gap >= Math.max(2, Math.round(scale)) || y === raw.h) { spans.push([st, y - gap]); st = -1; gap = 0; } } }
+    const out = [];
+    spans.forEach(([a, b]) => {
+      if (b - a + 1 < Math.max(3, Math.round(scale * 1.2))) return;
+      let x0 = raw.w, x1 = -1; for (let y = a; y <= b; y++) for (let x = 0; x < raw.w; x++) if (dark(x, y)) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+      if (x1 < 0) return;
+      const w = x1 - x0 + 1, h = b - a + 1, d = new Uint8ClampedArray(w * h), gd = new Uint8ClampedArray(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { d[y * w + x] = dark(x + x0, y + a) ? 0 : 255; const v = raw.d[(y + a) * raw.w + x + x0]; gd[y * w + x] = Math.min(255, Math.round(v * 255 / Math.max(1, bg))); }
+      out.push({ w, h, d, gray: { w, h, d: gd } });
+    });
+    return out;
+  }
+  /* ── 데이터 띠 OCR: 다중 판독 다수결 ──
+     Tesseract 단독 판독은 짧은 숫자를 자주 틀린다('09'→'03', '48,195'→'148,195'). 셀의 텍스트 줄마다
+     이진·회색조 × 배율 × 분할모드 8가지로 판독해 숫자열 다수결(3표 이상, 최다 단독)로 정한다.
+     구두점은 글자 모양(높이·위치)으로 자리를 정하고 의미는 항목 형식이 정한다(금액 = 천 단위 쉼표, 이율·세율 = 소수점).
+     다수결이 안 되거나 글자 수가 어긋나면 '판독 불확실'(error)로 남긴다 — 임의 보정 없음. */
+  function components(bin) {
+    const { w, h, d } = bin, lab = new Int32Array(w * h).fill(-1), comps = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (d[y * w + x] !== 0 || lab[y * w + x] >= 0) continue;
+      const id = comps.length, st = [y * w + x]; lab[y * w + x] = id; let x0 = x, x1 = x, y0 = y, y1 = y, n = 0;
+      while (st.length) {
+        const p = st.pop(); n++; const py = (p / w) | 0, px = p - py * w;
+        if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= w || qy >= h) continue; const q = qy * w + qx; if (d[q] === 0 && lab[q] < 0) { lab[q] = id; st.push(q); } }
+      }
+      comps.push({ ids: [id], x0, x1, y0, y1, n });
+    }
+    comps.sort((p, q) => p.x0 - q.x0);
+    const out = [];
+    comps.forEach(c => { const o = out[out.length - 1]; const ov = o ? Math.min(o.x1, c.x1) - Math.max(o.x0, c.x0) + 1 : -1;
+      if (o && ov >= 0.5 * Math.min(o.x1 - o.x0 + 1, c.x1 - c.x0 + 1)) { o.ids = o.ids.concat(c.ids); o.x0 = Math.min(o.x0, c.x0); o.x1 = Math.max(o.x1, c.x1); o.y0 = Math.min(o.y0, c.y0); o.y1 = Math.max(o.y1, c.y1); o.n += c.n; }
+      else out.push(Object.assign({}, c)); });
+    const res = out.filter(c => c.n >= 3); res.lab = lab; return res;
+  }
+  /* 숫자 글자 모양 벡터(12×18 칸 채움 비율) — 같은 문서 안 동점 판독을 가르는 데만 쓴다 */
+  function glyphVec(bin, lab, c) {
+    const GW = 12, GH = 18, v = new Float32Array(GW * GH), set = new Set(c.ids), bw = c.x1 - c.x0 + 1, bh = c.y1 - c.y0 + 1;
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+      const ya = c.y0 + Math.floor(gy * bh / GH), yb = Math.max(ya, c.y0 + Math.ceil((gy + 1) * bh / GH) - 1);
+      const xa = c.x0 + Math.floor(gx * bw / GW), xb = Math.max(xa, c.x0 + Math.ceil((gx + 1) * bw / GW) - 1);
+      let on = 0, n = 0; for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) { n++; if (set.has(lab[y * bin.w + x])) on++; }
+      v[gy * GW + gx] = n ? on / n : 0;
+    }
+    return v;
+  }
+  function vdist(a, b) { let t = 0; for (let i = 0; i < a.length; i++) t += Math.abs(a[i] - b[i]); return t / a.length; }
+  /* 줄 이미지 → 글자 종류 목록 'd'(숫자 높이) · 'sep'(아래쪽 작은 점) · 'dash'(가운데 가로획) · '?' — H는 셀 전체 기준 숫자 높이 */
+  function lineKinds(li, H) { return lineGlyphs(li, H).map(g => g.k); }
+  function lineGlyphs(li, H) {
+    const comps = components(li); if (!comps.length) return [];
+    const tallTop = comps.filter(c => c.y1 - c.y0 + 1 >= H * 0.65).map(c => c.y0);
+    const top = tallTop.length ? Math.min(...tallTop) : Math.min(...comps.map(c => c.y0)) - H * 0.35;
+    return comps.map(c => {
+      const w = c.x1 - c.x0 + 1, h = c.y1 - c.y0 + 1, cy = (c.y0 + c.y1) / 2;
+      let k = '?';
+      if (h >= H * 0.65) k = 'd';
+      else if (h < H * 0.5 && w >= H * 0.3 && cy > top + H * 0.2 && cy < top + H * 0.8) k = 'dash';
+      else if (h < H * 0.55 && w < H * 0.5 && cy > top + H * 0.55) k = 'sep';
+      return { k, vec: k === 'd' ? glyphVec(li, comps.lab, c) : null };
+    });
+  }
+  const OCR_VARIANTS = [{ g: 0, f: 1, psm: 7 }, { g: 0, f: 1, psm: 8 }, { g: 0, f: 2, psm: 7 }, { g: 0, f: 2, psm: 13 }, { g: 0, f: 1.5, psm: 7 }, { g: 1, f: 1, psm: 7 }, { g: 1, f: 2, psm: 7 }, { g: 1, f: 2, psm: 13 }];
+  function padImg(im, pad) { const w = im.w + pad * 2, h = im.h + pad * 2, d = new Uint8ClampedArray(w * h).fill(255); for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) d[(y + pad) * w + x + pad] = im.d[y * im.w + x]; return { w, h, d }; }
+  async function ocrVoteLine(env, li, H) {
+    const reads = [];
+    for (const v of OCR_VARIANTS) {
+      const src = v.g ? li.gray : li;
+      const im = padImg(v.f === 1 ? src : Img.scale(src, v.f), Math.round(14 * v.f));
+      const r = await env.ocr(im, { whitelist: '0123456789.,-~', psm: v.psm });
+      reads.push(String(r.text || '').replace(/\s+/g, ''));
+    }
+    const kinds = lineKinds(li, H), nd = kinds.filter(k => k === 'd').length, segOk = nd > 0 && kinds.indexOf('?') < 0;
+    const pick = list => { const cnt = {}; list.forEach(dg => { if (dg) cnt[dg] = (cnt[dg] || 0) + 1; }); const e = Object.entries(cnt).sort((a, b) => b[1] - a[1]); return e.length && e[0][1] >= 3 && (e.length === 1 || e[0][1] > e[1][1]) ? e[0][0] : null; };
+    const dgs = reads.map(t => t.replace(/[^\d]/g, ''));
+    // 글자 분할이 깨끗하면 숫자 개수가 맞는 판독만 투표, 안 되면 전체로
+    const win = (segOk && pick(dgs.filter(d => d.length === nd))) || pick(dgs);
+    return { reads, win, kinds, nd, segOk, cand: segOk ? dgs.filter(d => d.length === nd) : [] };
+  }
+  async function ocrDataCells(env, img, specs, scale) {
+    // specs: [{key, cell, stack, kind:'num'|'dec'|'date'}]
+    // 1차: 줄마다 다수결. 2차: 동점(예 '03' 4표 vs '09' 4표)인 글자 자리만, 같은 문서에서 만장일치로 확정된 같은 후보 숫자 모양과 비교해 가른다
+    const work = [];
+    for (const sp of specs) {
+      const L = cellLineImgs(img, sp.cell, scale);
+      const H = L.length ? Math.max(...L.map(li => li.h)) : 0;
+      sp.L = [];
+      for (const li of L) {
+        const gl = lineGlyphs(li, H), k0 = gl.map(g => g.k);
+        if (k0.length && k0.every(k => k === 'dash' || k === 'sep')) { sp.L.push({ fixed: k0.map(k => (k === 'dash' ? '-' : '.')).join('') }); continue; }
+        const v = await ocrVoteLine(env, li, H); v.gl = gl; sp.L.push(v); work.push(v);
+      }
+    }
+    const bank = {}; // 확신 글자 모양: 숫자 → [vec]
+    work.forEach(v => { if (v.win && v.segOk && v.win.length === v.nd && v.cand.length >= 5 && v.cand.every(c => c === v.win)) { let i = 0; v.gl.forEach(g => { if (g.k === 'd') (bank[v.win[i++]] = bank[v.win[i - 1]] || []).push(g.vec); }); } });
+    work.forEach(v => {
+      if (v.win || !v.segOk || v.cand.length < 3) return;
+      const dgl = v.gl.filter(g => g.k === 'd'); let out = '', note = [];
+      for (let i = 0; i < v.nd; i++) {
+        const cs = {}; v.cand.forEach(c => { cs[c[i]] = (cs[c[i]] || 0) + 1; });
+        const keys = Object.keys(cs);
+        if (keys.length === 1) { out += keys[0]; continue; }
+        const sc = keys.map(k => ({ k, d: (bank[k] || []).reduce((m, vec) => Math.min(m, vdist(vec, dgl[i].vec)), 9) })).sort((a, b) => a.d - b.d);
+        if (sc[0].d < 0.08 && (sc.length < 2 || sc[1].d > sc[0].d * 1.6)) { out += sc[0].k; note.push(keys.join('/') + '→' + sc[0].k); }
+        else { out = null; break; }
+      }
+      if (out) { v.win = out; v.tie = note.join(', '); }
+    });
+    const res = {};
+    specs.forEach(sp => {
+      const texts = [], amb = [], tie = [], ambs = [];
+      sp.L.forEach(v => {
+        if (v.fixed != null) { texts.push(v.fixed); ambs.push(''); return; }
+        if (!v.win) { texts.push('?'); amb.push('다수결 실패: ' + v.reads.join('/')); ambs.push('다수결 실패: ' + v.reads.join('/')); return; }
+        ambs.push('');
+        if (v.tie) tie.push(v.tie);
+        const sepCh = sp.kind === 'num' ? ',' : '.';
+        if (v.segOk && v.nd === v.win.length) { let i = 0, t = ''; v.kinds.forEach(k => { t += k === 'd' ? v.win[i++] : (k === 'sep' ? sepCh : '-'); }); texts.push(t); }
+        else {
+          const same = v.reads.filter(t => t.replace(/[^\d]/g, '') === v.win);
+          const c2 = {}; same.forEach(t => { c2[t] = (c2[t] || 0) + 1; }); const best = (Object.entries(c2).sort((a, b) => b[1] - a[1])[0] || [v.win])[0];
+          const t = best.replace(/[.,]/g, sepCh).replace(/~/g, '-');
+          if (sp.kind === 'dec' && v.win.length > 1 && t.indexOf('.') < 0) { texts.push('?'); amb.push('소수점 확인 불가: ' + v.reads.join('/')); ambs[ambs.length - 1] = '소수점 확인 불가'; }
+          else texts.push(t);
+        }
+      });
+      res[sp.key] = { lines: texts, amb: amb.join(' · '), ambs, tie: tie.join(' · ') };
+    });
+    return res;
+  }
+  /* OCR 1단계: 띠 안 잉크 있는 셀 전부(문단성 큰 셀 제외)를 범용 화이트리스트로 판독 → 징수의무자·소득자·계좌 찾기용 */
+  async function ocrGrid(doc, img, grid, env, prog) {
+    const sc = grid.scale, maxW = img.w * 0.55, maxH = 60 * sc;
+    const targets = [];
+    grid.bands.forEach(b => b.cells.forEach(c => { if ((c.x1 - c.x0) <= maxW && (c.bot - c.top) <= maxH) targets.push(c); else { c.text = null; c.skipped = true; } }));
+    let i = 0;
+    for (const c of targets) {
+      i++; if (i % 8 === 0) prog('OCR ' + i + '/' + targets.length, 0.2 + 0.6 * i / targets.length);
+      const r = await ocrCell(env, img, c, 'any', sc);
+      c.text = r.text; c.blank = r.blank; c.lines = r.lines;
+    }
+    // 사업자번호·계좌번호처럼 숫자 8자리 이상인 셀은 줄 단위 다중 판독 다수결로 다시 읽는다(등록 번호와 정확히 대조하므로 한 자리 오독도 막아야 함)
+    const ids = targets.filter(c => digits(c.text).length >= 8);
+    for (const c of ids) {
+      const L = cellLineImgs(img, c, sc); if (!L.length) continue;
+      const H = Math.max(...L.map(li => li.h)); const out = [];
+      for (const li of L) {
+        const v = await ocrVoteLine(env, li, H);
+        if (!v.win) { out.push(''); continue; }
+        const same = v.reads.filter(t => t.replace(/[^\d]/g, '') === v.win);
+        const c2 = {}; same.forEach(t => { c2[t] = (c2[t] || 0) + 1; });
+        out.push((Object.entries(c2).sort((a, b) => b[1] - a[1])[0] || [v.win])[0]);
+      }
+      c.text = out.join('\n'); c.voted = true;
+    }
+  }
+
+  /* ---------- 9. 원천징수영수증 판독 (징수의무자 → 서식 → 데이터 띠 → 라벨 검증 → 소득자·계좌) ---------- */
+  function bandText(b) { return b.cells.map(c => c.text || '').join(' '); }
+  function bizTokens(texts) {
+    const out = [];
+    texts.forEach(t => {
+      const s = squash(t);
+      (s.match(/\d{3}-\d{2}-[\d*]{5}/g) || []).forEach(x => out.push({ raw: x, digits: digits(x), masked: x.indexOf('*') >= 0, stars: (x.match(/\*/g) || []).length }));
+      (s.match(/(?<![\d-])\d{10}(?![\d-])/g) || []).forEach(x => out.push({ raw: x, digits: x, masked: false, stars: 0 }));
+    });
+    return out;
+  }
+  function acctTokens(texts) {
+    const out = [];
+    texts.forEach(t => {
+      const s = squash(t);
+      (s.match(/[\d*][\d\-*]{6,}[\d*]/g) || []).forEach(x => {
+        if (/^\d{3}-\d{2}-[\d*]{5}$/.test(x)) return;              // 사업자번호 형식은 제외
+        const stars = (x.match(/\*/g) || []).length;
+        const prefix = digits(x.split('*')[0]);
+        out.push({ raw: x, digits: digits(x), masked: stars > 0, stars, prefix });
+      });
+    });
+    return out;
+  }
+  function headerText(grid, firstBand, cell) {
+    const cx = (cell.x0 + cell.x1) / 2, lim = firstBand.top - 140 * grid.scale;
+    return grid.bands.filter(b => b.bot <= firstBand.top + 2 && b.top >= lim).sort((a, b) => a.top - b.top)
+      .map(b => b.cells.filter(c => c.x0 <= cx && c.x1 >= cx).map(c => c.text || '').join('')).join('');
+  }
+  async function extractWht(doc, grid, words, ocr) {
+    const iss = doc.issues;
+    const allTexts = [];
+    grid.bands.forEach(b => b.cells.forEach(c => { if (c.text) allTexts.push(c.text); }));
+    if (words) words.forEach(w => allTexts.push(w.s));
+    // (1) 징수의무자
+    const whs = [...new Set(bizTokens(allTexts).filter(b => !b.masked && WITHHOLDERS[b.digits]).map(b => b.digits))];
+    if (!whs.length) { iss.push(issue('error', 'withholder', '징수의무자 사업자번호를 찾지 못했거나 미등록 번호입니다 — 징수의무자 테이블(WITHHOLDERS) 확인' + (doc.mode === 'ocr' ? ' (OCR 판독)' : ''))); doc.status = 'error'; return; }
+    if (whs.length > 1) { iss.push(issue('error', 'withholder', '징수의무자 후보가 여러 개입니다: ' + whs.join(', '))); doc.status = 'error'; return; }
+    const whCode = whs[0], wh = WITHHOLDERS[whCode];
+    doc.withholder = { code: whCode, bank: wh.bank, pdfName: pdfBankName(grid, whCode) };
+    const form = FORMS[wh.bank];
+    if (!form) { iss.push(issue('error', 'form', wh.bank + ' 서식은 아직 지원하지 않습니다')); doc.status = 'error'; return; }
+    doc.form = form.id;
+    // (2) 데이터 띠
+    const sq = c => squash(c && c.text);
+    let units = [];
+    if (form.pair) {
+      const bs = grid.bands.filter(b => b.cells.length === form.cells);
+      bs.forEach(b => {
+        if (!FIRST.dateDot.test(sq(b.cells[0]))) return;
+        const nb = grid.bands.filter(x => x.top > b.top && x.cells.length === form.cells).sort((x, y) => x.top - y.top)[0];
+        if (nb && /^20\d{2}\.\d{2}$/.test(sq(nb.cells[0]))) units.push({ a: b, b: nb });
+      });
+    } else {
+      units = grid.bands.filter(b => b.cells.length === form.cells && FIRST[form.first].test(sq(b.cells[0]))).map(b => ({ a: b }));
+    }
+    if (!units.length) {
+      const counts = grid.bands.filter(b => b.cells.length >= 9).map(b => b.cells.length);
+      iss.push(issue('error', 'form', wh.bank + ' 서식의 지급내역 행을 찾지 못했습니다 — 열 ' + form.cells + '개 기대, 탐지된 표 행 열 수: ' + (counts.join('·') || '없음')));
+      doc.status = 'error'; return;
+    }
+    const firstBand = units[0].a;
+    // (3) OCR 2단계: 데이터 셀을 줄 단위 다중 판독 다수결로. 확정 못 한 셀은 '판독 불확실'
+    if (ocr) {
+      const specs = [];
+      units.forEach((u, ui) => {
+        const maps = form.pair ? [[u.a, form.colsA], [u.b, form.colsB]] : [[u.a, form.cols]];
+        maps.forEach(([band, cols]) => Object.entries(cols).forEach(([f, ci]) => { if (band.cells[ci]) specs.push({ key: ui + ':' + f, f, cell: band.cells[ci], stack: !!(form.stack && form.stack[f]), kind: FIELD_WL[f] || 'num' }); }));
+      });
+      const res = await ocrDataCells(ocr.env, ocr.img, specs, grid.scale);
+      specs.forEach(sp => {
+        const v = res[sp.key], cell = sp.cell;
+        if (sp.stack) { cell.stackVals = v.lines; cell.stackAmb = v.ambs; } else { cell.text = v.lines.join('\n'); cell.amb = v.amb; }
+        if (v.tie) cell.tie = v.tie;
+      });
+    }
+    // (4) 텍스트 경로: 열 머리글 라벨 확인
+    if (doc.mode === 'text') {
+      const check = (band, cols) => Object.entries(cols).forEach(([f, ci]) => {
+        const re = (form.labels && form.labels[f]) || L_[f]; if (!re) return;
+        const cell = band.cells[ci]; const ht = cell ? squash(headerText(grid, firstBand, cell)) : '';
+        if (!re.test(ht)) iss.push(issue('error', f, '열 라벨 불일치(' + f + ') — 머리글 "' + (ht || '없음') + '" · 서식 변경 의심'));
+      });
+      if (form.pair) { check(units[0].a, form.colsA); check(units[0].b, form.colsB); } else check(firstBand, form.cols);
+    }
+    // (5) 행 원시값
+    const tx = c => (c ? (c.text || '') : '');
+    doc.rawRows = units.map((u, k) => {
+      const r = { idx: k, src: doc.mode, fields: {} };
+      r.amb = {};
+      r.tie = {};
+      const put = (f, c) => { r.fields[f] = tx(c); if (c && c.amb) r.amb[f] = c.amb; if (c && c.tie) r.tie[f] = c.tie; };
+      if (form.pair) {
+        Object.entries(form.colsA).forEach(([f, ci]) => put(f, u.a.cells[ci]));
+        Object.entries(form.colsB).forEach(([f, ci]) => put(f, u.b.cells[ci]));
+        r.payDate = digits(r.fields.payDate);
+      } else {
+        Object.entries(form.cols).forEach(([f, ci]) => {
+          const c = u.a.cells[ci];
+          if (form.stack && form.stack[f]) {
+            const vals = ocr ? (c && c.stackVals || []) : (c && c.text ? c.text.split('\n').map(squash).filter(Boolean) : []);
+            form.stack[f].forEach((name, i) => { r.fields[name] = vals[i] != null ? vals[i] : ''; });
+            if (c && c.stackAmb) form.stack[f].forEach((name, i) => { if (c.stackAmb[i]) r.amb[name] = c.stackAmb[i]; });
+            if (vals.length < form.stack[f].length) r.stackShort = (r.stackShort || []).concat(f);
+          } else put(f, c);
+        });
+        r.payDate = ymd(r.fields.y, r.fields.m, r.fields.d);
+      }
+      r.noRateCol = !!form.noRate; r.noIncomeTaxCol = !!form.noIncomeTax;
+      return r;
+    });
+    // (6) 신한 실징수액-정상 교차검증 값
+    if (form.check) {
+      const last = units[units.length - 1].b || units[units.length - 1].a;
+      const cb = grid.bands.filter(b => b.top > last.top && b.cells.length === form.check.cells).sort((x, y) => x.top - y.top)[0];
+      if (cb) {
+        let v = tx(cb.cells[form.check.col]);
+        if (ocr) { const r = await ocrCell(ocr.env, ocr.img, cb.cells[form.check.col], 'num', grid.scale); v = r.text; }
+        const okLabel = doc.mode !== 'text' || form.check.label.test(squash(tx(cb.cells[0])));
+        doc.checkTotal = okLabel ? amt(v) : NaN;
+        if (!okLabel) iss.push(issue('warn', 'check', '실징수액-정상 행 라벨을 확인하지 못했습니다'));
+      } else iss.push(issue('warn', 'check', '실징수액-정상 행을 찾지 못해 행 누락 교차검증을 하지 못했습니다'));
+    }
+    // (7) 소득자 · 계좌 (지급내역 위 영역만)
+    const infoTexts = [];
+    grid.bands.filter(b => b.bot <= firstBand.top).forEach(b => b.cells.forEach(c => { if (c.text) infoTexts.push(c.text); }));
+    if (words) words.filter(w => w.cy <= firstBand.top).forEach(w => infoTexts.push(w.s));
+    resolveEarner(doc, infoTexts);
+    doc.status = doc.issues.some(i => i.level === 'error') ? 'error' : 'ok';
+  }
+  function pdfBankName(grid, code) {
+    // 텍스트 경로 표시용: 사업자번호 셀과 같은 띠의 '은행' 포함 셀
+    for (const b of grid.bands) {
+      if (!b.cells.some(c => digits(c.text) === code)) continue;
+      const c = b.cells.find(x => /은행|금융센터|지점/.test(x.text || '') && !/법인명|상호/.test(x.text || ''));
+      if (c) return squash(c.text).replace(/^①?법인명\(상호\)/, '');
+    }
+    return '';
+  }
+  function resolveEarner(doc, texts) {
+    const iss = doc.issues;
+    const mmtHit = acctTokens(texts).map(a => a.digits).find(dg => mmtAcctOwner(dg));
+    if (mmtHit) { iss.push(issue('error', 'acct', 'MMT 계좌(' + mmtAcctOwner(mmtHit) + ') 증빙입니다 — MMT 이자수익전표 메뉴를 사용하세요')); return; }
+    const bz = bizTokens(texts).filter(b => !WITHHOLDERS[b.digits]);
+    const hits = new Map();
+    bz.forEach(b => ACTIVE_COS.forEach(co => {
+      const cd = digits(COMPANIES[co].bizNo);
+      if (!b.masked && b.digits === cd) hits.set(co, 'exact');
+      else if (b.masked && b.digits.length + b.stars === 10 && b.digits.length >= 3 && cd.startsWith(b.digits) && !hits.has(co)) hits.set(co, 'masked');
+    }));
+    const accts = acctTokens(texts);
+    doc.earner = { bizRaw: bz.map(b => b.raw) };
+    let co = null;
+    if (hits.size > 1) { iss.push(issue('error', 'earner', '소득자 사업자번호가 여러 법인과 일치합니다: ' + [...hits.keys()].join(', '))); return; }
+    if (hits.size === 1) { co = [...hits.keys()][0]; doc.earner.by = hits.get(co) === 'exact' ? '사업자번호' : '사업자번호 부분 일치(마스킹)'; if (hits.get(co) === 'masked') iss.push(issue('info', 'earner', '소득자 사업자번호 마스킹 — 접두 일치로 ' + co + ' 판별')); }
+    let list = null;
+    if (co) { list = dirList(co); }
+    else {
+      // 사업자번호를 못 읽은 경우: 등록 계좌와 정확히 일치하는 계좌로만 판별 (OCR)
+      const found = [];
+      ACTIVE_COS.forEach(c => { const L = dirList(c); if (accts.some(a => !a.masked && L.some(x => x.digits === a.digits))) found.push(c); });
+      if (found.length === 1) { co = found[0]; list = dirList(co); doc.earner.by = '계좌번호'; iss.push(issue('warn', 'earner', '소득자 사업자번호를 판독하지 못해 계좌번호로 ' + co + ' 판별 — 원본 확인')); }
+      else { iss.push(issue('error', 'earner', '소득자 법인을 판별하지 못했습니다(대상: ' + ACTIVE_COS.join('·') + ') — PDF 사업자번호: ' + (doc.earner.bizRaw.join(', ') || '판독 불가'))); return; }
+    }
+    doc.co = co;
+    const exact = [...new Set(accts.filter(a => !a.masked && list.some(x => x.digits === a.digits)).map(a => a.digits))];
+    const pdfAcct = accts.map(a => a.raw);
+    doc.acctCandidates = [];
+    if (exact.length === 1) { doc.acct = { digits: exact[0], by: '계좌번호 일치' }; return; }
+    if (exact.length > 1) { doc.acctCandidates = exact.map(d => candOf(list, d)); doc.needsAccount = true; iss.push(issue('warn', 'acct', '계좌 후보가 여러 개입니다 — 선택 필요')); return; }
+    const masked = accts.filter(a => a.masked && a.prefix.length >= 3);
+    if (masked.length) {
+      const cand = [...new Set([].concat(...masked.map(a => list.filter(x => x.digits.startsWith(a.prefix) && x.digits.length === a.prefix.length + a.stars).map(x => x.digits))))];
+      if (cand.length === 1) { doc.acct = { digits: cand[0], by: '부분 일치(마스킹)' }; iss.push(issue('info', 'acct', '계좌번호 마스킹(' + masked[0].raw + ') — 접두·길이 일치 후보 1개 자동 선택')); return; }
+      doc.acctCandidates = (cand.length ? cand : list.map(x => x.digits)).map(d => candOf(list, d));
+      doc.needsAccount = true;
+      iss.push(issue('warn', 'acct', '마스킹 계좌(' + masked[0].raw + ') — 일치 후보 ' + cand.length + '개, 계좌 선택 필요'));
+      return;
+    }
+    doc.acct = null; doc.pdfAcct = pdfAcct;
+    if (doc.withholder && doc.withholder.bank === '기업') return; // RCMS: 가상계좌 — 거래내역확인증 계좌로 조회
+    iss.push(issue('error', 'acct', '계좌 미등록 — [설정] 또는 ERP_ACCT_MAP 확인 (PDF 계좌 후보: ' + (pdfAcct.join(', ') || '판독 불가') + ')'));
+  }
+  function candOf(list, d) { const a = list.find(x => x.digits === d); return { digits: d, label: a ? a.label : '', num: a ? a.num : '' }; }
+
+  /* ---------- 10. RCMS 번들 문서 (거래내역확인증 · 이자지급증명서) ---------- */
+  function kvOf(grid) {
+    const kv = {};
+    grid.bands.forEach(b => { for (let i = 0; i + 1 < b.cells.length; i += 2) { const k = squash(b.cells[i].text); if (k) kv[k] = (b.cells[i + 1].text || '').trim(); } });
+    return kv;
+  }
+  function parseTxn(doc, grid) {
+    const kv = kvOf(grid), iss = doc.issues;
+    const dt = digits((kv['거래일시'] || '').split(/\s+/)[0]);
+    const t = { acctRaw: kv['계좌번호'] || '', acct: digits(kv['계좌번호']), date: isYmd(dt) ? dt : '', deposit: amt(kv['입금금액']), withdraw: amt(kv['출금금액']), memo: kv['적요'] || '', party: kv['의뢰인/수취인'] || '', branch: kv['거래점'] || '', holder: kv['예금주'] || '' };
+    doc.txn = t;
+    if (!t.acct) iss.push(issue('error', 'acct', '거래내역확인증 계좌번호를 읽지 못했습니다'));
+    if (!t.date) iss.push(issue('error', 'date', '거래내역확인증 거래일시를 읽지 못했습니다'));
+    if (!(t.deposit > 0)) iss.push(issue('error', 'deposit', '거래내역확인증 입금금액을 읽지 못했습니다'));
+    doc.status = iss.some(i => i.level === 'error') ? 'error' : 'ok';
+  }
+  function parseRcmsCert(doc, grid) {
+    const iss = doc.issues, out = {};
+    const pick = (labelRe, map) => {
+      const hb = grid.bands.find(b => b.cells.some(c => labelRe.test(squash(c.text))));
+      if (!hb) return false;
+      const vb = grid.bands.filter(b => b.top > hb.top && b.cells.length === hb.cells.length).sort((a, b) => a.top - b.top)[0];
+      if (!vb) return false;
+      hb.cells.forEach((c, i) => { const k = squash(c.text); Object.entries(map).forEach(([re, key]) => { if (new RegExp(re).test(k)) out[key] = (vb.cells[i].text || '').trim(); }); });
+      return true;
+    };
+    pick(/^이자금액$/, { '^지급은행$': 'bank', '가상계좌': 'vacct', '^이자발생일자$': 'date', '^이자금액$': 'amount', '^원천징수$': 'wht', '^과세유형$': 'taxType' });
+    pick(/^사업자등록번호$/, { '^연구개발기관$': 'org', '^사업자등록번호$': 'bizNo' });
+    const d = digits(out.date || '');
+    doc.cert = { bank: out.bank || '', vacct: digits(out.vacct), vacctRaw: out.vacct || '', date: isYmd(d) ? d : '', amount: amt(out.amount), bizNo: digits(out.bizNo), org: out.org || '', wht: out.wht || '' };
+    if (!doc.cert.vacct) iss.push(issue('error', 'vacct', '이자지급증명서 가상계좌번호를 읽지 못했습니다'));
+    if (!doc.cert.date) iss.push(issue('error', 'date', '이자지급증명서 이자발생일자를 읽지 못했습니다'));
+    if (!(doc.cert.amount > 0)) iss.push(issue('error', 'amount', '이자지급증명서 이자금액을 읽지 못했습니다'));
+    doc.status = iss.some(i => i.level === 'error') ? 'error' : 'ok';
+  }
+
+  /* ---------- 11. 행 정규화 · 검증 (확정 정책) ---------- */
+  let _rowSeq = 0;
+  function normRow(raw, doc) {
+    const f = raw.fields, iss = [], add = (l, fl, m) => iss.push(issue(l, fl, m));
+    const r = { id: 'r' + (++_rowSeq), docId: doc.id, idx: raw.idx, include: true, src: raw.src, payDate: raw.payDate || '', start: '', end: '', rate: null, rateRaw: f.rate == null ? '' : f.rate,
+      pay: NaN, taxRate: NaN, incomeTax: NaN, corpTax: NaN, localTax: NaN, ruralTax: null, total: null, net: NaN, nLines: 0, issues: iss, raw: f };
+    Object.entries(raw.amb || {}).forEach(([k, v]) => add('error', k, 'OCR 판독 불확실(' + v + ') — 원본 대조 후 입력'));
+    Object.entries(raw.tie || {}).forEach(([k, v]) => add('warn', k, 'OCR 판독 동점을 같은 문서 글자 모양으로 확정(' + v + ') — 원본 확인'));
+    if (!isYmd(r.payDate)) add('error', 'payDate', '지급일 판독 불가(' + squash([f.y, f.m, f.d, f.payDate].filter(Boolean).join('/')) + ')');
+    // 귀속연월 = 지급연월 (OCR 오독 교차검증). 직접 입력한 칸은 OCR 판독값 표시에서 뺀다
+    const bym = f.belong != null ? digits(f.belong).slice(0, 6) : (f.by != null && f.bm != null ? digits(f.by) + digits(f.bm).padStart(2, '0') : '');
+    if (bym && isYmd(r.payDate) && bym !== r.payDate.slice(0, 6)) add(raw.src === 'ocr' && !(raw.manual && (raw.manual.belong || raw.manual.m || raw.manual.y)) ? 'error' : 'warn', 'payDate', '귀속연월(' + bym.slice(0, 4) + '-' + bym.slice(4) + ')과 지급월이 다릅니다');
+    Object.keys(raw.manual || {}).forEach(k => add('info', k, '직접 입력값'));
+    const p = period(f.period);
+    if (!p) add('error', 'period', '대상기간 판독 불가(' + squash(f.period) + ')');
+    else { r.start = p.start; r.end = p.end; if (U.days(p.start, p.end) <= 0) add('error', 'period', '종료일이 시작일보다 빠름'); }
+    if (p && isYmd(r.payDate)) { const g = U.days(r.end, r.payDate); r.payGap = g; if (!(g > 0 && g <= PAY_GAP_MAX)) add('warn', 'payDate', '지급일 − 대상기간 종료일 = ' + g + '일 (정상 1~' + PAY_GAP_MAX + '일)'); }
+    // 이율: 없거나 0이면 0 + info (error 아님 · 셀 수정 가능)
+    if (raw.noRateCol) { r.rate = 0; add('info', 'rate', '증빙에 이율 없음 → 0 입력(수정 가능)'); }
+    else { const v = rateNum(f.rate); if (v === null) { r.rate = 0; add('info', 'rate', '증빙에 이율 없음(공란) → 0 입력(수정 가능)'); } else if (Number.isNaN(v)) add('error', 'rate', '이율 판독 불가(' + squash(f.rate) + ')'); else { r.rate = v; if (v === 0) add('info', 'rate', '증빙 이율 0(' + squash(f.rate) + ') → 0 입력(수정 가능)'); } }
+    r.pay = amt(f.pay); if (!(r.pay > 0)) add('error', 'pay', '지급액 없음/판독 불가(' + squash(f.pay) + ')');
+    r.taxRate = rateNum(f.taxRate);
+    r.corpTax = amt(f.corpTax); r.localTax = amt(f.localTax);
+    if (r.corpTax === null) add('error', 'corpTax', '법인세 공란 — 0으로 간주하지 않음'); else if (Number.isNaN(r.corpTax)) add('error', 'corpTax', '법인세 판독 불가(' + squash(f.corpTax) + ')');
+    if (r.localTax === null) add('error', 'localTax', '지방세 공란 — 0으로 간주하지 않음'); else if (Number.isNaN(r.localTax)) add('error', 'localTax', '지방세 판독 불가(' + squash(f.localTax) + ')');
+    if (raw.stackShort) add('error', 'corpTax', '세액 칸 판독 부족(' + raw.stackShort.join(',') + ')');
+    const okCL = Number.isFinite(r.corpTax) && Number.isFinite(r.localTax);
+    // 소득세 · 농특세 · 계: 공란은 0으로 간주하지 않는다. 계 = 법인세 + 지방세가 성립할 때만 0 확정
+    const blanks = [];
+    if (raw.noIncomeTaxCol) r.incomeTax = 0;
+    else { const v = amt(f.incomeTax); if (v === null) blanks.push('incomeTax'); else if (Number.isNaN(v)) add('error', 'incomeTax', '소득세 판독 불가'); else { r.incomeTax = v; if (v !== 0) add('error', 'incomeTax', '소득세 ≠ 0 — 법인 이자소득 분개 대상 아님'); } }
+    if ('ruralTax' in f) { const v = amt(f.ruralTax); if (v === null) blanks.push('ruralTax'); else if (Number.isNaN(v)) add('error', 'ruralTax', '농특세 판독 불가'); else { r.ruralTax = v; if (v !== 0) add('error', 'ruralTax', '농어촌특별세 ≠ 0 — 확인 필요'); } }
+    if ('total' in f) { const v = amt(f.total); if (v === null) r.total = null; else if (Number.isNaN(v)) add('error', 'total', '계 판독 불가'); else r.total = v; }
+    if (okCL) {
+      const known = r.corpTax + r.localTax + (Number.isFinite(r.incomeTax) ? r.incomeTax : 0) + (Number.isFinite(r.ruralTax) ? r.ruralTax : 0);
+      if (blanks.length) {
+        if (Number.isFinite(r.total) && r.total === known) { blanks.forEach(b => { r[b] = 0; }); add('info', blanks[0], (blanks.map(b => b === 'incomeTax' ? '소득세' : '농특세').join('·')) + ' 공란 → 계(' + won(r.total) + ') = 법인세 + 지방세 성립, 0 확정'); }
+        else blanks.forEach(b => add('error', b, (b === 'incomeTax' ? '소득세' : '농특세') + ' 공란 — 계 검산 불가/불일치로 0 확정 불가'));
+      } else if (Number.isFinite(r.total) && r.total !== known) add('error', 'total', '계(' + won(r.total) + ') ≠ 세액 합(' + won(known) + ')');
+    }
+    // 소액부징수: 금액 기준 판정 금지 — 증빙 세액으로만
+    if (okCL) {
+      if (r.corpTax === 0 && r.localTax === 0) { r.nLines = 2; add('info', 'corpTax', '증빙상 원천징수세액 0 — 2라인(검산 생략)'); if (!Number.isFinite(r.taxRate)) add('warn', 'taxRate', '세율 판독 불가(2라인이라 분개 영향 없음)'); }
+      else if (r.corpTax > 0 && r.localTax > 0) {
+        r.nLines = 4;
+        if (!Number.isFinite(r.taxRate) || r.taxRate <= 0 || r.taxRate >= 50) add('error', 'taxRate', '세율 판독 불가(' + squash(f.taxRate) + ')');
+        else if (Number.isFinite(r.pay)) {
+          const cc = Math.floor(r.pay * r.taxRate / 100 / 10 + 1e-9) * 10, dc = Math.abs(cc - r.corpTax);
+          if (dc > 10) add('error', 'corpTax', '법인세 검산 불일치 (계산 ' + won(cc) + ')'); else if (dc > 0) add('warn', 'corpTax', '법인세 검산 ' + won(dc) + '원 차이 (계산 ' + won(cc) + ')');
+        }
+        const lc = Math.floor(r.corpTax / 100 + 1e-9) * 10, dl = Math.abs(lc - r.localTax);
+        if (dl > 10) add('error', 'localTax', '지방세 검산 불일치 (계산 ' + won(lc) + ')'); else if (dl > 0) add('warn', 'localTax', '지방세 검산 ' + won(dl) + '원 차이 (계산 ' + won(lc) + ')');
+      } else add('error', 'corpTax', '법인세·지방세 중 한쪽만 0 — 증빙 확인 필요');
+      if (Number.isFinite(r.pay)) { r.net = r.pay - r.corpTax - r.localTax; if (!(r.net > 0)) add('error', 'pay', '입금액(지급액 − 법인세 − 지방세) ≤ 0'); }
+    }
+    if (r.src === 'ocr') add('warn', 'ocr', 'OCR 판독값 — 지급일·기간·이율·지급액·세율·세액 원본 대조 필요' + (Object.keys(raw.manual || {}).length ? ' (직접 입력 ' + Object.keys(raw.manual).join('·') + ' 제외)' : ''));
+    r.days = (isYmd(r.start) && isYmd(r.end)) ? U.days(r.start, r.end) : NaN;
+    r.level = levelOf(iss);
+    return r;
+  }
+
+  /* ---------- 12. 조립: 문서 → 전표 단위(일반 1건 / RCMS 3문서 번들) ---------- */
+  function assemble(docs, opt) {
+    opt = opt || {};
+    const wm = opt.workMonth && /^\d{4}-\d{2}$/.test(opt.workMonth) ? opt.workMonth : '';
+    const entries = [], usedT = new Set(), usedC = new Set();
+    const whts = docs.filter(d => d.kind === 'wht'), txns = docs.filter(d => d.kind === 'txn' && d.status === 'ok'), certs = docs.filter(d => d.kind === 'rcmsCert' && d.status === 'ok');
+    whts.forEach(d => { try { one(d); } catch (err) { const e = entries.find(x => x.id === 'e' + d.id); const tgt = e || { id: 'e' + d.id, docIds: [d.id], files: [d.fileName], kind: 'general', rows: [], issues: [] }; if (!e) entries.push(tgt); tgt.issues.push(issue('error', 'acct', (err && err.code ? '[' + err.code + '] ' : '') + (err && err.message || err))); tgt.status = 'error'; } });
+    function one(d) {
+      const e = { id: 'e' + d.id, docIds: [d.id], files: [d.fileName], kind: 'general', isRcms: false, mode: d.mode, form: d.form || '', co: d.co || null, withholder: null, acct: null, rows: [], issues: d.issues.slice(), status: '', workMonth: '' };
+      entries.push(e);
+      if (d.status === 'error' || !d.rawRows) { e.status = 'error'; return; }
+      const rows = d.rawRows.map(r => normRow(r, d));
+      e.rows = rows;
+      // 작업월
+      if (rows.length > 1) {
+        const last = rows.map(r => r.payDate).filter(isYmd).sort().pop();
+        e.workMonth = wm || (last ? ymOf(last) : '');
+        rows.forEach(r => { r.include = ymOf(r.payDate) === e.workMonth; if (!r.include) r.issues.push(issue('info', 'include', '작업월(' + e.workMonth + ') 외 — 이미 처리했는지 확인')); r.level = levelOf(r.issues); });
+        if (Number.isFinite(d.checkTotal)) {
+          const sum = rows.reduce((a, r) => a + (Number.isFinite(r.pay) ? r.pay : 0), 0);
+          if (sum !== d.checkTotal) e.issues.push(issue('warn', 'check', '실징수액-정상 ' + won(d.checkTotal) + ' ≠ 전체 행 지급액 합 ' + won(sum) + ' — 행 누락 의심'));
+          else e.issues.push(issue('info', 'check', '실징수액-정상 ' + won(sum) + ' = 전체 ' + rows.length + '행 지급액 합'));
+        }
+      } else {
+        e.workMonth = wm || ymOf(rows[0].payDate);
+        if (wm && ymOf(rows[0].payDate) && ymOf(rows[0].payDate) !== wm) { rows[0].issues.push(issue('warn', 'include', '작업월(' + wm + ')과 지급월(' + ymOf(rows[0].payDate) + ')이 다릅니다')); rows[0].level = levelOf(rows[0].issues); }
+      }
+      rows.forEach(r => { r.dtAcct = r.payDate; });
+      // 징수의무자 표기
+      const co = d.co;
+      e.withholder = { code: d.withholder.code, bank: d.withholder.bank, name: bankName(co, d.withholder.code, d.withholder.pdfName) };
+      if (BANK_NAME[co] && BANK_NAME[co][d.withholder.code] && d.withholder.pdfName && squash(d.withholder.pdfName) !== squash(BANK_NAME[co][d.withholder.code])) e.issues.push(issue('info', 'bank', '은행명 표기 차이(코드 ' + d.withholder.code + ' 일치): PDF "' + d.withholder.pdfName + '" → "' + BANK_NAME[co][d.withholder.code] + '"'));
+      let acctDigits = d.acct ? d.acct.digits : '';
+      e.acctBy = d.acct ? d.acct.by : '';
+      // RCMS 번들: 원천징수영수증(기업은행) + 이자지급증명서 + 거래내역확인증
+      if (d.withholder.bank === '기업') {
+        e.kind = 'rcms';
+        if (rows.length !== 1) { e.issues.push(issue('error', 'rcms', 'RCMS 원천징수영수증은 1행만 지원합니다')); e.status = 'error'; return; }
+        const r = rows[0], v = (d.pdfAcct || []).map(digits);
+        // 묶기는 금액이 아니라 맥락으로: 증명서 = 같은 가상계좌(없으면 같은 이자발생일), 거래내역 = 'RCMS' 표기·기업은행 입금 중 지급일~+10일. 금액은 묶은 뒤 항등식으로 검사
+        const certC = certs.filter(c => !usedC.has(c.id) && (v.indexOf(c.cert.vacct) >= 0 || (!v.length && c.cert.date === r.payDate)));
+        const cert = certC.length === 1 ? certC[0] : (certC.find(c => c.cert.date === r.payDate) || null);
+        const inWin = t => isYmd(t.txn.date) && isYmd(r.payDate) && U.days(r.payDate, t.txn.date) >= 0 && U.days(r.payDate, t.txn.date) <= 10;
+        const txC = txns.filter(t => !usedT.has(t.id) && inWin(t) && /RCMS/i.test(t.txn.memo + ' ' + t.txn.party + ' ' + t.txn.branch + ' ' + (/기업/.test(t.txn.branch) ? 'RCMS' : '')));
+        const txn = txC.length === 1 ? txC[0] : (cert ? (txC.find(t => t.txn.deposit === cert.cert.amount) || null) : null);
+        if (txC.length > 1 && !txn) e.issues.push(issue('error', 'rcms', '거래내역확인증 후보가 ' + txC.length + '개라 묶을 수 없습니다 — 해당 건만 올리세요'));
+        const miss = []; if (!cert) miss.push('이자지급증명서'); if (!txn) miss.push('거래내역확인증');
+        if (miss.length) { e.issues.push(issue('error', 'rcms', 'RCMS 번들 문서 누락: ' + miss.join('·') + ' — 3문서가 모두 있어야 합니다')); e.status = 'error'; return; }
+        usedC.add(cert.id); usedT.add(txn.id); e.docIds.push(cert.id, txn.id); e.files.push(cert.fileName, txn.fileName); e.isRcms = true;
+        const bad = [];
+        if (!(Number.isFinite(r.net))) bad.push('원천징수영수증 세액 판독 불가');
+        else if (r.net !== txn.txn.deposit) bad.push('지급액 − 법인세 − 지방세 = ' + won(r.net) + ' ≠ 입금액 ' + won(txn.txn.deposit) + ' (차이 ' + won(r.net - txn.txn.deposit) + ')');
+        if (cert.cert.amount !== txn.txn.deposit) bad.push('이자지급증명서 금액 ' + won(cert.cert.amount) + ' ≠ 입금액 ' + won(txn.txn.deposit) + ' (차이 ' + won(cert.cert.amount - txn.txn.deposit) + ')');
+        if (cert.cert.date !== r.payDate) bad.push('이자지급증명서 이자발생일 ' + fmtYmd(cert.cert.date) + ' ≠ 지급일 ' + fmtYmd(r.payDate));
+        if (v.length && v.indexOf(cert.cert.vacct) < 0) bad.push('가상계좌 불일치(원천징수영수증 ' + (d.pdfAcct || []).join(',') + ' / 증명서 ' + cert.cert.vacctRaw + ')');
+        if (bad.length) { bad.forEach(b => e.issues.push(issue('error', 'rcms', 'RCMS 항등식 불일치 — 보정하지 않고 중단: ' + b))); e.status = 'error'; return; }
+        e.issues.push(issue('info', 'rcms', 'RCMS 번들 일치: 지급액 ' + won(r.pay) + ' − 법인세 ' + won(r.corpTax) + ' − 지방세 ' + won(r.localTax) + ' = 입금액 ' + won(txn.txn.deposit) + ' · 이자지급증명서 ' + fmtYmd(cert.cert.date) + ' ' + won(cert.cert.amount)));
+        if (cert.cert.bizNo && digits(COMPANIES[co].bizNo) !== cert.cert.bizNo) e.issues.push(issue('warn', 'rcms', '이자지급증명서 사업자번호(' + cert.cert.bizNo + ')가 소득자와 다릅니다'));
+        acctDigits = txn.txn.acct; e.acctBy = '거래내역확인증 계좌';
+        r.dtAcct = txn.txn.date; // RCMS: 회계일자·전표번호·품의일자 = 입금일
+        r.issues.push(issue('info', 'dtAcct', 'RCMS — 회계일자 = 거래내역확인증 입금일 ' + fmtYmd(txn.txn.date) + ' (지급일 ' + fmtYmd(r.payDate) + ')'));
+      }
+      if (!acctDigits) {
+        if (d.needsAccount) {
+          const ch = opt.accountChoice && opt.accountChoice[d.id];
+          if (ch && d.acctCandidates.some(c => c.digits === ch)) { acctDigits = ch; e.acctBy = '사용자 선택'; }
+          else { e.status = 'needsAccount'; e.candidates = d.acctCandidates; return; }
+        } else { e.status = 'error'; if (!e.issues.some(i => i.level === 'error')) e.issues.push(issue('error', 'acct', '계좌 미등록 — [설정] 또는 ERP_ACCT_MAP 확인')); return; }
+      }
+      // 계좌 · ERP 매핑 · 모듈 소속
+      const owner = mmtAcctOwner(acctDigits);
+      if (owner) { e.issues.push(issue('error', 'acct', 'MMT 계좌입니다 — MMT 이자수익전표 메뉴를 사용하세요')); e.status = 'error'; return; }
+      const meta = lookupAccountMeta(co, acctDigits);
+      if (!meta) { e.issues.push(issue('error', 'acct', '계좌 미등록 — [설정] 또는 ERP_ACCT_MAP 확인 (대시보드 ' + co + ' 계좌 목록에 없음)')); e.status = 'error'; return; }
+      const erp = erpEntry(co, acctDigits);
+      if (!erp) { e.issues.push(issue('error', 'acct', '계좌 미등록 — [설정] 또는 ERP_ACCT_MAP 확인 (' + co + ' ' + meta.label + ': ERP_ACCT_MAP 키 미설정)')); e.status = 'error'; return; }
+      const label = noteLabelOf(meta, erp);
+      if (!label) { e.issues.push(issue('error', 'acct', '적요 라벨을 만들 수 없습니다(' + meta.label + ') — ERP_ACCT_MAP noteLabel 지정 필요')); e.status = 'error'; return; }
+      if (meta.isMMT !== (erp.depAcct === '1110600')) e.issues.push(issue('info', 'acct', '대시보드 MMT 표시(isMMT=' + meta.isMMT + ')와 예금계정(' + erp.depAcct + ')이 다름 — 정보'));
+      e.acct = { digits: acctDigits, display: meta.acctNoDisplay, dLabel: meta.label, label, erp, style: e.isRcms ? 'rcms' : erp.noteStyle };
+      e.status = 'ok';
+    }
+    const unused = docs.filter(d => (d.kind === 'txn' && !usedT.has(d.id)) || (d.kind === 'rcmsCert' && !usedC.has(d.id)));
+    unused.forEach(d => entries.push({ id: 'e' + d.id, docIds: [d.id], files: [d.fileName], kind: d.kind, rows: [], issues: d.issues.concat([issue(d.status === 'error' ? 'error' : 'warn', 'rcms', 'RCMS 번들에 묶이지 않았습니다 — 같은 건의 원천징수영수증(기업은행)을 함께 올리세요')]), status: 'error' }));
+    docs.filter(d => d.kind === 'error').forEach(d => entries.push({ id: 'e' + d.id, docIds: [d.id], files: [d.fileName], kind: 'error', rows: [], issues: d.issues.slice(), status: 'error' }));
+    entries.forEach(e => { if (e.status === 'ok') { const lv = [].concat(e.issues, ...e.rows.map(r => r.issues)); e.level = levelOf(lv); if (e.rows.filter(r => r.include).some(r => r.level === 'error')) e.level = 'error'; } else e.level = e.status === 'needsAccount' ? 'warn' : 'error'; });
+    return { entries, workMonth: wm };
+  }
+
+  /* ---------- 13. 분개 ---------- */
+  const NOTE = {
+    std: L => [L + ' 이자수익', L + ' 이자수익 -법인세', L + ' 이자수익 -지방세', L + ' 이자수익 입금) 이자수익'],
+    std_nospace: L => [L + ' 이자수익', L + ' 이자수익 -법인세', L + ' 이자수익 -지방세', L + ' 이자수익 입금)이자수익'],
+    rcms: L => [L + ' RCMS 이자수익', L + ' RCMS 이자수익 -법인세', L + ' RCMS 이자수익 -지방세', L + ' RCMS 이자수익 입금) RCMS 이자수익'],
+    mmda: L => [L + ' 이자수익', L + ' 이자수익 -법인세', L + ' 이자수익 -지방세', L + ' 입금) ' + L + ' 이자수익']
+  };
+  function buildSlips(entries, meta) {
+    meta = meta || {};
+    if (!meta.idWrite || !String(meta.idWrite).trim()) throw new IntError('META', '작성사원(ID_WRITE)이 비어 있습니다');
+    if (!isYmd(String(meta.dtWrite || ''))) throw new IntError('META', '전표작성일(DT_WRITE)이 YYYYMMDD 형식이 아닙니다');
+    const out = { cos: {}, skipped: [] };
+    const units = [];
+    entries.forEach(e => {
+      if (e.status !== 'ok') { out.skipped.push({ entryId: e.id, files: e.files, reason: e.status === 'needsAccount' ? '계좌 선택 필요' : (e.issues.filter(i => i.level === 'error').map(i => i.msg)[0] || '오류') }); return; }
+      e.rows.forEach(r => {
+        if (!r.include) return;
+        if (r.level === 'error' || r.nLines === 0) { out.skipped.push({ entryId: e.id, rowId: r.id, files: e.files, reason: r.issues.filter(i => i.level === 'error').map(i => i.msg).join(' / ') || '분개 불가' }); return; }
+        units.push({ e, r });
+      });
+    });
+    ACTIVE_COS.forEach(co => {
+      const us = units.filter(u => u.e.co === co); if (!us.length) return;
+      const order = {}; dirList(co).forEach((a, i) => { order[a.digits] = i; });
+      us.sort((a, b) => (a.r.dtAcct < b.r.dtAcct ? -1 : a.r.dtAcct > b.r.dtAcct ? 1 : 0) || ((order[a.e.acct.digits] || 0) - (order[b.e.acct.digits] || 0)) || (a.r.payDate < b.r.payDate ? -1 : 1));
+      const C = COMPANIES[co], cfg = Object.assign({ dept: C.dept, deptName: C.deptName, cc: C.cc, ccName: C.ccName }, (meta.cfg && meta.cfg[co]) || {});
+      const seq = {}; const lines = [], rows = [];
+      us.forEach(({ e, r }) => {
+        const dt = r.dtAcct; seq[dt] = (seq[dt] == null ? SLIP_SEQ_START : seq[dt] + 1);
+        const slip = SLIP_PREFIX + dt + String(seq[dt]).padStart(5, '0');
+        const L = e.acct.label, notes = NOTE[e.acct.style](L), erp = e.acct.erp;
+        const cc = erp.cc ? erp.cc.code : cfg.cc, ccName = erp.cc ? erp.cc.name : cfg.ccName;
+        const pumm = '(' + co + ')' + dt.slice(2, 4) + '.' + dt.slice(4, 6) + '.' + dt.slice(6, 8) + ' ' + L + (e.isRcms ? ' RCMS' : '') + ' 이자수익';
+        const M1 = { CD_MNGD1: cfg.dept, NM_MNGD1: cfg.deptName }, M2 = { CD_MNGD2: cc, NM_MNGD2: ccName };
+        const MW = { CD_MNGD3: e.withholder.code, NM_MNGD3: e.withholder.name }, MD = { CD_MNGD3: erp.bank.code, NM_MNGD3: erp.bank.name };
+        const DEP = { code: erp.depAcct, name: DEP_NAME[erp.depAcct] || erp.depAcct, drcr: 1 };
+        let n = 0;
+        const mk = (a, amount, note, extra) => {
+          n++;
+          const cells = { ROW_ID: slip, ROW_NO: n, NO_TAX: '*', CD_PC: '1000', CD_WDEPT: cfg.dept, NO_DOCU: slip, NO_DOLINE: n, CD_COMPANY: C.cdCompany, ID_WRITE: String(meta.idWrite).trim(), CD_DOCU: '11', DT_ACCT: dt, ST_DOCU: 1, TP_DRCR: a.drcr, CD_ACCT: a.code, AMT: amount, NM_NOTE: note, TP_DOCU: 'N', NO_ACCT: 0, TP_GUBUN: '3', NM_PUMM: pumm, DT_WRITE: String(meta.dtWrite) };
+          Object.assign(cells, extra);
+          lines.push({ slip, n, dt, acct: a.code, acctName: a.name, drcr: a.drcr, amt: amount, note, cells, rowRef: r.id, entryId: e.id });
+        };
+        const four = r.nLines === 4;
+        if (C.layout === 'A') {
+          mk(ACCT.INT, r.pay, notes[0], Object.assign({ CD_PARTNER: e.withholder.code }, M1, M2, MW, { NM_MNGD4: r.start, NM_MNGD5: r.end, NM_MNGD6: r.rate, TP_EVIDENCE: 5 }));
+          if (four) {
+            mk(ACCT.CORP, r.corpTax, notes[1], Object.assign({ AM_TAXSTD: r.pay }, M1, M2, MW, { NM_MNGD4: r.pay, NM_MNGD5: r.taxRate }));
+            mk(ACCT.LOCAL, r.localTax, notes[2], Object.assign({ AM_TAXSTD: r.corpTax }, M1, M2, MW, { NM_MNGD4: r.corpTax }));
+          }
+          mk(DEP, r.net, notes[3], Object.assign({}, M1, MD, { CD_MNGD4: erp.depCd, NM_MNGD4: e.acct.display }));
+        } else {
+          mk(ACCT.INT, r.pay, notes[0], Object.assign({}, M1, M2, { NM_MNGD3: r.start, NM_MNGD4: r.end, NM_MNGD5: r.rate, TP_EVIDENCE: 5 }));
+          if (four) {
+            mk(ACCT.CORP, r.corpTax, notes[1], Object.assign({ AM_TAXSTD: r.pay }, M2, MW, { NM_MNGD4: r.pay, NM_MNGD5: r.taxRate }));
+            mk(ACCT.LOCAL, r.localTax, notes[2], Object.assign({ AM_TAXSTD: r.corpTax }, M2, MW, { NM_MNGD4: r.corpTax }));
+          }
+          mk(DEP, r.net, notes[3], Object.assign({}, M1, MD, { CD_MNGD4: erp.depCd, NM_MNGD4: e.acct.display }));
+        }
+        rows.push(Object.assign({}, r, { rate: String(r.rate), taxRate: Number.isFinite(r.taxRate) ? String(r.taxRate) : '', payDate: r.payDate, slip }));
+      });
+      out.cos[co] = { lines, rows, balance: checkBalance(lines) };
+    });
+    return out;
+  }
+  function checkBalance(lines) {
+    const by = {}, bad = []; let dr = 0, cr = 0;
+    lines.forEach(l => {
+      const s = by[l.slip] = by[l.slip] || { dr: 0, cr: 0, n: 0, dep: 0 };
+      s.n++;
+      if (!Number.isSafeInteger(l.amt)) bad.push(l.slip + ' L' + l.n + ' 금액 비정수/누락');
+      if (l.drcr === 1) { s.dr += l.amt; dr += l.amt; } else { s.cr += l.amt; cr += l.amt; }
+      if (l.acct === '1110400' || l.acct === '1110600') { s.dep++; if (!(l.amt > 0)) bad.push(l.slip + ' 예금 라인 금액 ≤ 0'); }
+    });
+    Object.entries(by).forEach(([k, s]) => { if (s.dr !== s.cr) bad.push(k + ' 차변 ' + won(s.dr) + ' ≠ 대변 ' + won(s.cr)); if (s.dep !== 1) bad.push(k + ' 예금 라인 ' + s.dep + '개'); if (s.n !== 2 && s.n !== 4) bad.push(k + ' 라인 수 ' + s.n); });
+    return { dr, cr, ok: bad.length === 0 && dr === cr && lines.length > 0, bad, slips: Object.keys(by).length };
+  }
+  /* MMTParser.buildWorkbook(읽기 전용 참조)으로 KO 시트 생성 — 요약 시트 이름만 바꾼다 */
+  function buildWorkbook(XLSX, coCode, built, meta) {
+    if (!built || !built.lines || !built.lines.length) throw new IntError('EMPTY', coCode + ' 전표 라인이 없습니다');
+    const wb = MP.buildWorkbook(XLSX, built.lines, built.rows, coCode, { idWrite: meta.idWrite, dtWrite: meta.dtWrite, fileName: meta.fileName || '' });
+    const old = coCode + '_MMT요약', nu = coCode + '_이자요약';
+    const i = wb.SheetNames.indexOf(old);
+    if (i >= 0) { wb.SheetNames[i] = nu; wb.Sheets[nu] = wb.Sheets[old]; delete wb.Sheets[old]; }
+    return wb;
+  }
+
+  /* 셀 직접 수정(UI): 원시값을 바꾸고 판독 불확실 표시를 지운 뒤, 호출부가 assemble()을 다시 부른다 */
+  function patchRaw(doc, rowIdx, field, value) {
+    const r = doc && doc.rawRows && doc.rawRows[rowIdx];
+    if (!r) throw new IntError('PATCH', '수정할 행이 없습니다');
+    if (!(field in r.fields) && ['rate', 'incomeTax', 'ruralTax', 'total'].indexOf(field) < 0) throw new IntError('PATCH', '이 서식에 없는 칸입니다: ' + field);
+    r.fields[field] = String(value == null ? '' : value);
+    if (field === 'rate') r.noRateCol = false;
+    if (r.amb) delete r.amb[field]; if (r.tie) delete r.tie[field];
+    (r.manual = r.manual || {})[field] = true;
+    if (['y', 'm', 'd', 'payDate'].indexOf(field) >= 0) r.payDate = r.fields.payDate != null ? digits(r.fields.payDate) : ymd(r.fields.y, r.fields.m, r.fields.d);
+    return r;
+  }
+
+  root.IntParser = Object.freeze({
+    ready: true, VERSION, ACTIVE_COS, SLIP_PREFIX, SLIP_SEQ_START, ACCT, WITHHOLDERS, BANK_NAME,
+    readPdf, assemble, buildSlips, checkBalance, buildWorkbook, lookupAccountMeta, mapStatus, browserEnv, patchRaw,
+    _t: { cellCrop, cellLineImgs, lineKinds, lineGlyphs, components, Grid, Img, amt, rateNum, period, tokensOf, joinTokens, normRow, bizTokens, acctTokens, noteLabelOf, erpEntry, mmtAcctOwner, FORMS, NOTE }
+  });
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 
