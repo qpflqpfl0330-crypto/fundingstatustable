@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v72 · 2026-10-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v73 · 2026-10-16</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -7751,7 +7751,7 @@ function matchSlipCms(c, iso){
     if(t.fxSlip0){ var z=t.fxSlip0; t.fxRate=z.fxRate; t.fxKrw=z.fxKrw; t.fxConfirmed=!!z.fxConfirmed; if("fxInternal" in z){ if(z.fxInternal==null) delete t.fxInternal; else t.fxInternal=z.fxInternal; } }
     delete t.fxLots;   // [v58]
     if(t.slip && t.slipCat0!==undefined && !t.catManual){ t.cat=t.slipCat0; t.auto=!!t.slipAuto0; }
-    delete t.fxSlip0; delete t.fxFromSlip; delete t.slipCat0; delete t.slipAuto0; delete t.slip; if(t.catSrc==="전표") delete t.catSrc;
+    delete t.fxSlip0; delete t.fxFromSlip; delete t.fxKrwSlipOnly; delete t.slipCat0; delete t.slipAuto0; delete t.slip; if(t.catSrc==="전표") delete t.catSrc;
     delete t.slipVoucher; delete t.planMemo; delete t.planVendor;
   });
   var sl=(c.slips||{})[iso]; if(!sl) return 0;
@@ -7875,6 +7875,19 @@ function matchSlipCms(c, iso){
     var ids=ss.sol.map(function(q){ return C[q]; }); usedL[L.key]=1; ids.forEach(function(i){ usedT[i]=1; });
     res.push({L:L, ids:ids, type:"외화", fxSplit:true, fxMove:L.kind==="move", acc:0});
   });
+  /* ②''' [v73] 관리항목명7·8(환율·외화금액)이 비어 있는 전표 외화 줄 — 같은 외화 계좌·방향에 남은 전표 줄 1개 ↔ CMS 외화 1건이면
+     전표 금액(원화)을 원화환산액으로 확정(04-10 하나 88138 $1,450 = 2,080,605 · 05-08 $512 = 734,669). 랏 차감은 하지 않음 */
+  (function(){ var gp={};
+    lines.forEach(function(L){ if(usedL[L.key] || L.fx || L.kind==="cash" || L.kind==="move" || !L.amt) return; var ac=acctOf(c,L.acct); if(!(ac && ac.group==="외화")) return;
+      (gp[L.acct+"|"+L.dir]=gp[L.acct+"|"+L.dir]||[]).push(L); });
+    Object.keys(gp).forEach(function(k){ var GL=gp[k], L=GL[0];   // 줄 여러 개(랏별, 07-15 $147 = 5,043 + 9,835 + 196,825)도 CMS가 1건이면 합계
+      var C=[]; T.forEach(function(t,i){ if(!usedT[i] && (t.kind==="외화(입금)"||t.kind==="외화(출금)") && !t.fxTrade && !t.fxTradeFrom && t.acct===L.acct && smDir(t)===L.dir) C.push(i); });
+      if(C.length!==1) return; var t=T[C[0]], fa=smAmt(t); if(!(fa>0)) return;
+      var sum=GL.reduce(function(a,x){ return a+(+x.amt||0); },0); if(!(sum>0)) return;
+      var Ls=GL.map(function(x){ return Object.assign({}, x, {fx:{ccy:t.ccy||"USD", rate:Math.round(sum/fa*100)/100, amt:fa*x.amt/sum}}); });
+      GL.forEach(function(x){ usedL[x.key]=1; }); usedT[C[0]]=1;
+      res.push({L:Ls[0], lines:Ls, ids:[C[0]], type:"외화", fxLs:Ls, fxMove:false, krwOnly:true}); });
+  })();
   var rest=function(){ return lines.filter(function(L){ return !usedL[L.key] && L.kind!=="move" && L.kind!=="cash" && !L.fx; }); };
   /* [v56] 짝 없는 CMS 자금이동 찾기: ①에서 전표 자금이동과 맞지 않았고, 같은 날 반대 방향 자금이동 중 금액 차 3,000원 이내가 없는 건.
      예) 01-15 하나 83804 → '에스넷시스템' 1,157,860 · 156,110 = 전표 FI…00009 전남대학교 관리비(미지급금(거래처)) */
@@ -8049,6 +8062,7 @@ function matchSlipCms(c, iso){
           var fk=FL.reduce(function(a,x){ return a+Math.round(x.amt); },0), rates=FL.map(function(x){ return x.fx.rate; }).filter(function(x,j,a){ return a.indexOf(x)===j; });
           if(r.fxSplit){ var sh=(k===n-1) ? Math.round(L.amt)-r.acc : Math.round(smAmt(t)*(+L.fx.rate||0)); r.acc+=sh; fk=sh; t.fxLots=[{rate:L.fx.rate||null, fx:smAmt(t), krw:sh}]; }   // [v58] 줄 1개를 여러 CMS로 나눔
           t.fxRate=rates.length===1?(rates[0]||null):null; t.fxKrw=fk; t.fxConfirmed=true; t.fxFromSlip=true; st.fxAuto++;   // 환율 = 관리항목명7, 원화 = 전표 금액(재계산 금지)
+          if(r.krwOnly){ delete t.fxLots; t.fxRate=null; t.fxKrwSlipOnly=true; s.fxKrwOnly=true; }   // [v73] 전표 원화만 — 장부환율 미기재
           if(r.fxMove){ t.fxInternal=true; s.fxMove=true; st.fxMove=(st.fxMove||0)+1; }
         } else s.fxKeep=true;
       }
@@ -8325,7 +8339,9 @@ function ilboModel(c, iso){
   m.fxDetail=ps.fxDetail||[];
 
   /* 검증 */
-  chk(!!(prec && prec.source==="cms"), prev+" CMS 거래내역 "+(prec&&prec.source==="cms"?"반영됨":"미반영 — ① CMS 파일을 올려주세요"));
+  /* [v73] 보고서상 거래가 없고 잔액도 그대로인 날은 CMS 파일에 행이 없다 — 미반영이 아니라 무거래일 */
+  var noTx=!!(prec && prec.source==="sheet" && !(prec.txns||[]).length && !((((c.sheetRef||{})[prev]||{}).txns)||[]).length && (function(){ try{ var s0=daySummary(c,prev); return Math.round(s0.open)===Math.round(s0.close); }catch(e){ return false; } })());
+  chk(!!(prec && (prec.source==="cms" || noTx)), prev+" CMS 거래내역 "+(prec&&prec.source==="cms"?"반영됨":noTx?"거래 없음(무거래일 · 잔액 변동 없음)":"미반영 — ① CMS 파일을 올려주세요"));
   if(prevEnd>prev) chk(true, "전일 실적 기간 "+ilboRangeText(m,"iso")+" — 비영업일 거래 "+rdays.filter(function(d){return d>prev}).length+"일분 합산");
   chk(!!sl, iso+" 전표 "+(sl?"반영됨 ("+L.length+"건)":"미반영 — ② 칸 또는 [데이터 업로드]에 전표자료조회 파일을 올려주세요(월 통합본 가능)"));
   chk(!bad.length, bad.length ? "시재표 1원 검증 불일치: "+bad.join(", ") : "시재표 계좌별 전일시재+입금−출금±자금이동 = 금일시재 (1원 단위 일치)");
