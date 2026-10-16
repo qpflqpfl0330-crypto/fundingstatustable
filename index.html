@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v63 · 2026-10-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v65 · 2026-10-16</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -10802,7 +10802,8 @@ var FER=(function(){
         else if(mmt&&BW>0) need="MMT 입금";
       } else {
         if(f==="지출") need="지출";
-        else if(BX>0&&g==="자금이동"&&has(BU,"굿어스스")) need="자금이동 출금";
+        /* [v65] GS 자금이동은 받는 쪽만 증빙 — 출금 계좌는 필요 없음. 입금 짝(pairOf)이 자금이동 출금이거나 적요·의뢰인이 자사명인 입금 */
+        else if(BW>0&&((t.fer.pairOf&&t.fer.pairOf.fer.g==="자금이동")||has(BT,"굿어스스")||has(BU,"굿어스스"))) need="자금이동 입금";
         else if(mmt&&BW>0) need="MMT 입금";
       }
       t.fer.need=need;
@@ -13648,7 +13649,7 @@ window.__INT_CMAPS = Object.freeze({"Adobe-Japan1-UCS2":"BOBSQ29weXJpZ2h0IDE5OTA
   const HDR = MP.HDR, COL = MP.COL, NCOL = MP.NCOL, U = MP.U, COMPANIES = MP.COMPANIES;
 
   /* ---------- 1. 상수 (운영 정책은 상수로만 분리) ---------- */
-  const VERSION = 'int-core v63';
+  const VERSION = 'int-core v64';
   const ACTIVE_COS = Object.freeze(['SN', 'GD', 'GS']);   // 활성 법인 (layout은 COMPANIES[co].layout 참조)
   const SLIP_PREFIX = 'BM';                              // 전표번호 접두어 (BM+일자+순번5)
   const SLIP_SEQ_START = 1;                              // 일자별 시작 순번
@@ -13660,6 +13661,7 @@ window.__INT_CMAPS = Object.freeze({"Adobe-Japan1-UCS2":"BOBSQ29weXJpZ2h0IDE5OTA
      내장에 없는 이름만 네트워크 1순위 cdnjs → 2순위 jsdelivr(같은 버전 데이터 파일). 운영 화면에서 CMap을 못 받으면 RCMS 원천징수영수증·
      이자지급증명서는 숫자까지 글자가 하나도 나오지 않는다(2026-10-15 운영 오류의 원인) — 그래서 네트워크에 의존하지 않게 했다. */
   const CMAP_URLS = Object.freeze([CMAP_URL, 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/']);
+  const RCMS_BANK_WIN = 20;                              // [v64] RCMS 거래내역확인증 묶기 창: 지급일 ~ +20일(사용자 지정 2026-10-16, 종전 10일)
   const PAY_GAP_MAX = 5;                                 // 0 < 지급일 − 종료일 ≤ 5일이면 정상
   const OCR_WL = { num: '0123456789,', dec: '0123456789.,', date: '0123456789.-~ ', id: '0123456789-*', any: '0123456789-.,~*:' };
 
@@ -14410,19 +14412,33 @@ window.__INT_CMAPS = Object.freeze({"Adobe-Japan1-UCS2":"BOBSQ29weXJpZ2h0IDE5OTA
     // (2) 데이터 띠
     const sq = c => squash(c && c.text);
     let units = [];
+    /* [v64] 지급 행 찾기 — 첫 칸(지급일/연도)은 OCR 1차 판독(단일 판독)이라 PC마다 구두점이 달라질 수 있다
+       (운영 PC: 신한 '2026.09.19'를 형식 밖으로 읽어 "지급내역 행을 찾지 못했습니다"). 그래서 ① 구두점을 빼고 숫자로 판정하고
+       ② 그래도 안 되면 같은 띠의 대상기간 칸(YYYYMMDD~YYYYMMDD 16자리)으로 지급 행을 찾는다. 값은 그 뒤 다수결 판독이 정한다. */
+    const dg = c => digits(c && c.text);
+    const firstOk = (b, kind) => { const d = dg(b.cells[0]); return kind === 'year' ? /^20\d{2}$/.test(d) : kind === 'ym' ? /^20\d{2}(0[1-9]|1[0-2])$/.test(d) : (d.length === 8 && isYmd(d)); };
+    const perCol = form.pair ? form.colsA.period : form.cols.period;
+    const periodOk = b => { const c = b.cells[perCol]; return !!(c && period(c.text)); };
+    let byPeriod = 0, bWeak = 0;
     if (form.pair) {
       const bs = grid.bands.filter(b => b.cells.length === form.cells);
       bs.forEach(b => {
-        if (!FIRST.dateDot.test(sq(b.cells[0]))) return;
+        const okA = firstOk(b, 'date'); if (!okA && !periodOk(b)) return;
         const nb = grid.bands.filter(x => x.top > b.top && x.cells.length === form.cells).sort((x, y) => x.top - y.top)[0];
-        if (nb && /^20\d{2}\.\d{2}$/.test(sq(nb.cells[0]))) units.push({ a: b, b: nb });
+        if (!nb) return;
+        const okB = firstOk(nb, 'ym');
+        if (!okB && !(nb.top - b.bot <= 30 * grid.scale && !firstOk(nb, 'date') && !periodOk(nb))) return;   // 바로 아래 띠(다음 지급 행이 아님)만 B로
+        if (!okA) byPeriod++; if (!okB) bWeak++;
+        units.push({ a: b, b: nb });
       });
     } else {
-      units = grid.bands.filter(b => b.cells.length === form.cells && FIRST[form.first].test(sq(b.cells[0]))).map(b => ({ a: b }));
+      units = grid.bands.filter(b => b.cells.length === form.cells && (firstOk(b, form.first === 'year' ? 'year' : 'date') || (periodOk(b) && ++byPeriod))).map(b => ({ a: b }));
     }
+    if (byPeriod || bWeak) iss.push(issue('info', 'form', '지급 행 첫 칸 1차 판독이 형식과 달라 대상기간 칸·행 위치로 지급 행을 찾았습니다(' + (byPeriod + bWeak) + '칸) — 값은 다수결 판독으로 다시 읽습니다'));
     if (!units.length) {
       const counts = grid.bands.filter(b => b.cells.length >= 9).map(b => b.cells.length);
-      iss.push(issue('error', 'form', wh.bank + ' 서식의 지급내역 행을 찾지 못했습니다 — 열 ' + form.cells + '개 기대, 탐지된 표 행 열 수: ' + (counts.join('·') || '없음')));
+      const firsts = grid.bands.filter(b => b.cells.length === form.cells).map(b => '"' + squash(b.cells[0].text || '').slice(0, 14) + '"' + (b.cells[perCol] ? '/"' + squash(b.cells[perCol].text || '').slice(0, 24) + '"' : '')).join(', ');
+      iss.push(issue('error', 'form', wh.bank + ' 서식의 지급내역 행을 찾지 못했습니다 — 열 ' + form.cells + '개 기대, 탐지된 표 행 열 수: ' + (counts.join('·') || '없음') + (firsts ? ' · ' + form.cells + '칸 행 첫 칸/기간 칸 판독: ' + firsts : '') + ' — [직접 입력]으로 이어 갈 수 있습니다'));
       doc.status = 'error'; return;
     }
     const firstBand = units[0].a;
@@ -14718,10 +14734,10 @@ window.__INT_CMAPS = Object.freeze({"Adobe-Japan1-UCS2":"BOBSQ29weXJpZ2h0IDE5OTA
         e.kind = 'rcms';
         if (rows.length !== 1) { e.issues.push(issue('error', 'rcms', 'RCMS 원천징수영수증은 1행만 지원합니다')); e.status = 'error'; return; }
         const r = rows[0], v = (d.pdfAcct || []).map(digits);
-        // 묶기는 금액이 아니라 맥락으로: 증명서 = 같은 가상계좌(없으면 같은 이자발생일), 거래내역 = 'RCMS' 표기·기업은행 입금 중 지급일~+10일. 금액은 묶은 뒤 항등식으로 검사
+        // 묶기는 금액이 아니라 맥락으로: 증명서 = 같은 가상계좌(없으면 같은 이자발생일), 거래내역 = 'RCMS' 표기·기업은행 입금 중 지급일~+RCMS_BANK_WIN일. 금액은 묶은 뒤 항등식으로 검사
         const certC = certs.filter(c => !usedC.has(c.id) && (v.indexOf(c.cert.vacct) >= 0 || (!v.length && c.cert.date === r.payDate)));
         const cert = certC.length === 1 ? certC[0] : (certC.find(c => c.cert.date === r.payDate) || null);
-        const inWin = t => isYmd(t.txn.date) && isYmd(r.payDate) && U.days(r.payDate, t.txn.date) >= 0 && U.days(r.payDate, t.txn.date) <= 10;
+        const inWin = t => isYmd(t.txn.date) && isYmd(r.payDate) && U.days(r.payDate, t.txn.date) >= 0 && U.days(r.payDate, t.txn.date) <= RCMS_BANK_WIN;
         const txC = txns.filter(t => !usedT.has(t.id) && inWin(t) && (t.txn.manual || /RCMS/i.test(t.txn.memo + ' ' + t.txn.party + ' ' + t.txn.branch + ' ' + (/기업/.test(t.txn.branch) ? 'RCMS' : ''))));   // [v63] 직접 입력한 거래내역확인증은 사용자가 RCMS 입금으로 넣은 것
         const txn = txC.length === 1 ? txC[0] : (cert ? (txC.find(t => t.txn.deposit === cert.cert.amount) || null) : null);
         if (txC.length > 1 && !txn) e.issues.push(issue('error', 'rcms', '거래내역확인증 후보가 ' + txC.length + '개라 묶을 수 없습니다 — 해당 건만 올리세요'));
@@ -14729,7 +14745,7 @@ window.__INT_CMAPS = Object.freeze({"Adobe-Japan1-UCS2":"BOBSQ29weXJpZ2h0IDE5OTA
         if (miss.length) {
           e.issues.push(issue('error', 'rcms', 'RCMS 번들 문서 누락: ' + miss.join('·') + ' — 3문서가 모두 있어야 합니다'));
           if (!txn && !txC.length) e.issues.push(issue('error', 'rcms', docs.some(x => x.kind === 'txn')
-            ? 'RCMS는 거래내역확인증 거래일시로 회계일자를 정합니다 — 올린 거래내역확인증 중 묶을 수 있는 건이 없습니다(문서 오류이거나 지급일 ' + fmtYmd(r.payDate) + ' ~ +10일 밖)'
+            ? 'RCMS는 거래내역확인증 거래일시로 회계일자를 정합니다 — 올린 거래내역확인증 중 묶을 수 있는 건이 없습니다(문서 오류이거나 지급일 ' + fmtYmd(r.payDate) + ' ~ +' + RCMS_BANK_WIN + '일 밖)'
             : 'RCMS는 거래내역확인증 거래일시로 회계일자를 정합니다 — 거래내역확인증을 함께 올리세요'));
           e.status = 'error'; return;
         }
