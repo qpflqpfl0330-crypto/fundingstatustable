@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v71 · 2026-10-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v72 · 2026-10-16</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -1597,6 +1597,12 @@ function loanAt(l, iso){
   var amt=+l.amount||0;
   (l.moves||[]).forEach(function(m){ if(!iso || m.date<=iso) amt += (+m.amount||0); });
   var active = (!l.start || !iso || l.start<=iso) && (!l.end || !iso || iso<=l.end);
+  /* [v72] 개별대출 — 한도 = 남은 차입잔액(상환하면 한도도 줄고, 전액상환·실행 전이면 집계·표시에서 빠짐). 약정 상세(편집표)에는 이력 관리용으로 그대로 */
+  if(l.type==="개별"){
+    if(l.start && iso && iso<l.start) amt=0;
+    var bal=Math.max(0,amt);
+    return {rate:rate, amount:bal, limit:bal, avail:0, active:active && bal>0, indiv:true, repaid:bal<=0 && (+l.amount||0)>0};
+  }
   return {rate:rate, amount:Math.max(0,amt), limit:+l.limit||0,
     avail:Math.max(0,(+l.limit||0)-Math.max(0,amt)), active:active};
 }
@@ -1624,6 +1630,7 @@ function loanScope(iso){
     if(snap){
       snap.loans.forEach(function(l){
         var amt=+l.amount||0, lim=+l.limit||0;
+        if(l.type==="개별" && amt<=0) return;   // [v72] 전액상환된 개별대출은 집계에서 제외
         var v={rate:+l.rate||0, amount:amt, limit:lim, avail:Math.max(0,lim-amt), active:true, snap:snap.date};
         used+=amt; limit+=lim; items.push({c:c, l:l, v:v});
         var d=daysTo(iso, l.end); if(d!=null && d>=0 && d<=60) soon.push({c:c, l:l, d:d});
