@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v67 · 2026-10-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v68 · 2026-10-16</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -547,71 +547,58 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
       </div>
 
       <div class="auto-screen" data-tool="expense" hidden>
-        <!-- [v34] 사원경비 대량이체 — 카드형 입력 폼 (EXP 엔진·EXS 상태·결과 표는 그대로) -->
-        <!-- 1. 법인 · 지급일자 카드 -->
-        <div class="panel exp-panel">
-          <div class="exp-card-header">
-            <h3 class="exp-step-title">1. 법인 · 지급일자</h3>
-            <p class="exp-step-sub">선택한 법인명과 지급일자는 대량이체 파일·AO~AR 원전표 파일 이름에 들어갑니다.</p>
-          </div>
-          <div class="exp-corp-pills" id="exCorpPills" role="group" aria-label="법인 선택">
-            <button type="button" class="exp-pill" data-corp="에스넷시스템(주)" aria-pressed="true">SN</button>
-            <button type="button" class="exp-pill" data-corp="굿어스(주)" aria-pressed="false">GU</button>
-            <button type="button" class="exp-pill" data-corp="굿어스데이터주식회사" aria-pressed="false">GD</button>
-            <button type="button" class="exp-pill" data-corp="굿어스스마트솔루션(주)" aria-pressed="false">GS</button>
-          </div>
-          <input type="hidden" id="exCorp" value="에스넷시스템(주)">
-          <div class="exp-field-group">
-            <label class="exp-field-label" for="exDate">사원경비 지급일자</label>
-            <input type="date" id="exDate" class="exp-date-input">
+        <!-- [v68] 사원경비 — 디자인을 법인카드 계정대체·연체자 관리 결(.fer-panel·.card-*)로 통일. 기능·ID(EXP 엔진·EXS·bindEx)는 그대로.
+             결과물 = ★사원경비_작업자동화 매크로의 [PDF] 시트(보고용 인쇄) · [대량이체파일] 시트(은행 업로드, 원전표 줄 단위) -->
+        <div class="panel fer-panel card-head">
+          <header><h2>사원경비</h2><span class="sub">사원경비전표 + 경비 계좌번호 → 사번별 계좌 매핑 · 성명=예금주 검증 → PDF(보고용) · 대량이체파일(은행 업로드용)</span></header>
+          <div class="pad card-headpad">
+            <ol class="fer-steps card-steps" id="exSteps"><li data-s="1">파일 올리기</li><li data-s="2">매핑 검증</li><li data-s="3">PDF · 대량이체파일</li></ol>
+            <div class="card-ctl">
+              <div class="grp"><span class="lbl">대상 법인</span>
+                <div class="card-cos" id="exCorpPills" role="group" aria-label="법인 선택">
+                  <button type="button" class="card-co exp-pill" data-corp="에스넷시스템(주)" data-co="SN" aria-pressed="true"><span class="chip co" style="color:var(--c-sn)">SN</span></button>
+                  <button type="button" class="card-co exp-pill" data-corp="굿어스(주)" data-co="GU" aria-pressed="false"><span class="chip co" style="color:var(--c-gu)">GU</span></button>
+                  <button type="button" class="card-co exp-pill" data-corp="굿어스데이터주식회사" data-co="GD" aria-pressed="false"><span class="chip co" style="color:var(--c-gd)">GD</span></button>
+                  <button type="button" class="card-co exp-pill" data-corp="굿어스스마트솔루션(주)" data-co="GS" aria-pressed="false"><span class="chip co" style="color:var(--c-gs)">GS</span></button>
+                </div></div>
+              <input type="hidden" id="exCorp" value="에스넷시스템(주)">
+              <div class="grp"><label class="lbl" for="exDate">지급일자 <span class="muted">PDF 제목 · 파일 이름</span></label><input type="date" id="exDate" class="card-date"></div>
+            </div>
           </div>
         </div>
 
-        <!-- 2. 자료 첨부 카드 -->
-        <div class="panel exp-panel" style="margin-top:16px">
-          <div class="exp-card-header">
-            <h3 class="exp-step-title">2. 자료 첨부</h3>
-            <p class="exp-step-sub">두 파일을 모두 올리면 자동으로 처리합니다. 파일을 상자에 끌어다 놓아도 됩니다.</p>
-          </div>
-          <div class="exp-attach-grid">
-            <!-- 사원경비전표 -->
-            <div class="exp-attach-box tc-item" data-k="slip">
-              <div class="exp-attach-title">사원경비전표</div>
-              <div class="exp-attach-desc">ERP 전표 조회 결과(.xls). 대변(보통예금) 줄은 지급 총액 대조에만 쓰고, 차변 줄을 사번으로 계좌와 매핑합니다.</div>
-              <div class="exp-file-action">
-                <button type="button" class="btn sm exp-btn-file">파일 선택</button>
-                <span class="exp-file-name" id="exSlipFileName">선택된 파일 없음</span>
-              </div>
-              <input type="file" hidden accept=".xls,.xlsx">
-            </div>
-            <!-- 경비 계좌번호 -->
-            <div class="exp-attach-box tc-item" data-k="acct">
-              <div class="exp-attach-title">경비 계좌번호 (이체계좌등록)</div>
-              <div class="exp-attach-desc">ERP 이체계좌등록 결과(.xls). 예외 마스터(법인카드·타법인 겸직자)를 먼저 적용하고, 나머지 사번을 이 파일에서 찾습니다.</div>
-              <div class="exp-file-action">
-                <button type="button" class="btn sm exp-btn-file">파일 선택</button>
-                <span class="exp-file-name" id="exAcctFileName">선택된 파일 없음</span>
-              </div>
-              <input type="file" hidden accept=".xls,.xlsx">
-            </div>
-          </div>
-          <div class="exp-action-row" style="margin-top:18px">
-            <button class="btn primary exp-btn-run" id="btnExRun" disabled>처리 시작</button>
-          </div>
-        </div>
-
-        <!-- 결과 및 툴바 (기존 요소·ID 그대로, 카드 안에 배치) -->
-        <div class="panel exp-result">
+        <div class="panel fer-panel">
+          <header><h2>1. 파일 올리기</h2><span class="sub">두 파일을 모두 올리면 자동으로 처리합니다 · 상자에 끌어다 놓아도 됩니다</span>
+            <div class="sp"><button class="btn primary sm" id="btnExRun" type="button" disabled>처리 시작</button></div></header>
           <div class="pad">
-            <div class="toolbar">
-              <button class="btn sm" id="btnExOut">대량이체 파일 다운로드</button>
-              <button class="btn sm" id="btnExMapped">AO~AR 원전표 저장</button>
-              <div class="seg" id="exSeg"><button data-f="bad" aria-pressed="true">불일치·누락만</button><button data-f="all">전체 행</button><button data-f="pivot">인별 집계</button></div>
-              <span class="mini" id="exNote"></span>
+            <div class="exp-attach-grid">
+              <div class="ilbo-drop exp-attach-box tc-item" data-k="slip">
+                <b>사원경비전표</b>
+                <span class="mini">ERP 전표 조회(.xls) · 대변(보통예금) 줄은 지급 총액 대조에만 쓰고, 차변 줄을 사번(AC)으로 계좌와 매핑</span>
+                <span class="exp-file-action"><button type="button" class="btn sm exp-btn-file">파일 선택</button><span class="exp-file-name" id="exSlipFileName">선택된 파일 없음</span></span>
+                <input type="file" hidden accept=".xls,.xlsx">
+              </div>
+              <div class="ilbo-drop exp-attach-box tc-item" data-k="acct">
+                <b>경비 계좌번호 (이체계좌등록)</b>
+                <span class="mini">ERP 이체계좌등록(.xls) · 예외 마스터(법인카드·타법인 겸직자)를 먼저 적용하고, 나머지 사번을 이 파일에서 찾음</span>
+                <span class="exp-file-action"><button type="button" class="btn sm exp-btn-file">파일 선택</button><span class="exp-file-name" id="exAcctFileName">선택된 파일 없음</span></span>
+                <input type="file" hidden accept=".xls,.xlsx">
+              </div>
             </div>
           </div>
-          <div class="pad" style="padding-top:0"><div class="kpis ar-kpis" id="exKpis"></div><div id="exAlert"></div></div>
-          <div class="scroll" style="max-height:60vh"><table class="tbl" id="exTbl"></table></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>2. 매핑 검증</h2><span class="sub">원전표 AO~AR(은행명·계좌번호·예금주·성명=예금주) · 인별 집계 = PDF 시트 내용</span>
+            <div class="sp"><div class="seg" id="exSeg"><button type="button" data-f="bad" aria-pressed="true">불일치·누락만</button><button type="button" data-f="all">전체 행</button><button type="button" data-f="pivot">인별 집계</button></div></div></header>
+          <div class="pad" style="padding-bottom:0"><div class="kpis ar-kpis" id="exKpis"></div><div id="exAlert"></div></div>
+          <div class="scroll" style="max-height:60vh"><table class="tbl card-tbl" id="exTbl"></table></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>3. PDF · 대량이체파일</h2><span class="sub">PDF = 인별 집계 보고용(A4 세로, 머리글·총합계 매 쪽 반복) · 대량이체파일 = 원전표 줄마다 은행명·계좌번호·입금액·예금주</span>
+            <div class="sp exp-dl"><button class="btn primary sm" id="btnExPdf" type="button" disabled>PDF 파일 다운로드</button><button class="btn primary sm" id="btnExOut" type="button" disabled>대량이체파일 다운로드</button><button class="btn sm" id="btnExMapped" type="button" disabled>AO~AR 원전표 저장</button></div></header>
+          <div class="pad"><span class="mini" id="exNote"></span></div>
         </div>
       </div>
 
@@ -10479,7 +10466,8 @@ var EXP=(function(){
         balanced:!slip.creditLines.length || Math.round(debit)===Math.round(slip.controlTotal), cashCount:mapped.filter(function(m){ return m.src==="GUCARD4 현금"; }).length}};
   }
   function transferWorkbook(R){
-    var aoa=[["은행명","계좌번호","이체금액","예금주"]].concat(R.pivot.filter(function(p){ return p.amount!==0; }).map(function(p){ return [normBank(p.bank),p.account,p.amount,p.holder]; }));
+    /* [v68] 매크로 [대량이체파일] 시트와 같게 — 원전표 차변 줄마다 1행(원전표 순서), 머리글 '입금액'. 사람별 합산 아님(사용자 결정 2026-10-16) */
+    var aoa=[["은행명","계좌번호","입금액","예금주"]].concat(R.mapped.filter(function(m){ return m.amount!==0; }).map(function(m){ return [normBank(m.bank),m.account,m.amount,m.holder]; }));
     var ws=XLSX.utils.aoa_to_sheet(aoa);
     for(var r=1;r<aoa.length;r++){ var b=ws[XLSX.utils.encode_cell({r:r,c:1})]; if(b){ b.t="s"; b.v=String(b.v); b.z="@"; } var c=ws[XLSX.utils.encode_cell({r:r,c:2})]; if(c) c.z="#,##0"; }
     ws["!cols"]=[{wch:14},{wch:22},{wch:14},{wch:12}];
@@ -10656,7 +10644,10 @@ var EXS={slip:null,acct:null,R:null,f:"bad",ack:false};
 function expExc(){ return (D.settings&&D.settings.expExc)||EXP.DEFAULT_EXCEPTIONS; }
 function renderEx(){
   var R=EXS.R, okGate=!!R&&(!R.failures.length||EXS.ack);
-  $("#btnExOut").disabled=!okGate; $("#btnExMapped").disabled=!R;
+  $("#btnExOut").disabled=!okGate; $("#btnExMapped").disabled=!R; $("#btnExPdf").disabled=!okGate;   // [v68] PDF도 대량이체와 같은 조건
+  var on={1:!!(EXS.slip&&EXS.acct), 2:okGate, 3:!!EXS.dl}, cur=[1,2,3].filter(function(n){ return !on[n]; })[0]||4;
+  $$("#exSteps li").forEach(function(li){ var n=+li.dataset.s; li.className=on[n]?"on":n===cur?"cur":""; });
+  $("#exNote").textContent=R?("PDF: "+expCoCode()+"_사원경비_"+expDate()+".pdf (인쇄 창에서 'PDF로 저장') · 대량이체파일: 대량이체파일_"+expCorpTag()+"_"+expDate()+".xlsx ("+R.mapped.filter(function(m){ return m.amount!==0; }).length+"행)"):"파일을 처리하면 내려받을 수 있습니다.";
   $$("#exSeg button").forEach(function(b){ b.setAttribute("aria-pressed",b.dataset.f===EXS.f?"true":"false"); });
   if(!R){ $("#exKpis").innerHTML=""; $("#exAlert").innerHTML=""; $("#exTbl").innerHTML='<tbody><tr><td class="empty" style="padding:22px">사원경비전표와 경비 계좌번호 파일을 올리면 자동으로 처리합니다. (다시 돌릴 때는 [처리 시작])</td></tr></tbody>'; return; }
   var s=R.summary, n=R.failures.length;
@@ -10676,12 +10667,29 @@ function renderEx(){
       (m.issues.length?m.issues.map(function(i){ return '<span class="chip ar-long">'+esc(i)+'</span>'; }).join(" "):'<span class="chip in">TRUE</span>')+'</td><td class="mini">'+esc(m.src)+'</td></tr>'; }).join("")
       :'<tr><td colspan="10" class="empty" style="padding:22px">불일치·누락 행이 없습니다.</td></tr>')+'</tbody>';
 }
+/* [v68] 사원경비 출력 도우미 — 법인 코드 · 지급일자 · 파일명 태그 · PDF(매크로 [PDF] 시트 인쇄 모양) */
+function expCoCode(){ var b=$("#exCorpPills .exp-pill[aria-pressed=true]"); return (b&&b.dataset.co)||"SN"; }
+function expDate(){ return ($("#exDate")&&$("#exDate").value)||todayISO(); }
+function expCorpTag(){ return ($("#exCorp").value||"").replace(/[\\/:*?"<>|()\s]/g,""); }
+function expPrint(){
+  var R=EXS.R; if(!R) return;
+  var co=expCoCode(), d=expDate(), title=co+" 사원경비_"+d, tot=R.pivot.reduce(function(a,p){ return a+p.amount; },0);
+  var body=R.pivot.map(function(p){ return '<tr><td>'+esc(p.empNo)+'</td><td>'+esc(p.empName)+'</td><td>'+esc(p.bank)+'</td><td>'+esc(p.account)+'</td><td>'+esc(p.holder)+'</td><td class="n">'+(p.amount?fmt(p.amount):"")+'</td></tr>'; }).join("");
+  $("#printReport").innerHTML='<div class="rpt-page exp-rpt"><div class="exp-rtitle">'+esc(title)+'</div>'+
+    '<table class="exp-rt"><colgroup><col style="width:13.1%"><col style="width:17%"><col style="width:23.9%"><col style="width:18.8%"><col style="width:12.1%"><col style="width:15.1%"></colgroup>'+
+    '<thead><tr><th>사번</th><th>사원명</th><th>은행</th><th>계좌</th><th>예금주</th><th>금액</th></tr><tr class="tot"><th colspan="5">총합계</th><th class="n">'+fmt(tot)+'</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
+    '<div class="rpt-actions no-print"><button class="btn primary" id="btnRptPrint">인쇄 · PDF로 저장</button><button class="btn" id="btnRptClose">닫기</button><span class="mini" style="align-self:center">인쇄 창에서 대상을 \'PDF로 저장\'으로 고르세요 · 파일 이름 '+esc(co+"_사원경비_"+d)+'.pdf</span></div>';
+  var t0=document.title, close=function(){ $("#printReport").hidden=true; document.body.classList.remove("reporting","exp-print"); document.title=t0; };
+  $("#printReport").hidden=false; document.body.classList.add("reporting","exp-print");
+  $("#btnRptPrint").onclick=function(){ document.title=co+"_사원경비_"+d; window.print(); setTimeout(function(){ document.title=t0; },1000); };   // 저장 파일 이름 = 문서 제목
+  $("#btnRptClose").onclick=close;
+}
 function bindEx(){
   $("#exDate").value=todayISO();
   /* [v34] 법인 알약 → 숨은 #exCorp 값 (파일명에 쓰는 기존 로직은 #exCorp를 그대로 읽는다) */
   $$("#exCorpPills .exp-pill").forEach(function(p){ p.onclick=function(){
     $$("#exCorpPills .exp-pill").forEach(function(x){ x.setAttribute("aria-pressed", x===p?"true":"false"); });
-    $("#exCorp").value=p.dataset.corp; }; });
+    $("#exCorp").value=p.dataset.corp; renderEx(); }; });
   /* [v34] 처리 시작은 두 파일이 모두 있을 때만 활성 */
   var syncRun=function(){ $("#btnExRun").disabled=!(EXS.slip&&EXS.acct); };
   var NAME={slip:"#exSlipFileName", acct:"#exAcctFileName"};
@@ -10703,7 +10711,9 @@ function bindEx(){
   syncRun();
   $("#btnExRun").onclick=function(){ if(!EXS.slip||!EXS.acct){ toast("원전표와 계좌정보 파일을 모두 올려주세요"); return; }
     try{ EXS.R=EXP.run(EXS.slip,EXS.acct,expExc()); EXS.ack=false; EXS.f=EXS.R.failures.length?"bad":"pivot"; }catch(e){ toast(e.message); } renderEx(); };
-  $("#btnExOut").onclick=function(){ if(!EXS.R) return; var corp=($("#exCorp").value||"").replace(/[\\/:*?"<>|()\s]/g,""); saveWb(EXP.transferWorkbook(EXS.R),"대량이체파일_"+corp+"_"+($("#exDate").value||todayISO())+".xlsx"); };
+  $("#btnExOut").onclick=function(){ if(!EXS.R) return; saveWb(EXP.transferWorkbook(EXS.R),"대량이체파일_"+expCorpTag()+"_"+expDate()+".xlsx"); EXS.dl=true; renderEx(); };
+  $("#btnExPdf").onclick=function(){ if(EXS.R){ expPrint(); EXS.dl=true; renderEx(); } };   // [v68]
+  $("#exDate").onchange=function(){ renderEx(); };
   $("#btnExMapped").onclick=function(){ if(EXS.R) saveWb(EXP.mappedWorkbook(EXS.slip,EXS.R),"원전표_AO-AR_"+($("#exDate").value||todayISO())+".xlsx"); };
   $$("#exSeg button").forEach(function(b){ b.onclick=function(){ EXS.f=b.dataset.f; renderEx(); }; });
 }
@@ -13067,36 +13077,37 @@ td.tc-act .btn{margin:2px 4px 2px 0}
 tr.tc-appr td{background:var(--move-soft)}
 .chip.tc-appr{color:var(--move);background:var(--move-soft);border-color:var(--move)}
 /* [v34] 사원경비 대량이체 — 카드형 입력 폼 */
-.exp-panel{padding:22px 24px}
-.exp-card-header{margin-bottom:16px}
-.exp-step-title{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
-.exp-step-sub{margin:5px 0 0;font-size:12.5px;color:var(--muted)}
-.exp-corp-pills{display:flex;gap:8px;flex-wrap:wrap}
-.exp-pill{min-width:60px;height:44px;padding:0 18px;border:1px solid var(--rule-strong);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s,color .12s}
-.exp-pill:hover{border-color:var(--navy)}
-.exp-pill[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:var(--on-accent)}
-.exp-pill:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
-.exp-field-group{margin-top:20px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
-.exp-field-label{font-size:13px;font-weight:600;color:var(--ink)}
-.exp-date-input{height:46px;min-width:180px;padding:0 14px;border:1px solid var(--rule-strong);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;font-size:15px;font-variant-numeric:tabular-nums}
-.exp-date-input:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
-.exp-attach-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media (max-width:880px){.exp-attach-grid{grid-template-columns:1fr}.exp-panel{padding:18px 16px}}
-.exp-attach-box{min-width:0;padding:16px 18px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);transition:border-color .15s,background .15s}
-.exp-attach-box.over{border-color:var(--navy);border-style:dashed;background:var(--navy-soft)}
-.exp-attach-box.done{border-color:var(--in);background:var(--in-soft)}
-.exp-attach-title{font-size:13.5px;font-weight:700;color:var(--ink)}
-.exp-attach-desc{margin-top:4px;font-size:12px;line-height:1.55;color:var(--muted)}
-.exp-file-action{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
-.btn.exp-btn-file{background:var(--ink);border-color:var(--ink);color:var(--surface);font-weight:600}
-.btn.exp-btn-file:hover{opacity:.88}
-.exp-file-name{min-width:0;font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
+/* [v68] 사원경비 PDF — 매크로 [PDF] 시트 인쇄 모양(A4 세로 · 맑은 고딕 · 머리글/총합계 연두 #E2EFDA · 매 쪽 반복) */
+#printReport .exp-rpt{max-width:760px;font-family:"Malgun Gothic","맑은 고딕",var(--f-sans)}
+#printReport .exp-rtitle{font-size:22px;font-weight:700;text-align:center;margin:4px 0 12px}
+#printReport .exp-rt{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+#printReport .exp-rt th,#printReport .exp-rt td{border:1px solid #000;padding:2px 4px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:clip}
+#printReport .exp-rt th{background:#E2EFDA;color:#000;font-weight:700;text-align:center;font-size:11px}
+#printReport .exp-rt td.n,#printReport .exp-rt th.n{text-align:right;font-variant-numeric:tabular-nums}
+#printReport .exp-rt thead{display:table-header-group}
+#printReport .exp-rt tr{break-inside:avoid;page-break-inside:avoid}
+@page exprpt{size:A4 portrait;margin:17mm 18mm 15mm 18mm}
+@media print{
+  body.exp-print #printReport .exp-rpt{page:exprpt;max-width:none;width:auto;margin:0;color:#000}
+  body.exp-print #printReport .exp-rtitle{font-size:26px;margin:0 0 8px}
+  body.exp-print #printReport .exp-rt{font-size:13.3px}
+  body.exp-print #printReport .exp-rt th{font-size:12.5px}
+  body.exp-print #printReport .exp-rt th,body.exp-print #printReport .exp-rt td{padding:0 3px;height:20.8px;line-height:19.8px}
+  html:has(body.exp-print),body.exp-print{height:auto!important;min-height:0!important;background:#fff!important}
+  body.exp-print #printReport{background:#fff!important}
+  body.exp-print #printReport .exp-rt th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.exp-print #printReport .exp-rt td{color:#000}
+}
+/* [v68] 사원경비 — 다른 탭(.fer-panel·.card-*)과 같은 결. 첨부 상자 = .ilbo-drop 모양 + 파일 선택 버튼 */
+.exp-attach-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:880px){.exp-attach-grid{grid-template-columns:1fr}}
+.exp-attach-box{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:16px 16px;text-align:left;cursor:default;min-width:0;font-size:13px}
+.exp-attach-box .mini{line-height:1.5}
+.exp-attach-box.done{border-style:solid;border-color:var(--in);background:var(--in-soft)}
+.exp-file-action{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;min-width:0}
+.exp-file-name{min-width:0;font-size:12.5px;color:var(--ink-2);overflow-wrap:anywhere}
 .exp-attach-box.done .exp-file-name{color:var(--ink);font-weight:600}
-.btn.exp-btn-run{padding:11px 22px;font-size:14px;font-weight:600;border-radius:10px}
-.exp-result{margin-top:16px}
-/* 다크 테마에서 날짜 입력창 달력 아이콘이 보이도록 */
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .exp-date-input{color-scheme:dark}}
-:root[data-theme="dark"] .exp-date-input{color-scheme:dark}
+.exp-dl{display:flex;gap:6px;flex-wrap:wrap}
 /* [v35] 자금집행결과보고서 */
 .fer-panel+.fer-panel{margin-top:14px}
 .fer-date{font-variant-numeric:tabular-nums}
