@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v65 · 2026-10-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v66 · 2026-10-16</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -416,11 +416,13 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
     <section class="view" id="v-fep" hidden>
       <div id="autoHub">
         <div class="auto-hero"><div><div class="auto-hero-t">에스넷그룹 자금파트 · 업무 모듈</div><div class="mini">필요한 업무를 선택하세요. 모든 파일은 이 브라우저 안에서만 처리됩니다.</div></div>
-          <div class="auto-pills"><span>운영 모듈 7개</span><span class="acc">엑셀 자동 생성</span><span>법인별 일괄 처리</span></div></div>
+          <div class="auto-pills"><span>운영 모듈 6개</span><span class="acc">엑셀 자동 생성</span><span>법인별 일괄 처리</span></div></div>
         <div class="auto-grid" id="autoGrid"></div>
       </div>
       <div class="auto-back" id="autoBack" hidden><button class="btn sm" id="btnAutoBack">← 자금업무자동화 목록</button><b id="autoToolTitle"></b></div>
       <!-- [v60] 이자수익전표 카드 하위 탭 — mmt = 기존 #mmt-app 그대로 · int = 기타 이자수익전표(#int-app) -->
+      <!-- [v66] 사원경비 자동화 카드 하위 탭 — cardpay = 법인카드 계정대체 · expense = 사원경비(구 사원경비 대량이체) · overdue = 연체자 관리 -->
+      <div class="seg" id="empTabs" role="group" aria-label="사원경비 자동화 업무" hidden><button type="button" data-t="cardpay" aria-pressed="true">법인카드 계정대체</button><button type="button" data-t="expense" aria-pressed="false">사원경비</button><button type="button" data-t="overdue" aria-pressed="false">연체자 관리</button></div>
       <div class="seg" id="intTabs" role="group" aria-label="이자수익전표 종류" hidden><button type="button" data-t="mmt" aria-pressed="true">MMT 이자수익전표</button><button type="button" data-t="int" aria-pressed="false">기타 이자수익전표</button></div>
 
       <div class="auto-screen" data-tool="plan" hidden>
@@ -1100,6 +1102,83 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
     <div class="mh" id="int-mh"></div><div class="mb" id="int-mb"></div><div class="mf" id="int-mf"></div>
   </div></div>
 </div>
+      </div>
+
+      <!-- [v66] 연체자 관리 — 카드사 연체내역 × 사원경비전표(카드번호 AE/AF → 사번 AC · 이름 AD) → 3개 계정 지급 합계 ↔ 연체금액.
+           저장하지 않는다(브라우저 메모리만, 새로고침하면 사라짐). 화면에서는 카드번호를 가리고 엑셀에는 전체 번호. -->
+      <div class="auto-screen" data-tool="overdue" hidden>
+<style>
+#empTabs{margin:0 0 12px}
+.od-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+@media (max-width:900px){.od-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.od-grid{grid-template-columns:1fr}}
+.od-co{border:1px solid var(--rule);border-radius:var(--r-md);background:var(--surface-2);padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0;font-size:12.5px}
+.od-co .row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.od-co .row span:last-child{white-space:nowrap}
+.od-co .fn{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.od-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:980px){.od-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.od-tbl td{white-space:nowrap}
+.od-tbl th.num,.od-tbl td.num{text-align:right}
+.od-tbl tr.od-under td{background:color-mix(in srgb,var(--out) 7%,transparent)}
+.od-tbl tr.od-none td{background:color-mix(in srgb,var(--warn) 9%,transparent)}
+.od-tbl .od-sub{display:block;font-size:10.5px;color:var(--muted)}
+.od-neg{color:var(--out);font-weight:600}
+.od-pos{color:var(--in)}
+.chip.od-c{color:var(--navy);background:var(--navy-soft)}
+.od-mail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px}
+@media (max-width:820px){.od-mail{grid-template-columns:1fr}}
+.od-steps{margin:0;padding-left:18px;font-size:13px;line-height:1.8}
+.od-mail textarea{width:100%;min-height:190px;box-sizing:border-box;padding:10px 12px;border:1px solid var(--rule-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink);font:inherit;font-size:13px;line-height:1.6;resize:vertical}
+.od-who{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+</style>
+        <div class="panel fer-panel card-head">
+          <header><h2>연체자 관리</h2><span class="sub">매월 사원경비 지급 후 · 카드사 연체내역의 카드번호로 사원경비전표에서 사번을 찾아, 회사가 지급한 금액과 연체금액을 비교합니다</span>
+            <div class="sp"><button class="btn sm" id="btnOdNew" type="button">새로 시작</button></div></header>
+          <div class="pad card-headpad">
+            <ol class="fer-steps card-steps" id="odSteps"><li data-s="1">연체내역 올리기</li><li data-s="2">사원경비전표 올리기</li><li data-s="3">지급액 비교</li><li data-s="4">안내 · 엑셀</li></ol>
+            <div class="card-ctl">
+              <div class="grp"><span class="lbl">연체 기준일</span><input type="date" id="odDate" class="card-date" aria-label="연체 기준일"></div>
+              <div class="grp"><span class="lbl">기준 시각</span><input type="time" id="odTime" class="card-date" aria-label="기준 시각" value="09:30"></div>
+              <div class="grp"><span class="lbl">처리 방식</span><div class="card-val"><span class="mini">저장하지 않음 · 이 브라우저 안에서만 계산 (새로고침하면 사라짐)</span></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>1. 파일 올리기</h2><span class="sub">법인별 카드사 연체내역 · 사원경비전표 — 여러 개를 한꺼번에 · 종류는 머리글로, 법인은 조직명·사번으로 구분</span></header>
+          <div class="pad">
+            <div class="ilbo-drop card-drop" id="odDrop" tabindex="0" role="button" aria-label="파일 선택"><b>파일을 끌어다 놓거나 눌러서 선택</b><span class="mini">연체내역(이용자명·카드번호·결제금액·연체일수) · 사원경비전표(ERP 전표 조회 .xls — 계정명 D열 · 사번 AC열 · 이름 AD열 · 카드번호 AE/AF열)</span></div>
+            <input type="file" id="odIn" accept=".xls,.xlsx" multiple hidden>
+            <div class="od-grid" id="odCos"></div>
+            <div id="odFiles" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"></div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>2. 지급액 비교</h2><span class="sub">지급 합계 = 그 사번의 미지급금(사원경비) + 미지급금(법인개인카드) + 미지급금(법인카드) · 차액 = 지급 합계 − 연체금액</span>
+            <div class="sp"><div class="seg" id="odSeg"></div></div></header>
+          <div class="pad" style="padding-bottom:0"><div class="kpis ar-kpis od-kpis" id="odKpis"></div><div id="odWarn"></div></div>
+          <div class="scroll" style="max-height:62vh"><table class="tbl card-tbl od-tbl" id="odTbl"></table></div>
+          <div class="pad mini" id="odLegend">판정 — <span class="chip od-c">연락 필요</span> 회사는 연체금액 이상 지급했는데 카드대금이 연체 → 당사자에게 안내 · <span class="chip out">덜 지급</span> 지급 합계가 연체금액보다 적음 → 회사 쪽 지급 누락 확인 · <span class="chip auto">전표 없음</span> 사원경비전표에 이 카드번호 행이 없음 → 카드번호·전표 확인 후 안내</div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>3. 안내 · 엑셀</h2><span class="sub">엑셀은 법인별 시트(작업하신 SN 시트 양식) · 연락 단계와 안내 메일 문구를 표 아래에 붙입니다</span>
+            <div class="sp"><button class="btn primary sm" id="btnOdXlsx" type="button" disabled>엑셀 다운로드</button></div></header>
+          <div class="pad od-mail">
+            <div>
+              <b style="font-size:13px">연락 단계</b>
+              <ol class="od-steps" id="odStepsTxt"></ol>
+              <b style="font-size:13px;display:block;margin-top:10px">연락 대상 <span class="mini" id="odWhoN"></span></b>
+              <div class="od-who" id="odWho"></div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px"><b style="font-size:13px">안내 메일 문구</b><span style="display:flex;gap:6px"><button class="btn sm" id="btnOdMailReset" type="button">기본 문구</button><button class="btn sm" id="btnOdCopy" type="button">복사</button></span></div>
+              <textarea id="odMail" aria-label="안내 메일 문구" spellcheck="false"></textarea>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- [v46] 법인카드 계정대체 — 명세서·승인내역·ERP 전표 → 계정대체전표 · 지급전표 (프로젝트 문서 `법인카드결제전표_자동화_프롬프트.md`) -->
@@ -10423,21 +10502,23 @@ var AUTO_TOOLS=[
   {k:"plan",   t:"자금집행계획서",     d:"법인별 전표자료조회 업로드, 계정과목 분류 및 집행전표 생성", tags:["전표자료 업로드","계정과목 분류","보통예금 대조"], ico:'<rect x="4" y="4" width="16" height="17" rx="2.5"/><path d="M8.5 2.5v3M15.5 2.5v3M8 11h8M8 15.5h5"/>'},
   {k:"result", t:"자금집행결과보고서", d:"법인별 자금집행계획 입력, ERP 전표/CMS 거래내역 대사 보고서", tags:["계획 입력","전표·CMS 대사","보고서 생성"], ico:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M13.5 3.5V8H18M8.5 15l2 2 4-4.5"/>'},
   {k:"check",  t:"대량이체 파일점검",   d:"작성 전표(차변) ↔ 은행 대량이체 파일 1:1 대사 검증", tags:["은행·계좌·금액·예금주","정상 건만 결과 생성"], ico:'<path d="M4 7h16M4 12h10M4 17h7"/><path d="M15 16l2 2 4-4"/>'},
-  {k:"expense",t:"사원경비 대량이체",   d:"사원경비 전표 및 계좌 매핑, 인별 집계 및 대량이체 파일 생성", tags:["계좌 매핑","성명=예금주 검증","대량이체 생성"], ico:'<circle cx="9" cy="7.5" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 9.4-3.9"/><circle cx="17" cy="16.5" r="4.5"/>'},
+  {k:"emp",    t:"사원경비 자동화",     d:"법인카드 계정대체 · 사원경비 대량이체 · 카드 연체자 관리", tags:["법인카드 계정대체","사원경비","연체자 관리"], ico:'<circle cx="9" cy="7.5" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 9.4-3.9"/><circle cx="17" cy="16.5" r="4.5"/>'},
   {k:"card",   t:"법인카드 등록",       d:"삼성카드 발급내역 → ERP 업로드 파일 · CMS 등록 파일", tags:["발급내역 업로드","ERP·CMS 파일"], ico:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6 15h4"/>'},
   {k:"mmt",    t:"이자수익전표",       d:"MMT·기타 계좌 원천징수영수증 PDF → 이자수익 전표", tags:["MMT · 기타 계좌","PDF 판독","ERP KO 엑셀 다운로드"], ico:'<rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M7 9h4M7 13h6M7 17h3"/><circle cx="16.5" cy="15.5" r="3.2"/><path d="M15 17l3-3"/>'}
-,
-  {k:"cardpay",t:"법인카드 계정대체",   d:"명세서·승인내역·ERP 전표 → 계정대체전표 · 지급전표 (월 작업파일)", tags:["회장님 카드 분리","ERP 승인번호 매칭","작업파일 생성"], ico:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M7 15h3M14 13.5l2 2 3.5-3.5"/>'}
 ];
 /* [v60] 'int'(기타 이자수익전표)는 이자수익전표 카드(k:"mmt")의 하위 탭 — 카드 정의는 하나, 화면은 둘 */
 var INT_TABS={mmt:"MMT", int:"기타"};
-function autoToolOf(t){ return AUTO_TOOLS.filter(function(x){ return x.k===(t==="int"?"mmt":t); })[0]; }
+/* [v66] 사원경비 자동화 카드(k:"emp") 하위 탭 — 화면(data-tool)은 cardpay · expense · overdue 셋, 카드 정의는 하나. 카드를 누르면 첫 탭(법인카드 계정대체) */
+var EMP_TABS={cardpay:"법인카드 계정대체", expense:"사원경비", overdue:"연체자 관리"};
+function autoToolOf(t){ var k=t==="int"?"mmt":EMP_TABS[t]?"emp":t; return AUTO_TOOLS.filter(function(x){ return x.k===k; })[0]; }
 function renderAutoHub(){
   var t=AUTO.tool;
+  if(t==="emp") t=AUTO.tool="cardpay";
   $("#autoHub").hidden=!!t; $("#autoBack").hidden=!t;
   $("#intTabs").hidden=!INT_TABS[t]; $$("#intTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });
+  $("#empTabs").hidden=!EMP_TABS[t]; $$("#empTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });   // [v66]
   $$("#v-fep .auto-screen").forEach(function(s){ s.hidden=s.dataset.tool!==t; });
-  $("#viewTitle").textContent = t ? "자금업무 자동화 · "+autoToolOf(t).t+(INT_TABS[t]?" · "+INT_TABS[t]:"") : TITLES.fep;
+  $("#viewTitle").textContent = t ? "자금업무 자동화 · "+autoToolOf(t).t+(INT_TABS[t]?" · "+INT_TABS[t]:EMP_TABS[t]?" · "+EMP_TABS[t]:"") : TITLES.fep;
   if(!t){
     $("#autoGrid").innerHTML=AUTO_TOOLS.map(function(x){
       return '<button class="auto-card" data-k="'+x.k+'"><span class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+x.ico+'</svg></span>'+
@@ -10450,10 +10531,12 @@ function renderAutoHub(){
   if(t==="plan") renderFep(); else if(t==="result") renderExecResult(); else if(t==="check") renderTc(); else if(t==="expense") renderEx(); else if(t==="card") renderCards();
   else if(t==="cardpay"){ renderCardpay(); cpMasterLoad(CPS.co).then(function(){ renderCardpay(); cpLoadSaved(); }); }   // [v46]
   else if(t==="mmt"){ /* [v31] #mmt-app · window.MMTSlipApp이 자체 초기화·렌더링을 전담 — 대시보드 쪽 추가 호출 불필요 */ }
+  else if(t==="overdue"){ renderOverdue(); }   // [v66] 연체자 관리
   else if(t==="int"){ if(window.IntSlipApp) window.IntSlipApp.show(); }   // [v60] 기타 이자수익전표 — 계좌 목록(D) 로드 후 매핑 상태를 다시 읽는다
 }
 $("#btnAutoBack").onclick=function(){ AUTO.tool=null; renderAutoHub(); };
 $$("#intTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });   // [v60]
+$$("#empTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });   // [v66]
 
 /* 공용: 드롭존 바인딩 */
 function bindDrop(item, onFile){
@@ -12697,6 +12780,191 @@ function bindCpMaster(){
   };
 }
 bindCpMaster();
+
+/* ===================== [v66] 연체자 관리 (사원경비 자동화 카드의 [연체자 관리] 탭) =====================
+   입력: 카드사 연체내역(이용자명·조직명·카드명·카드번호·결제은행·계좌번호·결제금액·연체개월수·연체일수 — .xlsx 또는 HTML .xls)
+         사원경비전표(ERP 전표 조회 .xls — D 계정명 · AC 사번(CD_MNGD3) · AD 이름(NM_MNGD3) · AE/AF 카드번호(CD_MNGD4/NM_MNGD4))
+   규칙: 연체 카드번호 = 전표 AE 또는 AF(숫자만) → 그 행의 사번(AC)·이름(AD).
+         지급 합계 = 그 사번의 차변 미지급금(사원경비) + 미지급금(법인개인카드) + 미지급금(법인카드), 차액 = 지급 합계 − 연체금액.
+         판정: 카드 행 없음 → 전표 없음 / 지급 합계 < 연체금액 → 덜 지급 / 그 밖 → 연락 필요(회사는 지급했는데 카드대금 연체).
+   법인별로 따로 계산(연체내역 조직명 · 전표 사번 접두로 법인 판별). 저장하지 않음(메모리만). */
+var OD=(function(){
+  var COS=["SN","GU","GD","GS"];
+  var ACC=["미지급금(사원경비)","미지급금(법인개인카드)","미지급금(법인카드)"];
+  var txt=function(v){ return String(v==null?"":v).trim(); };
+  var num=function(v){ if(typeof v==="number") return v; var n=parseFloat(String(v==null?"":v).replace(/[,\s원]/g,"")); return isFinite(n)?n:0; };
+  /* 카드·계좌번호: 화면 표기(w)가 숫자면 그것을, 아니면 값(숫자는 정수 문자열) */
+  var dig=function(v,w){ var a=String(w==null?"":w).replace(/[\s-]/g,""); if(/^\d+$/.test(a)) return a; if(typeof v==="number") return v.toFixed(0); return String(v==null?"":v).replace(/\D/g,""); };
+  var coOfOrg=function(s){ s=txt(s).replace(/\s/g,""); if(/에스넷|SNET/i.test(s)) return "SN"; if(/굿어스스마트|솔루션/.test(s)) return "GS"; if(/굿어스데이/.test(s)) return "GD"; if(/굿어스/.test(s)) return "GU"; return ""; };
+  var normName=function(s){ return txt(s).replace(/\([^)]*\)/g,"").replace(/[\d\s]/g,""); };
+  var uniq=function(a){ var o=[]; a.forEach(function(x){ if(x && o.indexOf(x)<0) o.push(x); }); return o; };
+  var major=function(list){ var c={}, best="", n=0; list.forEach(function(k){ if(!k) return; c[k]=(c[k]||0)+1; if(c[k]>n){ n=c[k]; best=k; } }); return {co:best, n:n, kinds:Object.keys(c)}; };
+  function hdr(aoa, need){ for(var r=0;r<Math.min(aoa.length,20);r++){ var row=(aoa[r]||[]).map(txt); if(need.every(function(h){ return row.indexOf(h)>=0; })) return {r:r, H:row}; } return null; }
+  function kindOf(aoa){ if(hdr(aoa,["이용자명","카드번호","결제금액"])) return "over"; if(hdr(aoa,["차대","계정명"])) return "slip"; return ""; }
+  function parseOver(aoa, aoaW){
+    var h=hdr(aoa,["이용자명","카드번호","결제금액"]), H=h.H, c=function(n){ return H.indexOf(n); }, rows=[];
+    for(var r=h.r+1;r<aoa.length;r++){ var v=aoa[r]||[], w=(aoaW[r]||[]);
+      var card=dig(v[c("카드번호")], w[c("카드번호")]); if(card.length<12) continue;
+      rows.push({user:txt(v[c("이용자명")]), org:txt(v[c("조직명")]), cardName:txt(v[c("카드명")]), card:card, bank:txt(v[c("결제은행")]),
+        acct:c("계좌번호")>=0?dig(v[c("계좌번호")], w[c("계좌번호")]):"", amt:num(v[c("결제금액")]), months:c("연체개월수")>=0?num(v[c("연체개월수")]):"", days:c("연체일수")>=0?num(v[c("연체일수")]):"", co:coOfOrg(v[c("조직명")])}); }
+    var m=major(rows.map(function(x){ return x.co; }));
+    return {kind:"over", rows:rows, co:m.co, mixed:m.kinds.length>1, total:rows.reduce(function(a,x){ return a+x.amt; },0)};
+  }
+  function parseSlip(aoa, aoaW){
+    var h=hdr(aoa,["차대","계정명"]), H=h.H, c=function(n,fb){ var i=H.indexOf(n); return i>=0?i:fb; };
+    var iDc=c("차대",1), iAcc=c("계정명",3), iAmt=c("금액",6), iDesc=c("적요명",5), iEmp=c("CD_MNGD3",28), iName=c("NM_MNGD3",29), iC4=c("CD_MNGD4",30), iN4=c("NM_MNGD4",31);
+    var lines=[], credit=0;
+    for(var r=h.r+1;r<aoa.length;r++){ var v=aoa[r]||[], w=aoaW[r]||[], acc=txt(v[iAcc]).replace(/\s/g,"");
+      if(/대/.test(txt(v[iDc])) && acc==="보통예금"){ credit+=num(v[iAmt]); continue; }
+      if(!/차/.test(txt(v[iDc])) || ACC.indexOf(acc)<0) continue;
+      var cards=uniq([dig(v[iC4],w[iC4]), dig(v[iN4],w[iN4])].filter(function(x){ return x.length>=12 && x.length<=19; }));
+      lines.push({emp:txt(v[iEmp]).toUpperCase(), name:txt(v[iName]), acc:acc, amt:num(v[iAmt]), desc:txt(v[iDesc]), cards:cards}); }
+    var m=major(lines.map(function(l){ var x=/^(SN|GU|GD|GS)\d/.exec(l.emp); return x?x[1]:""; }));
+    return {kind:"slip", lines:lines, co:m.co, credit:credit, emps:uniq(lines.map(function(l){ return l.emp; })).length,
+      byAcc:ACC.map(function(a){ return lines.filter(function(l){ return l.acc===a; }).reduce(function(s,l){ return s+l.amt; },0); })};
+  }
+  function compute(over, slip){
+    return over.rows.map(function(o){
+      var r={o:o, st:"wait", emps:[], names:[], sums:[0,0,0], tot:0, diff:0, note:[]};
+      if(!slip) return r;
+      var hits=slip.lines.filter(function(l){ return l.cards.indexOf(o.card)>=0; });
+      r.emps=uniq(hits.map(function(l){ return l.emp; })); r.names=uniq(hits.map(function(l){ return l.name; }));
+      if(!r.emps.length){ r.st="none"; r.diff=-o.amt; r.note.push("사원경비전표에 이 카드번호 행 없음"); return r; }
+      slip.lines.forEach(function(l){ if(r.emps.indexOf(l.emp)>=0) r.sums[ACC.indexOf(l.acc)]+=l.amt; });
+      r.tot=r.sums[0]+r.sums[1]+r.sums[2]; r.diff=r.tot-o.amt;
+      r.st=r.tot<o.amt?"under":"contact";
+      if(r.emps.length>1) r.note.push("사번 "+r.emps.length+"개("+r.emps.join(", ")+") — 합산");
+      if(r.names.length && !r.names.some(function(n){ return normName(n)===normName(o.user); })) r.note.push("이름 다름(ERP "+r.names.join(", ")+")");
+      if(r.st==="under") r.note.push(fmt(-r.diff)+"원 덜 지급");
+      return r; });
+  }
+  var ST={contact:"연락 필요", under:"덜 지급", none:"전표 없음", wait:"전표 대기"};
+  return {COS:COS, ACC:ACC, ST:ST, kindOf:kindOf, parseOver:parseOver, parseSlip:parseSlip, compute:compute, coOfOrg:coOfOrg};
+})();
+window.__od=OD;   // QA용(카드번호 등 데이터는 노출하지 않음 — 함수만)
+
+var ODS={files:[], over:{}, slip:{}, f:"all", date:"", time:"09:30", mail:null, done:false};
+function odReset(){ ODS.files=[]; ODS.over={}; ODS.slip={}; ODS.f="all"; ODS.mail=null; ODS.done=false; }
+function odMask(c){ c=String(c||""); return c.length>=12?c.slice(0,4)+"-****-****-"+c.slice(-4):c; }
+function odRows(){ var out=[]; OD.COS.forEach(function(k){ var ov=ODS.over[k]; if(!ov) return; OD.compute(ov, ODS.slip[k]).forEach(function(r){ r.co=k; out.push(r); }); }); return out; }
+function odStamp(){ var d=ODS.date||todayISO(), t=String(ODS.time||"09:30").replace(/^0(\d)/,"$1"); return d+" "+t; }
+function odCardBrand(){ var all=[]; OD.COS.forEach(function(k){ if(ODS.over[k]) ODS.over[k].rows.forEach(function(o){ all.push(o.cardName); }); }); return all.length&&all.every(function(n){ return /삼성/.test(n); })?"삼성법인카드":"법인카드"; }
+function odMailDefault(){
+  var b=odCardBrand();
+  return "[중요] "+b+" 연체되어 안내 드립니다.\n\n"+odStamp()+" 기준 법인카드 연체금액 확인되어 안내 메일 드립니다.\n\n"+
+    (b==="삼성법인카드"?"삼성카드":"카드사")+" 홈페이지 or 어플을 통해 연체 금액 확인 가능하오니, 금일까지 반드시 결제 처리 하시기 바랍니다.\n\n"+
+    "회사명의의 법인카드는 연체 시, 회사 신용도에 악영향을 가지고 올 수 있습니다.\n추후 연체 발생하지 않도록 카드 이용에 주의해 주시기 바랍니다.";
+}
+var OD_STEPS=["D+1 메일 발송 시, 황주영D 숨은참조","D+2 메일 발송 시, 사업부장+김한성 팀장님 참조 & 황주영D 숨은참조","D+3 전화"];
+function odAddFiles(files){
+  var arr=Array.prototype.slice.call(files||[]); if(!arr.length) return;
+  arr.reduce(function(p,f){ return p.then(function(){ return odReadOne(f); }); }, Promise.resolve()).then(function(){ ODS.done=false; renderOverdue(); });
+}
+function odReadOne(f){
+  var ent={name:f.name, kind:"reading", info:"읽는 중…", bad:false}; ODS.files=ODS.files.filter(function(x){ return x.name!==f.name; }); ODS.files.push(ent); renderOverdue();
+  var done=function(k,i,b){ ent.kind=k; ent.info=i; ent.bad=!!b; };
+  return readFile(f).then(function(ab){
+    var wb=XLSX.read(ab,{type:"array",codepage:949}), ws=wb.Sheets[wb.SheetNames[0]];
+    var aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:"",blankrows:true}), aoaW=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:"",blankrows:true});
+    var k=OD.kindOf(aoa);
+    if(k==="over"){ var o=OD.parseOver(aoa,aoaW); o.file=f.name;
+      if(!o.co){ done("unknown","연체내역 — 조직명으로 법인을 찾지 못했습니다",true); return; }
+      ODS.over[o.co]=o; done("over",o.co+" 연체내역 · "+o.rows.length+"명 · 결제금액 "+fmt(o.total)+(o.mixed?" · ⚠ 다른 법인 행이 섞여 있음":""), o.mixed); }
+    else if(k==="slip"){ var s=OD.parseSlip(aoa,aoaW); s.file=f.name;
+      if(!s.co){ done("unknown","사원경비전표 — 사번(AC열)으로 법인을 찾지 못했습니다",true); return; }
+      ODS.slip[s.co]=s; done("slip",s.co+" 사원경비전표 · 차변 "+s.lines.length+"행 · 사번 "+s.emps+"명 · 대변(보통예금) "+fmt(s.credit)); }
+    else done("unknown","알 수 없는 파일 — 연체내역(이용자명·카드번호·결제금액) 또는 사원경비전표(차대·계정명) 머리글이 없습니다",true);
+  }).catch(function(e){ done("unknown","읽기 실패: "+(e&&e.message||e),true); });
+}
+function renderOverdue(){
+  if(!$("#odDrop")) return;
+  if(!ODS.date) ODS.date=todayISO();
+  $("#odDate").value=ODS.date; if(document.activeElement!==$("#odTime")) $("#odTime").value=ODS.time;
+  var rows=odRows(), cos=OD.COS.filter(function(k){ return ODS.over[k]; }), anyOver=cos.length>0;
+  var slipOk=anyOver&&cos.every(function(k){ return ODS.slip[k]; });
+  var on={1:anyOver, 2:slipOk, 3:slipOk&&rows.length>=0, 4:ODS.done}, cur=[1,2,3,4].filter(function(n){ return !on[n]; })[0]||5;
+  $$("#odSteps li").forEach(function(li){ var n=+li.dataset.s; li.className=on[n]?"on":n===cur?"cur":""; });
+  /* 1. 법인별 상태 */
+  $("#odCos").innerHTML=OD.COS.map(function(k){ var o=ODS.over[k], s=ODS.slip[k];
+    var a=o?'<span class="chip in">✓ '+o.rows.length+'명</span>':'<span class="chip nv">없음</span>';
+    var b=s?'<span class="chip in">✓ '+s.lines.length+'행</span>':(o&&o.rows.length?'<span class="chip out">필요</span>':'<span class="chip nv">—</span>');
+    return '<div class="od-co"><div class="row"><span class="chip co" style="color:var(--c-'+k.toLowerCase()+')">'+k+'</span><span class="mini">'+(o?'연체 '+fmt(o.total):'')+'</span></div>'+
+      '<div class="row"><span>연체내역</span>'+a+'</div>'+(o?'<div class="fn" title="'+esc(o.file)+'">'+esc(o.file)+'</div>':'')+
+      '<div class="row"><span>사원경비전표</span>'+b+'</div>'+(s?'<div class="fn" title="'+esc(s.file)+'">'+esc(s.file)+'</div>':'')+'</div>'; }).join("");
+  $("#odFiles").innerHTML=ODS.files.map(function(f){ var lab={over:"연체내역",slip:"사원경비전표",unknown:"알 수 없음",reading:"읽는 중"}[f.kind]||f.kind;
+    return '<div class="filerow"'+(f.bad?' style="border-color:var(--out);color:var(--out)"':'')+'><span>'+esc(f.name)+'</span><span class="chip '+(f.bad?"out":f.kind==="reading"?"nv":"in")+'">'+esc(lab)+'</span><span class="mini">'+esc(f.info)+'</span></div>'; }).join("");
+  /* 2. 비교 */
+  var cnt={contact:0,under:0,none:0,wait:0}, amt={contact:0,under:0,none:0,wait:0}, tot=0;
+  rows.forEach(function(r){ cnt[r.st]++; amt[r.st]+=(r.st==="under"?-r.diff:r.o.amt); tot+=r.o.amt; });
+  $("#odKpis").innerHTML=anyOver?tileK("lead","연체 인원",fmt(rows.length)+"명",cos.join(" · "))+tileK("i","연체 총액",fmt(tot),"카드사 결제금액 합계")+
+    tileK(cnt.contact?"o":"i","연락 필요",fmt(cnt.contact)+"명","연체 "+fmt(amt.contact))+tileK(cnt.under?"o ar-warn":"i","덜 지급",fmt(cnt.under)+"명",cnt.under?"부족 "+fmt(amt.under):"회사 지급 누락 없음")+
+    tileK(cnt.none?"o ar-warn":"i","전표 없음",fmt(cnt.none)+"명",cnt.wait?"전표 대기 "+cnt.wait+"명":"카드번호 미매칭"):"";
+  var warn=[]; cos.forEach(function(k){ if(!ODS.slip[k]) warn.push(k+" 사원경비전표를 올리면 지급액을 비교합니다."); });
+  OD.COS.forEach(function(k){ if(ODS.slip[k]&&!ODS.over[k]) warn.push(k+" 사원경비전표만 있습니다 — 같은 법인 연체내역이 없어 비교하지 않습니다."); });
+  $("#odWarn").innerHTML=warn.length?'<div class="banner warn" style="margin-top:10px">'+warn.map(esc).join("<br>")+'</div>':'';
+  var segs=[["all","전체",rows.length],["contact","연락 필요",cnt.contact],["under","덜 지급",cnt.under],["none","전표 없음",cnt.none]];
+  $("#odSeg").innerHTML=segs.map(function(s){ return '<button type="button" data-f="'+s[0]+'" aria-pressed="'+(ODS.f===s[0])+'">'+s[1]+' '+s[2]+'</button>'; }).join("");
+  var view=rows.filter(function(r){ return ODS.f==="all"||r.st===ODS.f; });
+  var chip=function(st){ return '<span class="chip '+({contact:"od-c",under:"out",none:"auto",wait:"nv"})[st]+'">'+OD.ST[st]+'</span>'; };
+  var money=function(v,dim){ return dim?'<span class="mini">—</span>':fmt(v); };
+  $("#odTbl").innerHTML=!anyOver?'<tbody><tr><td class="empty" style="padding:22px">카드사 연체내역과 같은 법인의 사원경비전표를 올리면 사람별로 지급액과 연체금액을 비교합니다.</td></tr></tbody>':
+    '<thead><tr><th>법인</th><th>판정</th><th>이용자명<span class="od-sub">카드사</span></th><th>사번 · 사원명<span class="od-sub">ERP</span></th><th>카드번호</th><th>결제은행</th><th class="num">연체금액</th><th class="num">연체일수</th><th class="num">미지급금<span class="od-sub">사원경비</span></th><th class="num">미지급금<span class="od-sub">법인개인카드</span></th><th class="num">미지급금<span class="od-sub">법인카드</span></th><th class="num">지급 합계</th><th class="num">차액<span class="od-sub">지급 − 연체</span></th><th>비고</th></tr></thead><tbody>'+
+    (view.length?view.map(function(r){ var o=r.o, dim=r.st==="wait"||r.st==="none";
+      return '<tr class="'+(r.st==="under"?"od-under":r.st==="none"?"od-none":"")+'"><td><span class="chip co" style="color:var(--c-'+r.co.toLowerCase()+')">'+r.co+'</span></td><td>'+chip(r.st)+'</td><td><b>'+esc(o.user)+'</b></td>'+
+        '<td>'+(r.emps.length?'<span class="card-mono">'+esc(r.emps.join(", "))+'</span> '+esc(r.names.join(", ")):'<span class="mini">—</span>')+'</td><td class="card-mono">'+esc(odMask(o.card))+'<span class="od-sub">'+esc(o.cardName)+'</span></td><td>'+esc(o.bank)+'</td>'+
+        '<td class="num"><b>'+fmt(o.amt)+'</b></td><td class="num">'+(o.days===""?"":fmt(o.days))+'</td><td class="num">'+money(r.sums[0],dim)+'</td><td class="num">'+money(r.sums[1],dim)+'</td><td class="num">'+money(r.sums[2],dim)+'</td>'+
+        '<td class="num"><b>'+money(r.tot,dim)+'</b></td><td class="num '+(r.st==="wait"?"":r.diff<0?"od-neg":"od-pos")+'">'+(r.st==="wait"?'<span class="mini">—</span>':fmt(r.diff))+'</td><td class="mini">'+esc(r.note.join(" · "))+'</td></tr>'; }).join("")
+      :'<tr><td colspan="14" class="empty" style="padding:22px">해당하는 사람이 없습니다.</td></tr>')+
+    '</tbody><tfoot><tr><td colspan="6"><b>합계 · '+view.length+'명</b></td><td class="num"><b>'+fmt(view.reduce(function(a,r){ return a+r.o.amt; },0))+'</b></td><td></td>'+
+    [0,1,2].map(function(i){ return '<td class="num">'+fmt(view.reduce(function(a,r){ return a+r.sums[i]; },0))+'</td>'; }).join("")+'<td class="num"><b>'+fmt(view.reduce(function(a,r){ return a+r.tot; },0))+'</b></td><td colspan="2"></td></tr></tfoot>';
+  /* 3. 안내 */
+  $("#odStepsTxt").innerHTML=OD_STEPS.map(function(s){ return '<li>'+esc(s)+'</li>'; }).join("");
+  var who=rows.filter(function(r){ return r.st==="contact"||r.st==="none"; });
+  $("#odWhoN").textContent=anyOver?"· 연락 필요 "+cnt.contact+"명"+(cnt.none?" + 전표 없음 "+cnt.none+"명(확인 후)":""):"";
+  $("#odWho").innerHTML=who.length?who.map(function(r){ return '<span class="chip '+(r.st==="none"?"auto":"od-c")+'">'+r.co+' '+esc(r.o.user)+' · '+fmt(r.o.amt)+'</span>'; }).join(""):'<span class="mini">'+(anyOver?"연락할 사람이 없습니다.":"파일을 올리면 나타납니다.")+'</span>';
+  var ta=$("#odMail"); if(document.activeElement!==ta) ta.value=ODS.mail!=null?ODS.mail:odMailDefault();
+  $("#btnOdXlsx").disabled=!slipOk;
+}
+function odBuildXlsx(){
+  var wb=XLSX.utils.book_new(), rows=odRows(), mail=(ODS.mail!=null?ODS.mail:odMailDefault()).split("\n");
+  var H=["사번","이용자명","조직명","카드명","카드번호","결제은행","계좌번호","결제금액","연체개월수","연체일수","판정","비고","사번","사원명","미지급금(사원경비)","미지급금(법인개인카드)","미지급금(법인카드)","합계","차액(합계-결제금액)"];
+  OD.COS.forEach(function(k){ if(!ODS.over[k]) return;
+    var R=rows.filter(function(r){ return r.co===k; });
+    var aoa=[H].concat(R.map(function(r){ var o=r.o, has=r.st==="contact"||r.st==="under";
+      return [r.emps.join(", "), o.user, o.org, o.cardName, o.card, o.bank, o.acct, o.amt, o.months, o.days, OD.ST[r.st], r.note.join(" · "),
+        r.emps.join(", "), r.names.join(", "), has?r.sums[0]:"", has?r.sums[1]:"", has?r.sums[2]:"", has?r.tot:"", r.st==="wait"?"":r.diff]; }));
+    aoa.push([],[]); OD_STEPS.forEach(function(s){ aoa.push(["- "+s]); }); aoa.push([],[]);
+    mail.forEach(function(l){ aoa.push(["", l]); });
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+    for(var r=1;r<=R.length;r++){ ["E","G"].forEach(function(c){ var cell=ws[c+(r+1)]; if(cell){ cell.t="s"; cell.v=String(cell.v); } });
+      ["H","O","P","Q","R","S"].forEach(function(c){ var cell=ws[c+(r+1)]; if(cell&&cell.t==="n") cell.z="#,##0"; }); }
+    ws["!cols"]=[12,9,22,16,19,10,16,12,9,8,10,30,12,10,16,18,16,12,16].map(function(w){ return {wch:w}; });
+    ws["!autofilter"]={ref:"A1:S"+(R.length+1)};
+    XLSX.utils.book_append_sheet(wb, ws, k); });
+  return wb;
+}
+function bindOverdue(){
+  var drop=$("#odDrop"), inp=$("#odIn"); if(!drop) return;
+  drop.onclick=function(){ inp.click(); };
+  drop.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); inp.click(); } };
+  drop.ondragover=function(e){ e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave=function(){ drop.classList.remove("over"); };
+  drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove("over"); odAddFiles(e.dataTransfer.files); };
+  inp.onchange=function(){ odAddFiles(inp.files); setTimeout(function(){ inp.value=""; },0); };
+  $("#btnOdNew").onclick=function(){ odReset(); renderOverdue(); };
+  $("#odDate").onchange=function(){ ODS.date=this.value||todayISO(); renderOverdue(); };
+  $("#odTime").onchange=function(){ ODS.time=this.value||"09:30"; renderOverdue(); };
+  $("#odSeg").onclick=function(e){ var b=e.target.closest("button[data-f]"); if(!b) return; ODS.f=b.dataset.f; renderOverdue(); };
+  $("#odMail").oninput=function(){ ODS.mail=this.value; };
+  $("#btnOdMailReset").onclick=function(){ ODS.mail=null; $("#odMail").value=odMailDefault(); };
+  $("#btnOdCopy").onclick=function(){ var t=$("#odMail").value;
+    (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject()).then(function(){ toast("안내 메일 문구를 복사했습니다"); },
+      function(){ var ta=$("#odMail"); ta.focus(); ta.select(); try{ document.execCommand("copy"); toast("안내 메일 문구를 복사했습니다"); }catch(e){ toast("복사하지 못했습니다 — 직접 선택해 복사하세요"); } }); };
+  $("#btnOdXlsx").onclick=function(){
+    var d=ODS.date||todayISO(), name=d.slice(0,4)+"년 "+(+d.slice(5,7))+"월 "+odCardBrand()+" 연체내역_"+d+".xlsx";
+    try{ saveWb(odBuildXlsx(), name); ODS.done=true; renderOverdue(); }catch(e){ console.error(e); toast("엑셀을 만들지 못했습니다: "+e.message); } };
+}
+bindOverdue();
 
 function cpmOnSettings(){ if(CPMS.dirty){ renderCpMaster(); return; } cpMasterLoad(CPMS.co).then(function(){ CPMS.draft=null; renderCpMaster(); }); }
 window.__tr={fxInferLots:fxInferLots, fxAnchorOk:fxAnchorOk, cmsOwnish:cmsOwnish, slipKindFix:slipKindFix, clientIsOther:clientIsOther, fixMoveKinds:fixMoveKinds, loanSnapOk:loanSnapOk, loanScope:loanScope, classifyKind:classifyKind, slipMergeDay:slipMergeDay, matchSlipCms:matchSlipCms, slipCashLines:slipCashLines, slipText:slipText, nameKey:nameKey, nameScore:nameScore, subsetSum:subsetSum, get SLIP_MATCH(){return SLIP_MATCH}, linkFxTrades:linkFxTrades, fxTradeInfo:fxTradeInfo, fxTradesOf:fxTradesOf, slipFxSellFix:slipFxSellFix, parseSlip:parseSlip, buildSlip:buildSlip, slipDaysOf:slipDaysOf, saveSlipDays:saveSlipDays, relinkFxTrade:relinkFxTrade, fxPostAll:fxPostAll, applyFixedCats:applyFixedCats, unlinkFxTrade:unlinkFxTrade, CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
