@@ -267,7 +267,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v68 · 2026-10-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v69 · 2026-10-16</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -599,6 +599,21 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
           <header><h2>3. PDF · 대량이체파일</h2><span class="sub">PDF = 인별 집계 보고용(A4 세로, 머리글·총합계 매 쪽 반복) · 대량이체파일 = 원전표 줄마다 은행명·계좌번호·입금액·예금주</span>
             <div class="sp exp-dl"><button class="btn primary sm" id="btnExPdf" type="button" disabled>PDF 파일 다운로드</button><button class="btn primary sm" id="btnExOut" type="button" disabled>대량이체파일 다운로드</button><button class="btn sm" id="btnExMapped" type="button" disabled>AO~AR 원전표 저장</button></div></header>
           <div class="pad"><span class="mini" id="exNote"></span></div>
+        </div>
+
+        <!-- [v69] 특이케이스 — 예외 마스터로 계좌가 정해진 전표 줄(한 번 더 확인) + 예외 마스터 편집(추가·수정·삭제, 공용 설정 저장) -->
+        <div class="panel fer-panel">
+          <header><h2>4. 특이케이스 확인</h2><span class="sub">계좌번호 파일이 아니라 아래 예외 마스터로 계좌가 정해진 전표 줄 — 지급 전에 한 번 더 확인</span></header>
+          <div class="pad" style="padding-bottom:0"><div id="exSpSum" class="exm-sum"></div></div>
+          <div class="scroll" style="max-height:50vh"><table class="tbl card-tbl" id="exSpTbl"></table></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>5. 예외 마스터 (특이케이스 계좌)</h2><span class="sub">법인카드(SNCARD·GUCARD) · 타법인 겸직자 등 · 계좌번호 파일보다 먼저 적용 · 같은 사번은 위쪽 줄이 우선</span>
+            <div class="sp exp-dl"><button class="btn sm" id="btnExmAdd" type="button">행 추가</button><button class="btn sm" id="btnExmReset" type="button">기본값</button><button class="btn sm" id="btnExmCancel" type="button" disabled>되돌리기</button><button class="btn primary sm" id="btnExmSave" type="button" disabled>저장</button></div></header>
+          <div class="pad" style="padding-bottom:0"><div id="exmMsg" class="mini"></div></div>
+          <div class="scroll"><table class="tbl card-tbl exm-tbl" id="exmTbl"></table></div>
+          <div class="pad mini">현금 전용 = 적요에 '현금'이 들어간 전표 줄에만 이 계좌를 씁니다(매크로의 GUCARD4 현금 → 10행 규칙). 저장하면 공용 설정에 남고, 올린 파일이 있으면 바로 다시 계산합니다.</div>
         </div>
       </div>
 
@@ -10414,7 +10429,7 @@ var EXP=(function(){
     {row:7, empNo:"SNCARD02", empName:"자문경비카드", bank:"우리은행", account:"1002-3563-43574", holder:"이근면", note:"현금/자문경비카드/고문"},
     {row:8, empNo:"GU2022016", empName:"최민주(GS)", bank:"농협", account:"3560611669393", holder:"최민주", note:""},
     {row:9, empNo:"GUCARD4", empName:"자문경비카드", bank:"하나은행", account:"16591039413707", holder:"강윤구", note:"법인카드/자문경비카드/고문/"},
-    {row:10, empNo:"GUCARD4", empName:"자문경비카드", bank:"우리은행", account:"1002-3563-43574", holder:"이근면", note:"현금/자문경비카드/고문"}
+    {row:10, empNo:"GUCARD4", empName:"자문경비카드", bank:"우리은행", account:"1002-3563-43574", holder:"이근면", note:"현금/자문경비카드/고문", cash:true}
   ];
   var NA="#N/A", COL={dc:1, desc:5, amount:6, credit:8, empNo:28, empName:29};
   var blank=function(v){ return v===undefined||v===null||v===""; };
@@ -10443,17 +10458,18 @@ var EXP=(function(){
   function run(slipAoa, acctAoa, exc){
     exc=exc||DEFAULT_EXCEPTIONS;
     var slip=parseSlip(slipAoa), accts=parseAccounts(acctAoa), map={};
-    exc.forEach(function(e){ var k=key(e.empNo); if(k && !map[k]) map[k]=Object.assign({src:"예외마스터 "+e.row+"행"},e); });
+    /* [v69] 예외 마스터 — 사번별 첫 줄이 일반 매핑(매크로 VLOOKUP 첫 일치). cash:true 줄은 '현금 전용'(적요에 '현금'이 있는 줄에만, 매크로 GUCARD4 10행 규칙) */
+    exc.forEach(function(e){ var k=key(e.empNo); if(k && !e.cash && !map[k]) map[k]=Object.assign({src:"예외마스터 "+e.row+"행", exc:true},e); });
     accts.rows.forEach(function(e){ var k=key(e.empNo); if(k && !map[k]) map[k]=Object.assign({src:"계좌파일 "+e.row+"행"},e); });
-    var cashT=exc.filter(function(e){ return +e.row===10; })[0]||DEFAULT_EXCEPTIONS[8];
+    var cashOf=function(k){ return exc.filter(function(e){ return e.cash && key(e.empNo)===k; })[0]||null; };
     var mapped=slip.lines.map(function(l){
-      var cash=xlEq(l.empNo,"GUCARD4") && l.desc.indexOf("현금")>=0;               // GUCARD4 현금 → 10행 강제 매핑
-      var hit=cash?Object.assign({src:"GUCARD4 현금"},cashT):(map[key(l.empNo)]||null);
+      var cT=l.desc.indexOf("현금")>=0?cashOf(key(l.empNo)):null;                    // 현금 전용 계좌(기본: GUCARD4 10행)
+      var hit=cT?Object.assign({src:"예외마스터 "+cT.row+"행 · 현금 전용", exc:true, cashHit:true},cT):(map[key(l.empNo)]||null);
       var bank=hit?String(hit.bank==null?"":hit.bank):NA, account=hit?acctTxt(hit.account):NA, holder=hit?String(hit.holder==null?"":hit.holder):NA;
       var ok=!!hit && xlEq(l.empName,holder), issues=[];
       if(!hit) issues.push("계좌 미등록(#N/A)");
       else { if(!ok) issues.push(String(l.empName).replace(/\s/g,"")===holder.replace(/\s/g,"")?"성명≠예금주(공백 차이)":"성명≠예금주"); if(!account) issues.push("계좌번호 공란"); if(!bank) issues.push("은행명 공란"); }
-      return Object.assign({},l,{bank:bank, account:account, holder:holder, found:!!hit, isValid:ok, src:hit?hit.src:"-", issues:issues});
+      return Object.assign({},l,{bank:bank, account:account, holder:holder, found:!!hit, isValid:ok, src:hit?hit.src:"-", exc:!!(hit&&hit.exc), excRow:hit&&hit.exc?hit.row:null, issues:issues});
     });
     var g={}, order=[];
     mapped.forEach(function(m){ var k=[m.empNo,m.empName,m.bank,m.account,m.holder].join("␟");
@@ -10463,7 +10479,7 @@ var EXP=(function(){
     var debit=mapped.reduce(function(s,m){ return s+m.amount; },0), pt=pivot.reduce(function(s,p){ return s+p.amount; },0);
     return {slip:slip, accounts:accts, mapped:mapped, failures:mapped.filter(function(m){ return m.issues.length; }), pivot:pivot,
       summary:{lineCount:mapped.length, controlTotal:slip.controlTotal, debitTotal:debit, pivotTotal:pt, payeeCount:pivot.length,
-        balanced:!slip.creditLines.length || Math.round(debit)===Math.round(slip.controlTotal), cashCount:mapped.filter(function(m){ return m.src==="GUCARD4 현금"; }).length}};
+        balanced:!slip.creditLines.length || Math.round(debit)===Math.round(slip.controlTotal), cashCount:mapped.filter(function(m){ return /현금 전용/.test(m.src); }).length}};
   }
   function transferWorkbook(R){
     /* [v68] 매크로 [대량이체파일] 시트와 같게 — 원전표 차변 줄마다 1행(원전표 순서), 머리글 '입금액'. 사람별 합산 아님(사용자 결정 2026-10-16) */
@@ -10641,8 +10657,12 @@ function bindTc(){
 
 /* ---- 사원경비 대량이체 ---- */
 var EXS={slip:null,acct:null,R:null,f:"bad",ack:false};
-function expExc(){ return (D.settings&&D.settings.expExc)||EXP.DEFAULT_EXCEPTIONS; }
+/* [v69] 예외 마스터(특이케이스 계좌) — 공용 설정 D.settings.expExc. 예전 저장값(cash 표시 없음)은 GUCARD4 10행을 현금 전용으로 본다. row = 화면 순서 + 1(매크로 계좌번호 시트 행 번호와 같음) */
+function expExcNorm(list){ var any=list.some(function(e){ return "cash" in e; });
+  return list.map(function(e,i){ var o=Object.assign({},e); o.row=i+2; o.cash=any?!!e.cash:(+e.row===10 && String(e.empNo).toUpperCase()==="GUCARD4"); return o; }); }
+function expExc(){ return expExcNorm((D&&D.settings&&Array.isArray(D.settings.expExc)&&D.settings.expExc.length)?D.settings.expExc:EXP.DEFAULT_EXCEPTIONS); }
 function renderEx(){
+  renderExSpecial(); renderExm();   // [v69]
   var R=EXS.R, okGate=!!R&&(!R.failures.length||EXS.ack);
   $("#btnExOut").disabled=!okGate; $("#btnExMapped").disabled=!R; $("#btnExPdf").disabled=!okGate;   // [v68] PDF도 대량이체와 같은 조건
   var on={1:!!(EXS.slip&&EXS.acct), 2:okGate, 3:!!EXS.dl}, cur=[1,2,3].filter(function(n){ return !on[n]; })[0]||4;
@@ -10652,7 +10672,7 @@ function renderEx(){
   if(!R){ $("#exKpis").innerHTML=""; $("#exAlert").innerHTML=""; $("#exTbl").innerHTML='<tbody><tr><td class="empty" style="padding:22px">사원경비전표와 경비 계좌번호 파일을 올리면 자동으로 처리합니다. (다시 돌릴 때는 [처리 시작])</td></tr></tbody>'; return; }
   var s=R.summary, n=R.failures.length;
   $("#exKpis").innerHTML=tileK("lead","전표 행(차변)",fmt(s.lineCount),"대변 "+R.slip.creditLines.length+"행 제외")+tileK("i","원전표 대변금액",fmt(s.controlTotal),"보통예금 지급 총액")+
-    tileK(s.balanced?"i":"o ar-warn","인별 집계 합계",fmt(s.pivotTotal),s.balanced?"대변금액과 일치":"차이 "+fmt(s.pivotTotal-s.controlTotal))+tileK(n?"o ar-warn":"i","불일치·누락",fmt(n)+"건","지급 대상 "+s.payeeCount+"명 · GUCARD4 현금 "+s.cashCount+"건");
+    tileK(s.balanced?"i":"o ar-warn","인별 집계 합계",fmt(s.pivotTotal),s.balanced?"대변금액과 일치":"차이 "+fmt(s.pivotTotal-s.controlTotal))+tileK(n?"o ar-warn":"i","불일치·누락",fmt(n)+"건","지급 대상 "+s.payeeCount+"명 · 현금 전용 "+s.cashCount+"건");
   $("#exAlert").innerHTML=n?'<div class="banner warn" style="margin-top:10px">성명(AD)≠예금주(AQ) 또는 계좌 미등록 '+n+'건. 법인카드 행(SNCARD 등)은 매번 불일치로 나옵니다. <label style="margin-left:8px"><input type="checkbox" id="exAck"'+(EXS.ack?" checked":"")+'> 불일치 '+n+'건 확인함</label></div>':'';
   var ack=$("#exAck"); if(ack) ack.onchange=function(){ EXS.ack=this.checked; renderEx(); };
   if(EXS.f==="pivot"){
@@ -10683,6 +10703,61 @@ function expPrint(){
   $("#printReport").hidden=false; document.body.classList.add("reporting","exp-print");
   $("#btnRptPrint").onclick=function(){ document.title=co+"_사원경비_"+d; window.print(); setTimeout(function(){ document.title=t0; },1000); };   // 저장 파일 이름 = 문서 제목
   $("#btnRptClose").onclick=close;
+}
+/* [v69] 특이케이스 확인 · 예외 마스터 편집 */
+var EXM={draft:null, dirty:false, msg:""};
+function exmList(){ return EXM.draft||expExc(); }
+function renderExSpecial(){
+  var R=EXS.R, T=$("#exSpTbl"); if(!T) return;
+  var list=expExc();
+  if(!R){ $("#exSpSum").innerHTML='<span class="mini">파일을 처리하면 예외 마스터가 적용된 줄이 여기에 모입니다. 예외 마스터 '+list.length+'줄 등록됨.</span>'; T.innerHTML=""; return; }
+  var L=R.mapped.filter(function(m){ return m.exc; });
+  var by={}; L.forEach(function(m){ var k=m.excRow; if(!by[k]) by[k]={n:0,amt:0}; by[k].n++; by[k].amt+=m.amount; });
+  $("#exSpSum").innerHTML=list.map(function(e){ var u=by[e.row]; return '<span class="chip '+(u?"auto":"nv")+'" title="'+esc(e.note||"")+'">'+e.row+'행 '+esc(e.empNo)+' '+esc(e.empName)+(e.cash?' · 현금 전용':'')+' · '+(u?u.n+'줄 '+fmt(u.amt):'이번 전표 없음')+'</span>'; }).join("")+
+    '<span class="chip in">합계 '+L.length+'줄 · '+fmt(L.reduce(function(a,m){ return a+m.amount; },0))+'</span>';
+  T.innerHTML='<thead><tr><th>행</th><th>사번</th><th>성명</th><th>적요명</th><th class="num">금액</th><th>은행명</th><th>계좌번호</th><th>예금주</th><th>적용 규칙</th><th>검증</th></tr></thead><tbody>'+
+    (L.length?L.map(function(m){ return '<tr class="'+(m.issues.length?"tc-bad":"")+'"><td class="mini">'+m.rowNo+'</td><td class="card-mono">'+esc(m.empNo)+'</td><td>'+esc(m.empName)+'</td><td class="mini">'+esc(m.desc)+'</td><td class="num">'+fmt(m.amount)+'</td><td>'+esc(m.bank)+'</td><td class="card-mono">'+esc(m.account)+'</td><td>'+esc(m.holder)+'</td><td><span class="chip auto">'+esc(m.src)+'</span></td><td>'+
+      (m.issues.length?m.issues.map(function(i){ return '<span class="chip ar-long">'+esc(i)+'</span>'; }).join(" "):'<span class="chip in">TRUE</span>')+'</td></tr>'; }).join("")
+     :'<tr><td colspan="10" class="empty" style="padding:18px">이번 전표에는 예외 마스터가 적용된 줄이 없습니다.</td></tr>')+'</tbody>';
+}
+function renderExm(){
+  var T=$("#exmTbl"); if(!T) return;
+  var L=exmList(), base=expExc(), ro=!fepCanSave();
+  var F=[["empNo","사번",""],["empName","사원명",""],["bank","은행",""],["account","계좌번호",""],["holder","예금주",""],["note","비고","w-note"]];
+  T.innerHTML='<thead><tr><th>행</th>'+F.map(function(f){ return '<th>'+f[1]+'</th>'; }).join("")+'<th class="ctr">현금 전용</th><th class="ctr">순서</th><th></th></tr></thead><tbody>'+
+    L.map(function(e,i){ var b=base[i], ch=!b||F.some(function(f){ return String(b[f[0]]||"")!==String(e[f[0]]||""); })||!!b.cash!==!!e.cash;
+      return '<tr class="'+(EXM.draft&&ch?"exm-dirty ":"")+(e.cash?"exm-cash":/CARD/i.test(e.empNo)?"exm-card":"")+'"><td class="mini">'+(i+2)+'</td>'+
+        F.map(function(f){ return '<td><input type="text" class="'+f[2]+'" data-i="'+i+'" data-k="'+f[0]+'" value="'+esc(e[f[0]]==null?"":e[f[0]])+'"'+(ro?" disabled":"")+'></td>'; }).join("")+
+        '<td class="ctr"><input type="checkbox" data-i="'+i+'" data-k="cash"'+(e.cash?" checked":"")+(ro?" disabled":"")+'></td>'+
+        '<td class="ctr"><span class="exm-ord"><button type="button" data-up="'+i+'" title="위로"'+(ro||!i?" disabled":"")+'>▲</button><button type="button" data-dn="'+i+'" title="아래로"'+(ro||i===L.length-1?" disabled":"")+'>▼</button></span></td>'+
+        '<td><button type="button" class="exm-del" data-del="'+i+'"'+(ro?" disabled":"")+'>삭제</button></td></tr>'; }).join("")+'</tbody>';
+  $("#btnExmSave").disabled=!EXM.dirty||ro; $("#btnExmCancel").disabled=!EXM.dirty; $("#btnExmAdd").disabled=ro; $("#btnExmReset").disabled=ro;
+  $("#exmMsg").innerHTML=ro?'<span class="card-warn">읽기 전용 계정 — 보기만 가능합니다</span>':EXM.dirty?'<span class="card-warn">저장하지 않은 변경이 있습니다 — [저장]을 눌러야 계산에 반영됩니다</span>':esc(EXM.msg||("등록 "+L.length+"줄"));
+}
+function exmEdit(fn){ if(!EXM.draft) EXM.draft=JSON.parse(JSON.stringify(expExc())); fn(EXM.draft); EXM.dirty=true; renderExm(); }
+function exmRerun(){ if(EXS.slip&&EXS.acct){ try{ EXS.R=EXP.run(EXS.slip,EXS.acct,expExc()); EXS.ack=false; }catch(e){ toast(e.message); } } renderEx(); }
+function bindExm(){
+  var T=$("#exmTbl"); if(!T) return;
+  T.oninput=function(e){ var t=e.target; if(t.type!=="text") return; var i=+t.dataset.i, k=t.dataset.k, v=t.value;
+    if(!EXM.draft) EXM.draft=JSON.parse(JSON.stringify(expExc())); EXM.draft[i][k]=v; EXM.dirty=true;
+    var tr=t.closest("tr"); if(tr) tr.classList.add("exm-dirty"); $("#btnExmSave").disabled=false; $("#btnExmCancel").disabled=false;
+    $("#exmMsg").innerHTML='<span class="card-warn">저장하지 않은 변경이 있습니다 — [저장]을 눌러야 계산에 반영됩니다</span>'; };
+  T.onchange=function(e){ var t=e.target; if(t.type==="checkbox") exmEdit(function(L){ L[+t.dataset.i].cash=t.checked; }); };
+  T.onclick=function(e){ var b=e.target.closest("button"); if(!b) return;
+    if(b.dataset.del!=null){ var i=+b.dataset.del, x=exmList()[i]; if(!confirm((x.empNo||"빈 행")+" "+(x.empName||"")+" 줄을 삭제할까요? ([저장]을 눌러야 반영)")) return; exmEdit(function(L){ L.splice(i,1); }); }
+    else if(b.dataset.up!=null){ var u=+b.dataset.up; exmEdit(function(L){ var t=L[u]; L[u]=L[u-1]; L[u-1]=t; }); }
+    else if(b.dataset.dn!=null){ var d=+b.dataset.dn; exmEdit(function(L){ var t=L[d]; L[d]=L[d+1]; L[d+1]=t; }); } };
+  $("#btnExmAdd").onclick=function(){ exmEdit(function(L){ L.push({empNo:"", empName:"", bank:"", account:"", holder:"", note:"", cash:false}); });
+    var ins=$$("#exmTbl tbody tr:last-child input[type=text]"); if(ins[0]) ins[0].focus(); };
+  $("#btnExmCancel").onclick=function(){ EXM.draft=null; EXM.dirty=false; EXM.msg="변경을 취소했습니다"; renderExm(); };
+  $("#btnExmReset").onclick=function(){ if(!confirm("예외 마스터를 처음 기본값(매크로 계좌번호 시트 2~10행)으로 되돌릴까요? ([저장]을 눌러야 반영)")) return; EXM.draft=JSON.parse(JSON.stringify(expExcNorm(EXP.DEFAULT_EXCEPTIONS))); EXM.dirty=true; renderExm(); };
+  $("#btnExmSave").onclick=function(){
+    var L=(EXM.draft||[]).map(function(e){ var o={}; ["empNo","empName","bank","account","holder","note"].forEach(function(k){ o[k]=String(e[k]==null?"":e[k]).trim(); }); o.cash=!!e.cash; return o; });
+    var bad=L.filter(function(e){ return !e.empNo||!e.bank||!e.account||!e.holder; });
+    if(bad.length){ toast("사번·은행·계좌번호·예금주는 비울 수 없습니다 ("+bad.length+"줄)"); return; }
+    if(!D.settings) D.settings={}; D.settings.expExc=expExcNorm(L);
+    EXM.draft=null; EXM.dirty=false; EXM.msg="저장했습니다 · "+L.length+"줄 · "+todayISO();
+    try{ save(); }catch(e){} toast("예외 마스터를 저장했습니다"+(EXS.slip&&EXS.acct?" · 다시 계산했습니다":"")); exmRerun(); };
 }
 function bindEx(){
   $("#exDate").value=todayISO();
@@ -12064,7 +12139,7 @@ function bindCards(){
   };
 }
 
-bindTc(); bindEx(); bindExecResult(); bindCards();
+bindTc(); bindEx(); bindExm(); bindExecResult(); bindCards();
 
 /* ===================== [v46] 법인카드 계정대체 엔진 (CP) — DOM 비의존 =====================
    프로젝트 문서 `법인카드결제전표_자동화_프롬프트.md`.
@@ -13108,6 +13183,16 @@ tr.tc-appr td{background:var(--move-soft)}
 .exp-file-name{min-width:0;font-size:12.5px;color:var(--ink-2);overflow-wrap:anywhere}
 .exp-attach-box.done .exp-file-name{color:var(--ink);font-weight:600}
 .exp-dl{display:flex;gap:6px;flex-wrap:wrap}
+.exm-sum{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.exm-tbl td{padding:4px 6px;vertical-align:middle}
+.exm-tbl input[type=text]{width:100%;min-width:90px;box-sizing:border-box;height:28px;padding:0 7px;border:1px solid var(--rule-strong);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;font-size:12.5px}
+.exm-tbl input.w-note{min-width:180px}
+.exm-tbl tr.exm-dirty td{background:color-mix(in srgb,#F5C518 12%,transparent)}
+.exm-tbl tr.exm-card td:first-child{box-shadow:inset 3px 0 0 var(--navy)}
+.exm-tbl tr.exm-cash td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+.exm-ord{display:inline-flex;gap:2px}
+.exm-ord button{width:24px;height:24px;padding:0;border:1px solid var(--rule-strong);border-radius:5px;background:var(--surface);color:var(--ink-2);cursor:pointer;font-size:11px}
+.exm-del{border:0;background:none;color:var(--out);cursor:pointer;font:inherit;font-size:12px;padding:3px 6px}
 /* [v35] 자금집행결과보고서 */
 .fer-panel+.fer-panel{margin-top:14px}
 .fer-date{font-variant-numeric:tabular-nums}
