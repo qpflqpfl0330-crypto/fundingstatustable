@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">   <!-- [v78] 업무캘린더 글꼴 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- [v31] MMT 이자수익전표 생성기 전용 — 원천징수영수증 PDF 파싱용 -->
@@ -61,7 +62,7 @@
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
 }
 /* [v75] 업무캘린더 */
-:root{--wc-c:#9C3D6E; --wc-m:#1E3E68; --wc-i:#A2342A; --wc-q:#6A4BA0; --wc-d:#0F6A52; --wc-p:#8E6410; --wc-s:#1F7A8C; --wc-e:#5B6573}
+:root{--wc-c:oklch(0.55 0.17 350); --wc-m:oklch(0.45 0.09 255); --wc-i:oklch(0.58 0.18 28); --wc-q:oklch(0.5 0.15 295); --wc-d:oklch(0.56 0.12 155); --wc-p:oklch(0.62 0.13 70); --wc-s:oklch(0.56 0.1 215); --wc-e:oklch(0.62 0.01 255)}   /* [v78] 사양서 색 */
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){--wc-c:#E79BC0; --wc-m:#8DB2E4; --wc-i:#EC8C77; --wc-q:#B9A2E6; --wc-d:#57C4A0; --wc-p:#DCAE55; --wc-s:#6CC6D8; --wc-e:#9AA4B2} }
 :root[data-theme="dark"]{--wc-c:#E79BC0; --wc-m:#8DB2E4; --wc-i:#EC8C77; --wc-q:#B9A2E6; --wc-d:#57C4A0; --wc-p:#DCAE55; --wc-s:#6CC6D8; --wc-e:#9AA4B2}
 .wc-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
@@ -104,6 +105,109 @@
 .wc-dd.now{background:var(--navy);color:var(--on-accent)}
 #wcItemTbl td{vertical-align:top}
 #wcItemTbl textarea{width:220px;min-height:54px;resize:vertical}
+/* [v78] 업무캘린더 주간 보드 */
+:root{--wb-ink:#1C2330;--wb-sub:#6B7280;--wb-dim:#9AA0AA;--wb-line:#E8EAEE;--wb-col:#F7F8FA;--wb-holi:#F1F2F4;--wb-page:#FFFFFF;--wb-card:#FFFFFF;--wb-track:#F2F3F5;--wb-btnbd:#DFE2E7;--wb-cbbd:#C5CAD3;
+  --wb-navy:oklch(0.33 0.08 255);--wb-red:oklch(0.52 0.18 28);--wb-lateh:oklch(0.5 0.17 28);--wb-latebg:oklch(0.975 0.015 25);--wb-latetrack:#F0E6E4;--wb-todaybg:oklch(0.975 0.012 255);--wb-todaybd:oklch(0.85 0.04 255);--wb-onnavy:#FFFFFF}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){--wb-ink:#E4E9EF;--wb-sub:#8A94A2;--wb-dim:#6B7480;--wb-line:#2A323D;--wb-col:#171D25;--wb-holi:#1C222B;--wb-page:#141A22;--wb-card:#1E252F;--wb-track:#1B2129;--wb-btnbd:#2F3844;--wb-cbbd:#4A5462;
+  --wb-navy:oklch(0.78 0.08 255);--wb-red:oklch(0.72 0.15 28);--wb-lateh:oklch(0.74 0.14 28);--wb-latebg:oklch(0.24 0.03 25);--wb-latetrack:oklch(0.32 0.04 25);--wb-todaybg:oklch(0.25 0.03 255);--wb-todaybd:oklch(0.45 0.06 255);--wb-onnavy:#0C1015} }
+:root[data-theme="dark"]{--wb-ink:#E4E9EF;--wb-sub:#8A94A2;--wb-dim:#6B7480;--wb-line:#2A323D;--wb-col:#171D25;--wb-holi:#1C222B;--wb-page:#141A22;--wb-card:#1E252F;--wb-track:#1B2129;--wb-btnbd:#2F3844;--wb-cbbd:#4A5462;
+  --wb-navy:oklch(0.78 0.08 255);--wb-red:oklch(0.72 0.15 28);--wb-lateh:oklch(0.74 0.14 28);--wb-latebg:oklch(0.24 0.03 25);--wb-latetrack:oklch(0.32 0.04 25);--wb-todaybg:oklch(0.25 0.03 255);--wb-todaybd:oklch(0.45 0.06 255);--wb-onnavy:#0C1015}
+body.cal-mode #cotabs{display:none}
+body.cal-mode #topbar{display:none}
+body.cal-mode #topbar:has(#reloadChip:not([hidden])){display:flex}
+body.cal-mode #topbar > :not(#reloadChip){display:none}
+.wb{font-family:"Pretendard","Noto Sans KR",system-ui,sans-serif;color:var(--wb-ink);background:var(--wb-page);border:1px solid var(--wb-line);border-radius:14px;margin-bottom:16px;min-width:0}
+.wb button,.wb select{font-family:inherit}
+.wb-top{min-height:60px;display:flex;align-items:center;gap:16px;padding:10px 28px;border-bottom:1px solid var(--wb-line);flex-wrap:wrap}
+.wb-top h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em}
+.wb-topr{margin-left:auto;display:flex;align-items:center;gap:10px}
+.wb-seg{display:inline-flex;gap:2px;background:var(--wb-track);border-radius:9px;padding:3px;flex-wrap:wrap}
+.wb-seg button{border:0;background:transparent;border-radius:7px;padding:5px 12px;font-size:13px;font-weight:400;color:var(--wb-sub);cursor:pointer}
+.wb-seg button[aria-selected="true"]{background:var(--wb-card);color:var(--wb-ink);font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.08),0 1px 3px rgba(16,24,40,.06)}
+.wb-btn{height:32px;padding:0 12px;border:1px solid var(--wb-btnbd);background:var(--wb-card);border-radius:8px;font-size:13px;color:var(--wb-ink);cursor:pointer}
+.wb-ib{width:32px;height:32px;border:1px solid var(--wb-btnbd);background:var(--wb-card);border-radius:8px;font-size:17px;line-height:1;color:var(--wb-ink);cursor:pointer;display:inline-grid;place-items:center}
+.wb-btn:hover,.wb-ib:hover{background:var(--wb-col)}
+.wb-fwrap{position:relative}
+.wb-fpop{position:absolute;right:0;top:38px;z-index:30;background:var(--wb-card);border:1px solid var(--wb-line);border-radius:10px;box-shadow:0 8px 24px -8px rgba(16,24,40,.25);padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:190px}
+.wb-fpop label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.wb-nav{display:flex;align-items:center;gap:10px;padding:18px 28px;flex-wrap:wrap}
+.wb-nav h3{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.wb-sub{font-size:13px;color:var(--wb-sub)}
+.wb-nav .wb-btn{margin-left:4px}
+.wb-board{display:grid;grid-template-columns:1.15fr repeat(5,minmax(0,1fr));gap:12px;padding:0 28px;height:calc(100vh - 230px);min-height:460px}
+.wb-col{background:var(--wb-col);border-radius:12px;padding:14px;display:flex;flex-direction:column;min-height:0;min-width:0}
+.wb-col.holi{background:var(--wb-holi)}
+.wb-col.today{background:var(--wb-todaybg);box-shadow:inset 0 0 0 1px var(--wb-todaybd)}
+.wb-h{display:flex;align-items:baseline;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.wb-h b{font-size:20px;font-weight:700;line-height:1.2}
+.wb-wd{font-size:13px;color:var(--wb-sub)}
+.wb-col.today .wb-h b{color:var(--wb-navy)}
+.wb-todayb{align-self:center;background:var(--wb-navy);color:var(--wb-onnavy);font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px}
+.wb-hn{font-size:11px;color:var(--wb-red);font-weight:600}
+.wb-late .wb-h b,.wb-late .wb-h span{color:var(--wb-lateh);font-size:15px;font-weight:700}
+.wb-late .wb-h span{font-size:13px}
+.wb-late{background:var(--wb-latebg)}
+.wb-list{display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0;flex:1;padding-right:2px}
+.wb-empty{margin:auto;font-size:13px;color:var(--wb-dim);padding:24px 0;text-align:center}
+.wb-we{font-size:12px;font-weight:600;color:var(--wb-sub);padding-top:6px;border-top:1px dashed var(--wb-line)}
+.wb-card{background:var(--wb-card);border:1px solid var(--wb-line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.wb-card.done{opacity:.55}
+.wb-c1{display:flex;align-items:center;gap:6px;min-width:0;width:100%}
+.wb-dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;background:var(--wcc)}
+.wb-cat{font-size:11.5px;color:var(--wb-sub);white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.wb-prog{flex:0 0 auto;margin-left:auto;font-size:11.5px;color:var(--wb-sub);font-variant-numeric:tabular-nums}
+.wb-ttl{font-size:14px;font-weight:600;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere}
+.wb-cl{display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--wb-line);padding-top:9px}
+.wb-ck{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.4;cursor:pointer;color:var(--wb-ink)}
+.wb-ck span{word-break:keep-all;overflow-wrap:anywhere}
+.wb-ck.ok span{color:var(--wb-dim);text-decoration:line-through}
+.wb-cb{appearance:none;-webkit-appearance:none;margin:1px 0 0;width:15px;height:15px;flex:0 0 15px;border:1.5px solid var(--wb-cbbd);border-radius:4px;background:var(--wb-card);display:inline-grid;place-content:center;cursor:pointer}
+.wb-cb:checked{background:var(--wb-navy);border-color:var(--wb-navy)}
+.wb-cb:checked::after{content:"";width:7px;height:3.5px;border:2px solid var(--wb-onnavy);border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+.wb-cb:focus-visible{outline:2px solid var(--wb-navy);outline-offset:2px}
+.wb-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--wb-sub)}
+.wb-amt{font-weight:600;font-variant-numeric:tabular-nums;color:var(--wb-red)}
+.wb-amt.in{color:var(--in)}
+.wb-st{font-size:12px;padding:2px 4px;border:1px solid var(--wb-btnbd);border-radius:6px;background:var(--wb-card);color:var(--wb-ink)}
+.wb-lcard{background:var(--wb-card);border-radius:8px;box-shadow:0 1px 2px rgba(120,30,20,.08);display:flex;flex-direction:column}
+.wb-lhead{all:unset;box-sizing:border-box;cursor:pointer;padding:12px;display:grid;grid-template-columns:1fr auto;gap:8px 8px;align-items:center}
+.wb-lhead:focus-visible{outline:2px solid var(--wb-navy);outline-offset:-2px;border-radius:8px}
+.wb-lhead .wb-c1{grid-column:1/-1}
+.wb-dd{flex:0 0 auto;margin-left:auto;font-size:11.5px;font-weight:700;color:var(--wb-red);white-space:nowrap}
+.wb-lttl{grid-column:1/-1;font-size:13.5px;font-weight:600;line-height:1.35;color:var(--wb-ink);word-break:keep-all;overflow-wrap:anywhere}
+.wb-bar{height:4px;border-radius:2px;background:var(--wb-latetrack);overflow:hidden}
+.wb-bar i{display:block;height:100%;background:var(--wb-red)}
+.wb-barn{font-size:11.5px;color:var(--wb-sub);font-variant-numeric:tabular-nums}
+.wb-lcard .wb-cl{margin:0 12px;padding-bottom:10px}
+.wb-lcard .wb-foot{margin:0 12px 10px}
+.wb-next{display:flex;align-items:center;gap:12px;padding:16px 28px 20px;min-width:0}
+.wb-next > b{font-size:13px;font-weight:700;white-space:nowrap}
+.wb-chips{display:flex;gap:8px;overflow-x:auto;min-width:0;padding-bottom:2px}
+.wb-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--wb-line);background:var(--wb-card);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--wb-ink);cursor:pointer}
+.wb-chip:hover{background:var(--wb-col)}
+.wb-month{padding:0 28px 22px}
+.wb-month .wc-grid{border:1px solid var(--wb-line);border-radius:10px;overflow:hidden}
+.wb-month .wc-day{border-color:var(--wb-line)}
+.wb-month .wc-ev{border-left:0;background:none;padding:0;border-radius:0;display:block}
+.wb-month .wc-ev::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--wcc);margin-right:5px;vertical-align:1px}
+@media (max-width:1279px){
+  .wb-board{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:auto minmax(0,1fr);height:calc(100vh - 210px)}
+  .wb-late{grid-column:1/-1;padding:12px 14px}
+  .wb-late .wb-h{margin-bottom:8px}
+  .wb-late .wb-list{flex-direction:row;overflow-x:auto;overflow-y:visible;padding-bottom:4px}
+  .wb-late .wb-lcard{flex:0 0 240px}
+  .wb-late .wb-empty{margin:0;padding:4px 0;text-align:left}
+}
+@media (max-width:767px){
+  .wb-top,.wb-nav,.wb-next{padding-left:16px;padding-right:16px}
+  .wb-topr{margin-left:0}
+  .wb-board{display:flex;flex-direction:column;height:auto;padding:0 16px}
+  .wb-day{order:var(--ord)}
+  .wb-late{order:-1}
+  .wb-list{overflow:visible}
+  .wb-day .wb-empty{padding:6px 0;margin:0;text-align:left}
+  .wb-month{padding:0 16px 16px;overflow-x:auto}
+}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-sans);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -311,7 +415,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v77 · 2026-10-19</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v78 · 2026-10-19</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -2252,6 +2356,7 @@ function dbFlush(){
   return seq.then(function(){ if(total>12) toast("반영 완료 · "+total+"건"); })
     .catch(function(e){
       var code=e&&e.code;
+      wcSaveFailAt=Date.now();   // [v78] 업무캘린더 낙관적 체크 되돌림
       if(code==="invalid_argument" || code==="not_granted"){
         readOnly=true; renderAccess();
         toast("보기 전용입니다 — 편집 권한이 없어 저장되지 않았습니다.");
@@ -4388,6 +4493,7 @@ function render(){
 }
 function setView(v){
   view=v;
+  document.body.classList.toggle("cal-mode", v==="cal");   // [v78] 업무캘린더는 자체 상단 바(회사·주/월)
   if(v==="ilbo" && !ILBO.date && curDate) ILBO.date=curDate;   // [v23] 상단 기준일 ↔ 자금일보 집행일 동기화
   $$("#nav button").forEach(function(b){ b.setAttribute("aria-current", b.dataset.v===v?"true":"false"); });
   VIEWS.forEach(function(k){ $("#v-"+k).hidden=(k!==v); });
@@ -5716,7 +5822,7 @@ var WC_CATS=[
   {k:"etc", t:"기타", v:"--wc-e"}
 ];
 var WC_WD=["일","월","화","수","목","금","토"];
-var WC={ym:null, sel:null, off:{}, edit:false};
+var WC={ym:null, sel:null, off:{}, edit:false, mode:"week", wk:null, open:{}, filt:false};   // [v78] mode 주/월 · wk 그 주 월요일 · open 지연 카드 펼침 · filt 필터 창
 function wcCat(k){ for(var i=0;i<WC_CATS.length;i++) if(WC_CATS[i].k===k) return WC_CATS[i]; return WC_CATS[WC_CATS.length-1]; }
 function wcColor(k){ return "var("+wcCat(k).v+")"; }
 function wcStore(){ if(!D.workCal) D.workCal={items:[], done:{}}; if(!D.workCal.items) D.workCal.items=[]; if(!D.workCal.done) D.workCal.done={}; return D.workCal; }
@@ -5830,59 +5936,168 @@ var WC_INT_ST=["미발생","확인필요","작성예정","진행중","납부완�
 function wcIsDone(ev){ var s=wcDone(ev.key); if(!s) return false; if(s.ok) return true; if(s.st==="납부완료"||s.st==="미발생") return true; var n=(ev.checklist||[]).length; return n>0 && (s.c||[]).filter(Boolean).length>=n; }
 function wcDD(iso){ var t=todayISO(); var n=Math.round((new Date(iso+"T00:00:00")-new Date(t+"T00:00:00"))/86400000); return n; }
 function wcDDchip(iso){ var n=wcDD(iso); return '<span class="wc-dd'+(n===0?' now':(n>0&&n<=3?' hot':''))+'">'+(n===0?'오늘':(n>0?'D-'+n:'D+'+(-n)))+'</span>'; }
+/* [v78] 업무캘린더 — 주간 보드형(지연 칼럼 + 월~금 + 다음 주 스트립) · 월 보기는 기존 달력(날짜 클릭 → 그 주 보드)
+   데이터·규칙(wcEvents·이자 엔진·D.workCal.done)은 그대로, 화면만 바꾼다. */
+var WC_LATE_DAYS=14;   // 지연 칼럼: 오늘 기준 이 일수 안의 지난 일정 중 체크리스트가 남은 건
+var wcSaveFailAt=0;    // dbFlush 실패 시각 — 체크 낙관적 업데이트 되돌림용
+function wcMon(iso){ var w=new Date(iso+"T00:00:00").getDay(); return isoAdd(iso, w===0?-6:1-w); }
+function wcWeekNo(mon){ var th=isoAdd(mon,3); return {m:+th.slice(5,7), n:Math.ceil((+th.slice(8))/7)}; }
+function wcMD(iso){ return (+iso.slice(5,7))+"/"+(+iso.slice(8)); }
+/* 진행도: 체크리스트 n개 중 k개(상태 '납부완료'·'미발생'·전체 완료는 n/n). 체크리스트 없는 일정은 1칸('완료') */
+function wcProg(e){
+  var s=wcDone(e.key)||{}, n=(e.checklist||[]).length;
+  if(!n) return {n:1, k:wcIsDone(e)?1:0};
+  var k=(s.c||[]).filter(Boolean).length;
+  if(wcIsDone(e)) k=n;
+  return {n:n, k:Math.min(k,n)};
+}
+function wcWho(){ return (typeof AUTH!=="undefined" && AUTH && AUTH.user && AUTH.user.email)||""; }
+/* 체크 토글 — 즉시 화면 반영(낙관적), 저장 실패 시 원래 상태로 되돌리고 알림 */
+function wcToggle(key, i, n, val){
+  var st=wcStore();
+  if(typeof readOnly!=="undefined" && readOnly){ toast("보기 전용입니다 — 편집 권한이 없어 체크할 수 없습니다."); renderCal(); return; }
+  var old=st.done[key]?JSON.parse(JSON.stringify(st.done[key])):null;
+  var s=st.done[key]?JSON.parse(JSON.stringify(st.done[key])):{c:[]};
+  if(i<0){ s.ok=!!val; s.c=[]; }
+  else { s.c=s.c||[]; s.c[i]=!!val; s.ok=s.c.filter(Boolean).length>=n; }
+  var any=s.ok || (s.c||[]).filter(Boolean).length || s.st;
+  if(s.ok){ s.by=wcWho(); s.at=new Date().toISOString(); } else { delete s.by; delete s.at; }
+  if(any) st.done[key]=s; else delete st.done[key];
+  renderCal();
+  var t0=Date.now();
+  save().then(function(){
+    if(wcSaveFailAt>=t0){
+      if(old) st.done[key]=old; else delete st.done[key];
+      renderCal(); toast("저장되지 않아 체크를 되돌렸습니다.");
+    }
+  });
+}
+function wcChecklistHtml(e){
+  var s=wcDone(e.key)||{}, list=(e.checklist||[]).length?e.checklist:null, all=wcIsDone(e);
+  if(!list) return '<label class="wb-ck'+(all?' ok':'')+'"><input type="checkbox" class="wb-cb" data-wbk="'+esc(e.key)+'" data-i="-1" data-n="1"'+(all?' checked':'')+'><span>완료</span></label>';
+  return list.map(function(t,i){
+    var ok=all || !!(s.c&&s.c[i]);
+    return '<label class="wb-ck'+(ok?' ok':'')+'"><input type="checkbox" class="wb-cb" data-wbk="'+esc(e.key)+'" data-i="'+i+'" data-n="'+list.length+'"'+(ok?' checked':'')+'><span>'+esc(t)+'</span></label>';
+  }).join("");
+}
+function wcFootHtml(e){
+  var s=wcDone(e.key)||{}, co0=e.co&&e.co!=="ALL"?co(e.co):null, bits=[];
+  if(co0 && curCo==="ALL" && !e.auto) bits.push(esc(co0.short));
+  if(e.rule) bits.push(esc(e.rule));
+  var amt=e.amt?'<span class="wb-amt'+(e.inflow?' in':'')+'">'+(e.inflow?'+':'−')+fmt(e.amt)+'</span>':'';
+  var stSel=(e.auto&&e.cat==="interest"&&e.amt&&!e.inflow)?'<select class="wb-st" data-wcst="'+esc(e.key)+'" title="진행중 = ERP 전표 작성 완료·납부 전 / 납부완료 = 이자·수수료 납부 완료">'+['<option value="">상태</option>'].concat(WC_INT_ST.map(function(x){ return '<option'+(s.st===x?' selected':'')+'>'+x+'</option>'; })).join('')+'</select>':'';
+  if(!bits.length && !amt && !stSel) return '';
+  return '<div class="wb-foot">'+amt+stSel+(bits.length?'<span>'+bits.join(' · ')+'</span>':'')+'</div>';
+}
+function wcCardHtml(e){
+  var p=wcProg(e), done=p.k>=p.n;
+  return '<div class="wb-card'+(done?' done':'')+'" title="'+esc(e.memo||"")+'">'+
+    '<div class="wb-c1"><span class="wb-dot" style="--wcc:'+wcColor(e.cat)+'"></span><span class="wb-cat">'+esc(wcCat(e.cat).t)+'</span><span class="wb-prog">'+p.k+'/'+p.n+'</span></div>'+
+    '<div class="wb-ttl">'+esc(e.title)+'</div>'+
+    '<div class="wb-cl">'+wcChecklistHtml(e)+'</div>'+wcFootHtml(e)+
+  '</div>';
+}
+function wcLateHtml(e){
+  var p=wcProg(e), d=-wcDD(e.date), open=!!WC.open[e.key];
+  return '<div class="wb-lcard'+(open?' open':'')+'">'+
+    '<button type="button" class="wb-lhead" data-wbopen="'+esc(e.key)+'" aria-expanded="'+(open?'true':'false')+'">'+
+      '<span class="wb-c1"><span class="wb-dot" style="--wcc:'+wcColor(e.cat)+'"></span><span class="wb-cat">'+esc(wcCat(e.cat).t)+'</span><span class="wb-dd">'+wcMD(e.date)+' · D+'+d+'</span></span>'+
+      '<span class="wb-lttl">'+esc(e.title)+'</span>'+
+      '<span class="wb-bar"><i style="width:'+Math.round(p.k/p.n*100)+'%"></i></span><span class="wb-barn">'+p.k+'/'+p.n+'</span>'+
+    '</button>'+
+    (open?'<div class="wb-cl">'+wcChecklistHtml(e)+'</div>'+wcFootHtml(e):'')+
+  '</div>';
+}
+function wcSortDay(list){
+  return list.map(function(e,i){ return {e:e,i:i,d:wcProg(e)}; })
+    .sort(function(a,b){ var da=a.d.k>=a.d.n?1:0, db=b.d.k>=b.d.n?1:0; return da-db || a.i-b.i; })
+    .map(function(x){ return x.e; });
+}
+function wcCoSeg(){
+  var tabs=[{id:"ALL",name:"그룹 통합"}].concat(D.companies.filter(function(c){ return c.active!==false || curCo===c.id; }).map(function(c){ return {id:c.id,name:c.name}; }));
+  return '<div class="wb-seg" role="tablist" aria-label="회사 선택">'+tabs.map(function(t){
+    return '<button type="button" role="tab" data-wbco="'+t.id+'" aria-selected="'+(curCo===t.id?'true':'false')+'">'+esc(t.name)+'</button>'; }).join("")+'</div>';
+}
+function wcFilterHtml(){
+  var off=WC_CATS.filter(function(c){ return WC.off[c.k]; }).length;
+  return '<div class="wb-fwrap"><button type="button" class="wb-btn wb-fbtn" id="wbFilter" aria-expanded="'+(WC.filt?'true':'false')+'">필터'+(off?' · '+(WC_CATS.length-off)+'/'+WC_CATS.length:'')+'</button>'+
+    (WC.filt?'<div class="wb-fpop" role="dialog" aria-label="분류 필터">'+WC_CATS.map(function(c){
+      return '<label><input type="checkbox" class="wb-cb" data-wbcat="'+c.k+'"'+(WC.off[c.k]?'':' checked')+'><span class="wb-dot" style="--wcc:var('+c.v+')"></span>'+esc(c.t)+'</label>'; }).join("")+
+      '<button type="button" class="wb-btn" id="wbFiltAll" style="margin-top:6px">모두 보기</button></div>':'')+'</div>';
+}
 function renderCal(){
   var host=$("#calBody"); if(!host) return;
-  var st=wcStore();
-  if(!WC.ym) WC.ym=(todayISO()).slice(0,7);
-  if(!WC.sel) WC.sel=todayISO();
+  var st=wcStore(), today=todayISO();
+  if(!WC.mode) WC.mode="week";
+  if(!WC.wk) WC.wk=wcMon(today);
+  if(!WC.ym) WC.ym=today.slice(0,7);
+  if(!WC.sel) WC.sel=today;
+  var top='<div class="wb-top"><h2>업무캘린더</h2>'+wcCoSeg()+'<div class="wb-topr">'+wcFilterHtml()+
+    '<div class="wb-seg" role="tablist" aria-label="보기"><button type="button" role="tab" data-wbmode="week" aria-selected="'+(WC.mode==="week"?'true':'false')+'">주</button><button type="button" role="tab" data-wbmode="month" aria-selected="'+(WC.mode==="month"?'true':'false')+'">월</button></div></div></div>';
+  var body;
+  if(WC.mode==="month") body=wcMonthHtml(today);
+  else body=wcWeekHtml(today);
+  host.innerHTML='<div class="wb">'+top+body+'</div>'+
+    '<div class="panel"><header><h2>반복 업무 관리</h2>'+finSub(st.items.length+"개 · 대출이자·만기는 금융 › 차입/대여 약정에서 자동")+
+      '<div class="sp"><button class="btn sm" id="wcAdd">업무 추가</button><button class="btn sm" id="wcToggle">'+(WC.edit?'접기':'펼치기')+'</button></div></header>'+
+      (WC.edit?'<div class="scroll"><table class="tbl" id="wcItemTbl">'+wcItemTable(st.items)+'</table></div>':'<p class="hint" style="padding:0 16px 14px">매월 반복·분기마감·예적금 만기·매입대금·상생파트너론 연장 같은 업무를 규칙(매월 N일·말일·N째 주 요일·분기 월·영업일 가감·휴일 처리)과 체크리스트로 등록합니다. [펼치기]로 편집. 체크·완료 기록은 공용 저장소에 남아 다른 분도 같은 상태를 봅니다.</p>')+
+    '</div>';
+  wcBind(host);
+}
+function wcWeekHtml(today){
+  var mon=WC.wk, fri=isoAdd(mon,4), sun=isoAdd(mon,6), nMon=isoAdd(mon,7), nSun=isoAdd(mon,13);
+  var lateFrom=isoAdd(today,-WC_LATE_DAYS), lateTo=isoAdd(today,-1);
+  var from=lateFrom<mon?lateFrom:mon, to=nSun;
+  var all=wcEvents(from, to).filter(function(e){ return !WC.off[e.cat]; });
+  var byDay={}; all.forEach(function(e){ (byDay[e.date]=byDay[e.date]||[]).push(e); });
+  /* 지연: 지난 일정(오늘 전 WC_LATE_DAYS일) 중 체크리스트가 남은 건 — 오래된 순 */
+  var late=all.filter(function(e){ return e.date>=lateFrom && e.date<=lateTo && !wcIsDone(e); })
+    .sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+  var wn=wcWeekNo(mon);
+  var lbl=(+mon.slice(5,7))+'월 '+(+mon.slice(8))+'일 – '+(fri.slice(5,7)!==mon.slice(5,7)?(+fri.slice(5,7))+'월 ':'')+(+fri.slice(8))+'일';
+  var nav='<div class="wb-nav"><button type="button" class="wb-ib" id="wbPrev" aria-label="이전 주">‹</button><h3>'+lbl+'</h3><button type="button" class="wb-ib" id="wbNext" aria-label="다음 주">›</button>'+
+    '<span class="wb-sub">'+wn.m+'월 '+wn.n+'주차</span>'+(mon!==wcMon(today)?'<button type="button" class="wb-btn" id="wbToday">오늘</button>':'')+'</div>';
+  var lateCol='<section class="wb-col wb-late" aria-label="지연"><div class="wb-h"><b>지연</b><span>'+late.length+'건</span></div>'+
+    '<div class="wb-list">'+(late.length?late.map(wcLateHtml).join(""):'<div class="wb-empty">밀린 업무 없음</div>')+'</div></section>';
+  var cols='';
+  for(var k=0;k<5;k++){
+    var d=isoAdd(mon,k), hn=holidayName(d), evs=wcSortDay(byDay[d]||[]);
+    var wk='';
+    if(k===4){
+      var we=wcSortDay((byDay[isoAdd(mon,5)]||[]).concat(byDay[sun]||[]));
+      if(we.length) wk='<div class="wb-we">주말 · '+wcMD(isoAdd(mon,5))+'–'+wcMD(sun)+'</div>'+we.map(wcCardHtml).join("");
+    }
+    cols+='<section class="wb-col wb-day'+(d===today?' today':'')+(hn?' holi':'')+'" style="--ord:'+(d===today?0:k+1)+'" aria-label="'+esc(d)+'">'+
+      '<div class="wb-h"><span class="wb-wd">'+WC_WD[k+1]+'</span><b>'+(+d.slice(8))+'</b>'+(d===today?'<span class="wb-todayb">오늘</span>':'')+(hn?'<span class="wb-hn">'+esc(hn)+'</span>':'')+'</div>'+
+      '<div class="wb-list">'+(evs.length?evs.map(wcCardHtml).join(""):(wk?'':'<div class="wb-empty">일정 없음</div>'))+wk+'</div></section>';
+  }
+  var nx=all.filter(function(e){ return e.date>=nMon && e.date<=nSun; });
+  var strip='<div class="wb-next"><b>다음 주</b><div class="wb-chips">'+(nx.length?nx.slice(0,14).map(function(e){
+      return '<button type="button" class="wb-chip" data-wbgo="'+nMon+'" title="'+esc(e.title)+'"><span class="wb-dot" style="--wcc:'+wcColor(e.cat)+'"></span>'+wcMD(e.date)+' '+esc(e.title)+'</button>'; }).join("")+
+      (nx.length>14?'<button type="button" class="wb-chip" data-wbgo="'+nMon+'">+'+(nx.length-14)+'건</button>':''):'<span class="wb-sub">일정 없음</span>')+'</div></div>';
+  return nav+'<div class="wb-board">'+lateCol+cols+'</div>'+strip;
+}
+function wcMonthHtml(today){
   var y=+WC.ym.slice(0,4), m=+WC.ym.slice(5,7);
   var first=new Date(y,m-1,1), gStart=isoAdd(ymdISO(y,m,1), -first.getDay());
   var n=new Date(y,m,0).getDate(), lastDow=new Date(y,m-1,n).getDay(), gEnd=isoAdd(ymdISO(y,m,n), 6-lastDow);
-  var upTo=isoAdd(todayISO(),21), rangeEnd=gEnd>upTo?gEnd:upTo, rangeStart=gStart<todayISO()?gStart:todayISO();
-  var all=wcEvents(rangeStart, rangeEnd).filter(function(e){ return !WC.off[e.cat]; });
+  var all=wcEvents(gStart, gEnd).filter(function(e){ return !WC.off[e.cat]; });
   var byDay={}; all.forEach(function(e){ (byDay[e.date]=byDay[e.date]||[]).push(e); });
-  var today=todayISO();
-  /* 달력 */
   var cells=WC_WD.map(function(w,i){ return '<div class="wc-dow'+(i===0?' sun':(i===6?' sat':''))+'">'+w+'</div>'; }).join("");
   for(var d=gStart; d<=gEnd; d=isoAdd(d,1)){
     var dw=new Date(d+"T00:00:00").getDay(), hn=holidayName(d), evs=byDay[d]||[];
-    cells+='<button type="button" class="wc-day'+(d.slice(0,7)!==WC.ym?' other':'')+(dw===0?' sun':'')+(dw===6?' sat':'')+(hn?' holi':'')+(d===today?' today':'')+(d===WC.sel?' sel':'')+'" data-d="'+d+'">'+
+    cells+='<button type="button" class="wc-day'+(d.slice(0,7)!==WC.ym?' other':'')+(dw===0?' sun':'')+(dw===6?' sat':'')+(hn?' holi':'')+(d===today?' today':'')+'" data-d="'+d+'" title="이 주 보드로">'+
       '<span class="wc-num"><b>'+(+d.slice(8))+'</b>'+(hn?'<span class="wc-hn">'+esc(hn)+'</span>':'')+'</span>'+
       evs.slice(0,3).map(function(e){ return '<span class="wc-ev'+(wcIsDone(e)?' done':'')+'" style="--wcc:'+wcColor(e.cat)+'" title="'+esc(e.title)+'">'+esc(e.title)+'</span>'; }).join("")+
       (evs.length>3?'<span class="wc-more">+'+(evs.length-3)+'건</span>':'')+'</button>';
   }
-  /* 선택일 목록 */
-  var selEv=byDay[WC.sel]||[];
-  if(!selEv.length && (WC.sel<rangeStart || WC.sel>rangeEnd)) selEv=wcEvents(WC.sel,WC.sel).filter(function(e){ return !WC.off[e.cat]; });
-  var selHtml=selEv.map(wcItemHtml).join("")||'<div class="empty" style="padding:22px"><b>일정 없음</b>'+esc(WC.sel)+' ('+WC_WD[new Date(WC.sel+"T00:00:00").getDay()]+')'+(holidayName(WC.sel)?' · '+esc(holidayName(WC.sel)):'')+'</div>';
-  /* 다가오는 일정(오늘 ~ 21일) + 지난 미완료(7일) */
-  var past=isoAdd(today,-7);
-  var pend=all.filter(function(e){ return e.date>=past && e.date<today && !wcIsDone(e); });
-  var up=all.filter(function(e){ return e.date>=today && e.date<=upTo; });
-  var upHtml=(pend.length?'<div class="wc-meta" style="padding:10px 16px 0;color:var(--out);font-weight:600">지난 7일 미완료 '+pend.length+'건</div>'+pend.map(wcItemHtml).join(""):"")+
-    (up.map(wcItemHtml).join("")||'<div class="empty" style="padding:22px">3주 안에 일정이 없습니다</div>');
-  var monthCnt={}; all.forEach(function(e){ if(e.date.slice(0,7)===WC.ym) monthCnt[e.cat]=(monthCnt[e.cat]||0)+1; });
-  var intSum=all.filter(function(e){ return e.date.slice(0,7)===WC.ym && e.cat==="interest" && e.amt && !e.inflow && !e.fee; }).reduce(function(a,e){ return a+e.amt; },0);
-  var feeSum=all.filter(function(e){ return e.date.slice(0,7)===WC.ym && e.fee; }).reduce(function(a,e){ return a+e.amt; },0);
-  host.innerHTML=
-    '<div class="panel"><div class="pad wc-top">'+
-      '<button class="btn sm" id="wcPrev" aria-label="이전 달">◀</button><h2>'+y+'년 '+m+'월</h2><button class="btn sm" id="wcNext" aria-label="다음 달">▶</button>'+
-      '<button class="btn sm" id="wcToday">오늘</button>'+
-      '<span class="wc-meta" style="margin-left:8px">이달 '+Object.keys(monthCnt).reduce(function(a,k){return a+monthCnt[k]},0)+'건 · 대출이자 '+fmt(intSum)+(feeSum?' · 한도미사용수수료 '+fmt(feeSum):'')+'</span>'+
-      '<div class="wc-cats">'+WC_CATS.map(function(c){ return '<button type="button" class="wc-cat" data-cat="'+c.k+'" aria-pressed="'+(WC.off[c.k]?'false':'true')+'"><span class="wc-dot" style="--wcc:var('+c.v+')"></span>'+esc(c.t)+(monthCnt[c.k]?' <b>'+monthCnt[c.k]+'</b>':'')+'</button>'; }).join("")+'</div>'+
-    '</div></div>'+
-    '<div class="wc-wrap">'+
-      '<div class="panel"><div class="wc-grid">'+cells+'</div></div>'+
-      '<div style="display:flex;flex-direction:column;gap:16px;min-width:0">'+
-        '<div class="panel"><header><h2>'+esc(WC.sel)+' ('+WC_WD[new Date(WC.sel+"T00:00:00").getDay()]+')</h2>'+finSub(selEv.length+"건")+'</header><div class="wc-list">'+selHtml+'</div></div>'+
-        '<div class="panel"><header><h2>다가오는 일정</h2>'+finSub("오늘 ~ "+upTo)+'</header><div class="wc-list" style="max-height:520px;overflow:auto">'+upHtml+'</div></div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="panel"><header><h2>반복 업무 관리</h2>'+finSub(st.items.length+"개 · 대출이자·만기는 금융 › 차입/대여 약정에서 자동")+
-      '<div class="sp"><button class="btn sm" id="wcAdd">업무 추가</button><button class="btn sm" id="wcToggle">'+(WC.edit?'접기':'펼치기')+'</button></div></header>'+
-      (WC.edit?'<div class="scroll"><table class="tbl" id="wcItemTbl">'+wcItemTable(st.items)+'</table></div>':'<p class="hint" style="padding:0 16px 14px">매월 반복·분기마감·예적금 만기·매입대금·상생파트너론 연장 같은 업무를 규칙(매월 N일·말일·N째 주 요일·분기 월·영업일 가감·휴일 처리)과 체크리스트로 등록합니다. [펼치기]로 편집하세요.</p>')+
-    '</div>';
-  wcBind(host, selEv.concat(pend, up));
+  var mon=all.filter(function(e){ return e.date.slice(0,7)===WC.ym; });
+  var intSum=mon.filter(function(e){ return e.cat==="interest" && e.amt && !e.inflow && !e.fee; }).reduce(function(a,e){ return a+e.amt; },0);
+  var feeSum=mon.filter(function(e){ return e.fee; }).reduce(function(a,e){ return a+e.amt; },0);
+  var nav='<div class="wb-nav"><button type="button" class="wb-ib" id="wbPrev" aria-label="이전 달">‹</button><h3>'+y+'년 '+m+'월</h3><button type="button" class="wb-ib" id="wbNext" aria-label="다음 달">›</button>'+
+    '<span class="wb-sub">이달 '+mon.length+'건 · 대출이자 '+fmt(intSum)+(feeSum?' · 한도미사용수수료 '+fmt(feeSum):'')+' · 날짜를 누르면 그 주 보드</span>'+
+    (WC.ym!==today.slice(0,7)?'<button type="button" class="wb-btn" id="wbToday">오늘</button>':'')+'</div>';
+  return nav+'<div class="wb-month"><div class="wc-grid">'+cells+'</div></div>';
 }
 function wcItemHtml(e){
   var s=wcDone(e.key)||{}, done=wcIsDone(e), co0=e.co&&e.co!=="ALL"?co(e.co):null;
@@ -5930,27 +6145,32 @@ function wcItemTable(items){
   return '<thead><tr><th>분류</th><th>업무</th><th>법인</th><th>반복 규칙</th><th>체크리스트</th><th>메모</th><th></th></tr></thead><tbody>'+
     (rows||'<tr><td colspan="7" class="mini" style="padding:18px;text-align:center">등록된 반복 업무가 없습니다 — [업무 추가]</td></tr>')+'</tbody>';
 }
-function wcBind(host, evs){
-  var st=wcStore(), byKey={}; evs.forEach(function(e){ byKey[e.key]=e; });
-  function who(){ return (typeof AUTH!=="undefined" && AUTH && AUTH.user && AUTH.user.email)||""; }
-  $("#wcPrev").onclick=function(){ var p=ymShift(+WC.ym.slice(0,4),+WC.ym.slice(5,7),-1); WC.ym=p[0]+"-"+String(p[1]).padStart(2,"0"); renderCal(); };
-  $("#wcNext").onclick=function(){ var p=ymShift(+WC.ym.slice(0,4),+WC.ym.slice(5,7),1); WC.ym=p[0]+"-"+String(p[1]).padStart(2,"0"); renderCal(); };
-  $("#wcToday").onclick=function(){ WC.ym=todayISO().slice(0,7); WC.sel=todayISO(); renderCal(); };
-  $$("#calBody .wc-cat").forEach(function(b){ b.onclick=function(){ WC.off[b.dataset.cat]=!WC.off[b.dataset.cat]; renderCal(); }; });
-  $$("#calBody .wc-day").forEach(function(b){ b.onclick=function(){ WC.sel=b.dataset.d; if(WC.sel.slice(0,7)!==WC.ym) WC.ym=WC.sel.slice(0,7); renderCal(); }; });
-  $$("#calBody [data-wcok]").forEach(function(el){ el.onchange=function(){
-    var k=el.dataset.wcok, e=byKey[k]||{checklist:[]}, s=st.done[k]||{};
-    if(el.checked){ s.ok=true; s.c=(e.checklist||[]).map(function(){ return true; }); s.by=who(); s.at=new Date().toISOString(); st.done[k]=s; }
-    else delete st.done[k];
-    wcSave(el.checked?"완료 처리됨":"완료 취소됨").then(renderCal); }; });
-  $$("#calBody [data-wcc]").forEach(function(el){ el.onchange=function(){
-    var k=el.dataset.wcc, s=st.done[k]||{c:[]}, nn=+el.dataset.n; s.c=s.c||[]; s.c[+el.dataset.i]=el.checked;
-    var cnt=s.c.filter(Boolean).length; s.ok=cnt>=nn; if(s.ok){ s.by=who(); s.at=new Date().toISOString(); } else { delete s.by; delete s.at; }
-    if(!cnt) delete st.done[k]; else st.done[k]=s;
-    wcSave().then(renderCal); }; });
+function wcStep(dir){
+  if(WC.mode==="month"){ var p=ymShift(+WC.ym.slice(0,4),+WC.ym.slice(5,7),dir); WC.ym=p[0]+"-"+String(p[1]).padStart(2,"0"); }
+  else WC.wk=isoAdd(WC.wk||wcMon(todayISO()), 7*dir);
+}
+function wcBind(host){
+  var st=wcStore();
+  function go(fn){ return function(){ fn(); renderCal(); }; }
+  $$("#calBody [data-wbco]").forEach(function(b){ b.onclick=function(){ curCo=b.dataset.wbco; render(); }; });
+  $$("#calBody [data-wbmode]").forEach(function(b){ b.onclick=go(function(){
+    WC.mode=b.dataset.wbmode;
+    if(WC.mode==="month") WC.ym=isoAdd(WC.wk||wcMon(todayISO()),3).slice(0,7);
+  }); });
+  if($("#wbPrev")) $("#wbPrev").onclick=go(function(){ wcStep(-1); });
+  if($("#wbNext")) $("#wbNext").onclick=go(function(){ wcStep(1); });
+  if($("#wbToday")) $("#wbToday").onclick=go(function(){ WC.wk=wcMon(todayISO()); WC.ym=todayISO().slice(0,7); });
+  if($("#wbFilter")) $("#wbFilter").onclick=go(function(){ WC.filt=!WC.filt; });
+  if($("#wbFiltAll")) $("#wbFiltAll").onclick=go(function(){ WC.off={}; });
+  $$("#calBody [data-wbcat]").forEach(function(el){ el.onchange=go(function(){ WC.off[el.dataset.wbcat]=!el.checked; }); });
+  $$("#calBody [data-wbgo]").forEach(function(b){ b.onclick=go(function(){ WC.wk=b.dataset.wbgo; }); });
+  $$("#calBody .wc-day").forEach(function(b){ b.onclick=go(function(){ WC.sel=b.dataset.d; WC.wk=wcMon(b.dataset.d); WC.mode="week"; }); });
+  $$("#calBody [data-wbopen]").forEach(function(b){ b.onclick=go(function(){ var k=b.dataset.wbopen; WC.open[k]=!WC.open[k]; }); });
+  $$("#calBody [data-wbk]").forEach(function(el){ el.onchange=function(){ wcToggle(el.dataset.wbk, +el.dataset.i, +el.dataset.n, el.checked); }; });
   $$("#calBody [data-wcst]").forEach(function(el){ el.onchange=function(){
+    if(typeof readOnly!=="undefined" && readOnly){ toast("보기 전용입니다 — 편집 권한이 없습니다."); renderCal(); return; }
     var k=el.dataset.wcst, s=st.done[k]||{}; s.st=el.value||undefined; if(!s.st) delete s.st;
-    if(s.st){ s.by=who(); s.at=new Date().toISOString(); st.done[k]=s; } else if(!(s.c||[]).filter(Boolean).length && !s.ok) delete st.done[k];
+    if(s.st){ s.by=wcWho(); s.at=new Date().toISOString(); st.done[k]=s; } else if(!(s.c||[]).filter(Boolean).length && !s.ok) delete st.done[k];
     wcSave(s.st?"상태: "+s.st:"상태 지움").then(renderCal); }; });
   $("#wcToggle").onclick=function(){ WC.edit=!WC.edit; renderCal(); };
   $("#wcAdd").onclick=function(){
@@ -7894,6 +8114,8 @@ document.addEventListener("keydown",function(e){
   var ki="1234567890".indexOf(e.key);                        // [v26] 메뉴 순서와 번호 일치
   if(ki>=0 && VIEWS[ki]){ e.preventDefault(); setView(VIEWS[ki]); }
   if(e.key==="c"||e.key==="C"){ e.preventDefault(); setView("cal"); }   // [v75] 업무캘린더
+  if(view==="cal" && (e.key==="ArrowLeft"||e.key==="ArrowRight")){ e.preventDefault(); wcStep(e.key==="ArrowLeft"?-1:1); renderCal(); }   // [v78]
+  if(view==="cal" && (e.key==="t"||e.key==="T")){ e.preventDefault(); WC.mode="week"; WC.wk=wcMon(todayISO()); WC.ym=todayISO().slice(0,7); renderCal(); }
   if(e.key==="l"||e.key==="L") lock();
 });
 
