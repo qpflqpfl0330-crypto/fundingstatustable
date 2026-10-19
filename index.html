@@ -61,6 +61,68 @@
   --c-sn:#8DB2E4; --c-gu:#57C4A0; --c-gd:#DCAE55; --c-gs:#C98FBC;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
 }
+/* [v81] 대시보드 — 흰 카드 + 얇은 네이비 선, 억원 표시, 원색 없이 네이비 농도로만 강조 */
+.dx-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 2px 0}
+.dx-head .dx-h-l{display:flex;align-items:baseline;gap:10px}
+.dx-head .dx-h-l b{font-size:15px;letter-spacing:-.01em}
+.dx-head .dx-h-l span{font-size:12.5px;color:var(--muted)}
+.dx-head .dx-h-r{margin-left:auto;display:flex;gap:6px;align-items:center}
+.dx-head .chip{font-weight:600;padding:3px 10px}
+.dx-head .dx-ok{color:var(--ink-2);border-color:var(--rule-strong);background:var(--surface)}
+.dx-head .dx-bad{cursor:pointer;font:inherit;font-size:11px;font-weight:700}
+.dx-chk{flex-basis:100%;margin:4px 0 0;padding:10px 14px 10px 30px;background:var(--out-soft);border-radius:var(--r-md);font-size:12.5px;color:var(--ink-2);line-height:1.7}
+.dx-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1100px){ .dx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:560px){ .dx-kpis{grid-template-columns:1fr} }
+.kpi.dx-k{padding:16px 18px 14px;border-top:2px solid var(--navy)}
+.kpi.dx-k .lbl{font-size:12px;font-weight:600;color:var(--ink-2)}
+.kpi.dx-k .v{font-size:clamp(24px,2.1vw,30px);margin-top:8px;letter-spacing:-.03em;color:var(--ink)}
+.kpi.dx-k.neg .v{color:var(--out)}
+.kpi.dx-k .v small,.dx-co .big small{font-size:.5em;font-weight:600;margin-left:3px;color:var(--muted);letter-spacing:0}
+.kpi.dx-k .d{font-size:12px;color:var(--muted);margin-top:4px}
+.kpi.dx-k .d b{color:var(--ink-2);font-weight:700}
+b.up,td.up,dd.up{color:var(--in)} b.dn,td.dn,dd.dn{color:var(--out)}
+.dx-bar{height:6px;border-radius:999px;background:var(--navy-soft);margin:12px 0 10px;overflow:hidden}
+.dx-bar.off{background:transparent}
+.dx-bar i{display:block;height:100%;background:var(--navy);border-radius:999px}
+.dx-bar.sm{height:5px;margin:0;flex:1;min-width:40px}
+.dx-rows{display:grid;grid-template-columns:auto 1fr auto;gap:5px 12px;margin:0;font-size:12.5px;border-top:1px solid var(--rule);padding-top:10px}
+.dx-rows dt{color:var(--muted)}
+.dx-rows dd{margin:0;font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)}
+.dx-rows dd.r{text-align:right;font-weight:500;color:var(--muted)}
+.dx-due{color:var(--out)}
+.dx-strip{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:9px 16px;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r-md);font-size:12.5px;color:var(--muted)}
+.dx-strip .t{font-weight:700;color:var(--ink-2)}
+.dx-strip b{color:var(--ink);font-variant-numeric:tabular-nums;margin-left:3px}
+.dx-co .big{font-size:22px}
+.dx-co h3 .dot,.dx-flow .dot{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--dot);margin-right:2px}
+.dx-co .dx-share{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:8px}
+.dx-co .dx-share b{color:var(--ink-2)}
+.dx-co .dx-bar{margin:5px 0 8px;height:5px}
+.dx-flow th,.dx-flow td{white-space:nowrap}
+.dx-flow th.num,.dx-flow td.num,#dxBankTbl th.num{text-align:right}
+.dx-flow tbody tr[data-co]{cursor:pointer}
+.dx-flow td{font-size:13.5px;padding:11px 14px}
+.dx-flow td.dx-close{font-weight:700;color:var(--ink)}
+.dx-flow td.dx-oth{color:var(--muted)}
+.tbl tr.dx-tot td{font-weight:700;font-size:14px;background:var(--surface-2);border-bottom:1px solid var(--rule-strong)}
+.dx-foot{padding:10px 15px;border-top:1px solid var(--rule);font-size:11.5px;color:var(--muted);line-height:1.6}
+.dx-foot b{color:var(--ink-2);font-weight:600}
+.dx-mixlist{padding:14px 16px 12px;display:flex;flex-direction:column;gap:9px}
+.dx-mrow{display:grid;grid-template-columns:72px 1fr 64px 52px;gap:10px;align-items:center;font-size:12.5px}
+.dx-mrow .n{color:var(--ink-2)}
+.dx-mrow .b{height:10px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.dx-mrow .b i{display:block;height:100%;background:var(--navy);border-radius:0 4px 4px 0}
+.dx-mrow .v{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.dx-mrow .p{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.dx-mrow.tot{border-top:1px solid var(--rule);padding-top:8px;font-weight:700}
+.dx-mrow.tot .b{background:none}
+.dx-bcell{min-width:180px;white-space:nowrap}
+.dx-bcell .dx-bar.sm{display:inline-block;vertical-align:middle;width:calc(100% - 66px);min-width:40px}
+.dx-bcell b{display:inline-block;width:58px;text-align:right;font-variant-numeric:tabular-nums;vertical-align:middle}
+#dxBankTbl td.num{text-align:right}
+.dx-ccy{font-size:10px;font-weight:700;color:var(--navy);margin-left:2px}
+#loanTbl td:last-child{min-width:230px}   /* [v81] 이자 납부 문구가 좁은 칸에서 세로로 길게 접혀 행이 높아지던 것 */
 /* [v75] 업무캘린더 */
 :root{--wc-c:oklch(0.55 0.17 350); --wc-m:oklch(0.45 0.09 255); --wc-i:oklch(0.58 0.18 28); --wc-q:oklch(0.5 0.15 295); --wc-d:oklch(0.56 0.12 155); --wc-p:oklch(0.62 0.13 70); --wc-s:oklch(0.56 0.1 215); --wc-e:oklch(0.62 0.01 255)}   /* [v78] 사양서 색 */
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){--wc-c:#E79BC0; --wc-m:#8DB2E4; --wc-i:#EC8C77; --wc-q:#B9A2E6; --wc-d:#57C4A0; --wc-p:#DCAE55; --wc-s:#6CC6D8; --wc-e:#9AA4B2} }
@@ -425,7 +487,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v80 · 2026-10-19</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v81 · 2026-10-19</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -461,8 +523,16 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
     <div class="cotabs" id="cotabs"></div>
 
     <section class="view" id="v-dash">
-      <div class="kpis" id="kpis"></div>
+      <div class="dx-head" id="dxHead"></div>   <!-- [v81] 기준일 · 단위 억원 · 검산 배지 -->
+      <div class="kpis dx-kpis" id="kpis"></div>
+      <div class="dx-strip" id="dxStrip"></div>
       <div id="coCardsWrap"></div>
+      <div class="panel">   <!-- [v81] 입·출금 막대그래프 → 법인별 자금수지 -->
+        <header><h2>법인별 자금수지</h2><span class="sub" id="dxFlowSub"></span>
+          <div class="sp"><div class="seg" id="dxFlowSeg"><button type="button" data-p="day">당일</button><button type="button" data-p="mtd" aria-pressed="true">당월누계</button><button type="button" data-p="ytd">연누계</button></div></div></header>
+        <div class="scroll"><table class="tbl dx-flow" id="dxFlowTbl"></table></div>
+        <div class="dx-foot" id="dxFlowFoot"></div>
+      </div>
       <div class="grid2">
         <div class="panel">
           <header><h2>시재 추이</h2><span class="sub" id="trendRange"></span></header>
@@ -470,15 +540,14 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
           <div class="legend" id="legendBal"></div>
         </div>
         <div class="panel">
-          <header><h2>입·출금</h2><span class="sub">자금이동·외화 제외</span></header>
-          <div class="chartwrap"><div id="chartFlow"></div></div>
-          <div class="legend"><span><i style="background:var(--in)"></i>입금</span><span><i style="background:var(--out)"></i>출금</span></div>
+          <header><h2>지출 구성</h2><span class="sub" id="mixRange"></span></header>
+          <div id="chartMix"></div>
         </div>
       </div>
       <div class="grid2">
-        <div class="panel">
-          <header><h2>지출 구성</h2><span class="sub" id="mixRange"></span></header>
-          <div class="chartwrap"><div id="chartMix"></div></div>
+        <div class="panel">   <!-- [v81] 은행별 잔액 -->
+          <header><h2>은행별 잔액</h2><span class="sub" id="dxBankSub"></span><div class="sp"><label class="mini"><input type="checkbox" id="dxBankAll"> 모두 보기</label></div></header>
+          <div class="scroll"><table class="tbl" id="dxBankTbl"></table></div>
         </div>
         <div class="panel">
           <header><h2>오늘의 할일</h2><span class="sub" id="todoSub"></span><div class="sp"><button class="btn sm" id="todoOpen">업무캘린더</button></div></header>   <!-- [v79] 최근 일자별 요약 대신 -->
@@ -4508,7 +4577,8 @@ function setView(v){
 }
 
 /* ===================== 대시보드 ===================== */
-function renderDash(){
+/* [v81] 아래 새 renderDash로 교체 — 되돌릴 때 이름만 되돌리면 됨 */
+function renderDash_v80(){
   var ds=allDates(), cos=scopeCos();
   if(!ds.length){
     $("#kpis").innerHTML='<div class="kpi" style="grid-column:1/-1"><div class="empty"><b>아직 데이터가 없습니다</b>데이터 업로드 탭에서 CMS 거래내역 또는 월별 자금현황보고 파일을 올려주세요.</div></div>';
@@ -4579,6 +4649,315 @@ function renderDash(){
   renderLoans();
   renderTodo();   // [v79]
 }
+/* ===================== [v81] 대시보드 리디자인 — 억원 표시 · 핵심지표 4칸 · 검산 배지 · 법인별 자금수지 · 월별 콤보 · 은행별 잔액 =====================
+   계산은 기존 함수(daySummary·scopeSummary·rollup·coState·loanScope)를 그대로 읽기만 한다. 새로 저장하는 값 없음.
+   외화 금액은 fmtFx(소수 2자리) 그대로. 원화만 억 단위(소수 1자리)로 보여주고, 마우스를 올리면 원 단위 전체 금액. */
+var DX={p:"mtd", chkOpen:false, bankAll:false};
+function eok(n){
+  if(n==null||isNaN(n)) return "-";
+  if(Math.abs(n)<0.5) return "-";
+  return (n/1e8).toLocaleString("ko-KR",{minimumFractionDigits:1,maximumFractionDigits:1});
+}
+function eokS(n){ if(n==null||isNaN(n)) return "-"; if(Math.abs(n)<0.5) return "0.0"; return (n>0?"+":"")+eok(n); }
+function eokT(n){ return (n==null||isNaN(n))?"":fmt(n)+"원"; }
+function dxPct(a,b){ return b?(a/b*100):0; }
+function dxPctTxt(v){ return (Math.round(v*10)/10).toFixed(1)+"%"; }
+function dxClamp(v){ return Math.max(0,Math.min(100,v)); }
+/* 기간: 당일 / 당월누계(1일~기준일) / 연누계(1월 1일~기준일) */
+function dxRange(p, iso){
+  if(p==="day") return {from:iso, to:iso, label:iso+" 당일"};
+  if(p==="ytd") return {from:iso.slice(0,4)+"-01-01", to:iso, label:iso.slice(0,4)+"년 1월 1일 ~ "+iso.slice(5).replace("-","/")};
+  return {from:iso.slice(0,7)+"-01", to:iso, label:(+iso.slice(5,7))+"월 1일 ~ "+iso.slice(5).replace("-","/")};
+}
+function dxCoDates(c, from, to){
+  var t=todayISO(); return Object.keys(c.days||{}).filter(function(d){ return d>=from && d<=to && d<=t && (!c.endDate || d<=c.endDate); }).sort();
+}
+function dxScopeDates(cos, from, to){ var s={}; cos.forEach(function(c){ dxCoDates(c,from,to).forEach(function(d){ s[d]=1; }); }); return Object.keys(s).sort(); }
+/* 같은 날 전월(말일 넘으면 그 달 말일) 이전 가장 가까운 데이터 일자 */
+function dxPrevMonthIso(c, iso){
+  var pm=shiftMonth(iso.slice(0,7),-1), last=new Date(+pm.slice(0,4), +pm.slice(5,7), 0).getDate();
+  var want=pm+"-"+String(Math.min(+iso.slice(8,10), last)).padStart(2,"0");
+  var ds=Object.keys(c.days||{}).filter(function(d){ return d<=want; }).sort();
+  return ds.length?ds[ds.length-1]:null;
+}
+function dxTrust(c, iso){ var m=(c.manual||{})[iso]; return (m&&+m.trust)||0; }
+function dxBizDays(ym){
+  var y=+ym.slice(0,4), m=+ym.slice(5,7), n=new Date(y,m,0).getDate(), k=0;
+  for(var d=1; d<=n; d++){ var iso=ym+"-"+String(d).padStart(2,"0"), w=new Date(y,m-1,d).getDay(); if(w && w<6 && !isHoliday(iso)) k++; }
+  return k;
+}
+
+/* ---- 검산: 자금일보 "시재표 1원 검증"과 같은 기준 — 계좌별 전일시재+입금−출금±자금이동 = 금일시재, 계좌 합계 = 시재 ---- */
+function dxCheck(iso){
+  var out=[], n=0;
+  scopeCos().forEach(function(c){
+    if(c.endDate && iso>c.endDate) return;
+    var st=coState(c), row=st.chain[iso], tt=st.totals[iso];
+    if(!row) return;
+    n++;
+    (st.accs||[]).forEach(function(a){
+      if(a.group==="외화") return;
+      var o=row[a.label]; if(!o) return;
+      var gap=Math.round(o.open+(o.in||0)-(o.out||0)+(o.mvIn||0)-(o.mvOut||0)-o.close);
+      if(Math.abs(gap)>=1) out.push(c.short+" · "+a.label+" 계좌 차이 "+fmt(gap)+"원");
+      if(o.cmsAfter!=null && Math.abs(o.cmsAfter-o.close)>=1) out.push(c.short+" · "+a.label+" CMS 잔액과 차이 "+fmt(o.cmsAfter-o.close)+"원");
+    });
+    if(tt && Math.abs(tt.unalloc||0)>=1) out.push(c.short+" · 계좌 합계와 시재 차이(보고서 총액 미배분) "+fmt(tt.unalloc)+"원");
+  });
+  return {ok:!out.length, items:out, n:n};
+}
+function dxHead(iso, ck){
+  var scope=curCo==="ALL"?"그룹 통합":((co(curCo)||{}).name||"");
+  var badge = !ck.n ? '<span class="chip nv" title="기준일 계좌별 데이터가 없어 검산하지 않았습니다">검산 대상 없음</span>'
+    : ck.ok ? '<span class="chip nv dx-ok" title="계좌별 전일시재+입금−출금±자금이동 = 금일시재 (1원 단위)">✓ 검산 일치</span>'
+    : '<button type="button" class="chip out dx-bad" id="dxChkBtn" aria-expanded="'+(DX.chkOpen?"true":"false")+'">검산 불일치 '+ck.items.length+'건</button>';
+  $("#dxHead").innerHTML='<div class="dx-h-l"><b>'+esc(scope)+'</b><span>'+esc(iso)+' ('+dowOf(iso)+') 기준</span></div>'+
+    '<div class="dx-h-r"><span class="chip nv">단위 억원</span>'+badge+'</div>'+
+    (!ck.ok && DX.chkOpen ? '<ul class="dx-chk">'+ck.items.map(function(x){ return '<li>'+esc(x)+'</li>'; }).join("")+'<li class="mini">자금일보 작성 탭의 검증 목록에서 같은 내용을 자세히 볼 수 있어요.</li></ul>' : '');
+  var b=$("#dxChkBtn"); if(b) b.onclick=function(){ DX.chkOpen=!DX.chkOpen; dxHead(iso, ck); };
+}
+
+/* ---- 핵심지표 4칸: 라벨 → 큰 숫자 → 비교 한 줄 → 진행 막대 → 세부 3행 ---- */
+function dxCard(o){
+  var bar = o.bar==null ? '<div class="dx-bar off"></div>' : '<div class="dx-bar" title="'+esc(o.barTip||"")+'"><i style="width:'+dxClamp(o.bar).toFixed(1)+'%"></i></div>';
+  return '<div class="kpi dx-k'+(o.neg?' neg':'')+'"><div class="lbl">'+esc(o.l)+'</div>'+
+    '<div class="v" title="'+esc(eokT(o.v))+'">'+eok(o.v)+'<small>억</small></div>'+
+    '<div class="d">'+o.cmp+'</div>'+bar+
+    '<dl class="dx-rows">'+o.rows.map(function(r){ return '<dt>'+esc(r[0])+'</dt><dd title="'+esc(r[3]||"")+'">'+r[1]+'</dd><dd class="r">'+(r[2]||"")+'</dd>'; }).join("")+'</dl></div>';
+}
+function dxDiff(v){ if(v==null) return '<span class="mini">전일 자료 없음</span>'; var c=v>0?"up":v<0?"dn":""; return '전일 대비 <b class="'+c+'" title="'+esc(eokT(v))+'">'+(v>0?"▲ ":v<0?"▼ ":"")+eok(Math.abs(v))+(Math.abs(v)>=0.5?"억":"")+'</b>'; }
+function dxKpis(iso, s, ps){
+  var cos=scopeCos();
+  var krw=s.close-s.fx, cash=s.cash||0, total=s.close+cash, ptotal=ps?ps.close+(ps.cash||0):null;
+  var trust=cos.reduce(function(a,c){ return a+(c.endDate&&iso>c.endDate?0:dxTrust(c,iso)); },0);
+  var lst=loanScope(iso), used=lst.used, lim=lst.limit;
+  var byT={}, near=null;
+  lst.items.forEach(function(it){ var t=it.l.type==="개별"?"개별":"한도"; var b=byT[t]||(byT[t]={amt:0,n:0}); b.amt+=it.v.amount; b.n++;
+    var d=daysTo(iso, it.l.end); if(d!=null && d>=0 && (!near || d<near.d)) near={d:d, bank:it.l.bank, co:it.c.short}; });
+  var ym=iso.slice(0,7), mtdDs=allDates().filter(function(d){ return d.slice(0,7)===ym && d<=iso; });
+  var mIn=0, mOut=0; mtdDs.forEach(function(d){ var r=scopeSummary(d); mIn+=r.inTotal; mOut+=r.outTotal; });
+  var biz=dxBizDays(ym), past=mtdDs.filter(function(d){ var w=new Date(d+"T00:00:00").getDay(); return w && w<6 && !isHoliday(d); }).length;
+  var cards=[
+    {l:"총 예금잔액 (현금 포함)", v:total, cmp:dxDiff(ptotal==null?null:total-ptotal), bar:dxPct(krw,total), barTip:"원화 비중 "+dxPctTxt(dxPct(krw,total)),
+      rows:[["원화",eok(krw),dxPctTxt(dxPct(krw,total)),eokT(krw)],["외화",eok(s.fx),dxPctTxt(dxPct(s.fx,total)),eokT(s.fx)],["현금",eok(cash),dxPctTxt(dxPct(cash,total)),eokT(cash)]]},
+    {l:"사용 가능 원화", v:s.usable, neg:s.usable<0, cmp:dxDiff(ps?s.usable-ps.usable:null), bar:dxPct(s.usable,krw), barTip:"원화 예금 중 사용 가능 "+dxPctTxt(dxPct(s.usable,krw)),
+      rows:[["원화 예금",eok(krw),"",eokT(krw)],["국고용",(s.gov?"−":"")+eok(s.gov),"차감",eokT(s.gov)],["자사주신탁",(trust?"−":"")+eok(trust),"차감",eokT(trust)]]},
+    {l:"차입 사용액", v:used, cmp:'한도 <b title="'+esc(eokT(lim))+'">'+eok(lim)+'억</b> · 사용률 <b>'+dxPctTxt(dxPct(used,lim))+'</b>', bar:dxPct(used,lim), barTip:"한도 대비 사용률",
+      rows:[["개별",eok((byT["개별"]||{}).amt||0),((byT["개별"]||{}).n||0)+"건",eokT((byT["개별"]||{}).amt||0)],["한도·(-)통장",eok((byT["한도"]||{}).amt||0),((byT["한도"]||{}).n||0)+"건",eokT((byT["한도"]||{}).amt||0)],
+        ["최근 만기",near?'<span class="'+(near.d<=30?"dx-due":"")+'">D-'+near.d+'</span>':"-",near?esc(near.bank)+(curCo==="ALL"?" · "+esc(near.co):""):"",""]]},
+    {l:"당월 수지차", v:mIn-mOut, neg:(mIn-mOut)<0, cmp:'당일 수지차 <b class="'+(s.net>0?"up":s.net<0?"dn":"")+'" title="'+esc(eokT(s.net))+'">'+eokS(s.net)+'억</b>', bar:dxPct(past,biz), barTip:(+ym.slice(5))+"월 영업일 경과 "+past+"/"+biz,
+      rows:[["입금 누계",eok(mIn),"",eokT(mIn)],["출금 누계",eok(mOut),"",eokT(mOut)],["영업일 경과",past+" / "+biz+"일",dxPctTxt(dxPct(past,biz)),""]]}
+  ];
+  $("#kpis").innerHTML=cards.map(dxCard).join("");
+  var fx=fxKpi(s);
+  $("#dxStrip").innerHTML='<span class="t">당일</span>'+
+    '<span>입금 <b title="'+esc(eokT(s.inTotal))+'">'+eok(s.inTotal)+'</b></span><span>출금 <b title="'+esc(eokT(s.outTotal))+'">'+eok(s.outTotal)+'</b></span>'+
+    '<span>수지차 <b class="'+(s.net>0?"up":s.net<0?"dn":"")+'" title="'+esc(eokT(s.net))+'">'+eokS(s.net)+'</b></span>'+
+    '<span>자금이동 <b title="입금 '+esc(eokT(s.mvIn))+' / 출금 '+esc(eokT(s.mvOut))+'">'+eok(s.mvIn)+'</b></span>'+
+    '<span>외화 <b title="'+esc(fx.title||"")+'">'+(fx.raw||"-")+'</b>'+(s.fx?' <span class="mini">(₩'+eok(s.fx)+'억)</span>':'')+'</span>'+
+    (s.autoCount?'<span class="chip auto">구분 추정 '+s.autoCount+'건</span>':'');
+}
+
+/* ---- 법인 카드: 그룹 비중 막대(도넛 대신) ---- */
+function dxCoCards(iso){
+  if(curCo!=="ALL"){ $("#coCardsWrap").innerHTML=""; return; }
+  var list=D.companies.map(function(c){
+    var on=c.active && (!c.endDate || iso<=c.endDate);
+    return {c:c, on:on, s:daySummary(c,iso)};
+  });
+  var tot=list.reduce(function(a,x){ return a+(x.on?x.s.close+(x.s.cash||0):0); },0);
+  var cards=list.map(function(x){ var c=x.c, cs=x.s, bal=cs.close+(cs.cash||0), sh=x.on?dxPct(bal,tot):0;
+    var note = !c.active ? "비활성" : (c.endDate && iso>c.endDate ? "종료 "+c.endDate : (c.endDate? "종료예정 "+c.endDate : ""));
+    return '<div class="cocard dx-co" data-co="'+c.id+'" style="--dot:'+c.color+';'+(x.on?"":"opacity:.5")+'">'+
+      '<h3><i class="dot"></i>'+esc(c.name)+(note?' <span class="chip nv" style="margin-left:auto">'+esc(note)+'</span>':'')+'</h3>'+
+      '<div class="big" title="'+esc(eokT(bal))+'">'+eok(bal)+'<small>억</small></div>'+
+      '<div class="dx-share"><span>그룹 비중</span><b>'+(x.on?dxPctTxt(sh):"-")+'</b></div>'+
+      '<div class="dx-bar"><i style="width:'+dxClamp(sh).toFixed(1)+'%"></i></div>'+
+      '<dl><dt>입금</dt><dd title="'+esc(eokT(cs.inTotal))+'">'+eok(cs.inTotal)+'</dd>'+
+      '<dt>출금</dt><dd title="'+esc(eokT(cs.outTotal))+'">'+eok(cs.outTotal)+'</dd>'+
+      '<dt>수지차</dt><dd class="'+(cs.net>0?"up":cs.net<0?"dn":"")+'" title="'+esc(eokT(cs.net))+'">'+eokS(cs.net)+'</dd></dl></div>';
+  }).join("");
+  $("#coCardsWrap").innerHTML='<div class="cocards">'+cards+'</div>';
+  $$("#coCardsWrap .cocard").forEach(function(el){ el.onclick=function(){ curCo=el.dataset.co; render(); }; });
+}
+
+/* ---- 법인별 자금수지: 기초 + 수지차 ± 이동·외화 = 기말 (예금 기준, 현금 별도) ---- */
+function dxFlowRow(c, R, iso){
+  var ds=dxCoDates(c, R.from, R.to); if(!ds.length) return null;
+  var first=daySummary(c, ds[0]), lastD=ds[ds.length-1], last=daySummary(c, lastD);
+  var r={c:c, open:first.open, close:last.close, inT:0, outT:0, mvNet:0, lastD:lastD};
+  ds.forEach(function(d){ var x=daySummary(c,d); r.inT+=x.inTotal; r.outT+=x.outTotal; r.mvNet+=(x.mvIn||0)-(x.mvOut||0); });
+  r.net=r.inT-r.outT; r.other=r.close-r.open-r.net;   // 이동·외화 = 자금이동 순액 + 외화 거래·환산 변동 (항등식이 표 안에서 보이도록)
+  var pmIso=dxPrevMonthIso(c, R.to); r.pm=pmIso?daySummary(c,pmIso).close:null; r.pmIso=pmIso;
+  return r;
+}
+function dxFlow(iso){
+  var R=dxRange(DX.p, iso);
+  var cos=curCo==="ALL" ? D.companies.filter(function(c){ return c.active && (!c.endDate || c.endDate>=R.from); }) : scopeCos();
+  var rows=cos.map(function(c){ return dxFlowRow(c,R,iso); }).filter(Boolean);
+  $$("#dxFlowSeg button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.p===DX.p?"true":"false");
+    b.onclick=function(){ DX.p=b.dataset.p; dxFlow(curDate); dxMix(curDate); }; });
+  $("#dxFlowSub").textContent=R.label+" · 단위 억원";
+  if(!rows.length){ $("#dxFlowTbl").innerHTML='<tbody><tr><td class="empty">기간 내 자료가 없습니다</td></tr></tbody>'; $("#dxFlowFoot").textContent=""; return; }
+  var T={open:0,inT:0,outT:0,net:0,other:0,close:0,pm:0,pmN:0,mvNet:0};
+  rows.forEach(function(r){ ["open","inT","outT","net","other","close","mvNet"].forEach(function(k){ T[k]+=r[k]; }); if(r.pm!=null){ T.pm+=r.pm; T.pmN++; } });
+  if(!T.pmN) T.pm=null;
+  var rate=function(cl,pm){ if(pm==null||!pm) return '<td class="num zero">-</td>'; var v=(cl-pm)/Math.abs(pm)*100; return '<td class="num '+(v>0?"up":v<0?"dn":"")+'">'+(v>0?"+":"")+v.toFixed(1)+'%</td>'; };
+  var cell=function(v,cls){ return '<td class="num'+(cls?" "+cls:"")+'" title="'+esc(eokT(v))+'">'+eok(v)+'</td>'; };
+  var otherCell=function(r){ var fxo=r.other-r.mvNet;
+    return '<td class="num dx-oth" title="'+esc("자금이동 순액 "+fmt(r.mvNet)+"원 · 외화·기타 "+fmt(fxo)+"원 = 합계 "+fmt(r.other)+"원")+'">'+(Math.abs(r.other)<0.5?'-':eokS(r.other))+'</td>'; };
+  var tr=function(r,isT){
+    var name=isT?'그룹 합계':'<i class="dot" style="--dot:'+r.c.color+'"></i>'+esc(r.c.name)+(r.c.endDate&&r.lastD<R.to?' <span class="mini">('+esc(r.lastD.slice(5))+'까지)</span>':'');
+    return '<tr'+(isT?' class="dx-tot"':' data-co="'+r.c.id+'"')+'><td>'+name+'</td>'+cell(r.open)+cell(r.inT)+cell(r.outT)+
+      '<td class="num '+(r.net>0?"up":r.net<0?"dn":"")+'" title="'+esc(eokT(r.net))+'">'+eokS(r.net)+'</td>'+otherCell(r)+
+      '<td class="num dx-close" title="'+esc(eokT(r.close))+'">'+eok(r.close)+'</td>'+
+      '<td class="num" title="'+esc(isT?(r.pm==null?"전월 자료 없음":"법인별 전월 동기 합계 "+eokT(r.pm)):(r.pmIso?r.pmIso+" 기말 "+eokT(r.pm):"전월 자료 없음"))+'">'+(r.pm==null?"-":eok(r.pm))+'</td>'+rate(r.close,r.pm)+'</tr>';
+  };
+  var multi=rows.length>1;
+  $("#dxFlowTbl").innerHTML='<thead><tr><th>법인</th><th class="num">기초시재</th><th class="num">입금</th><th class="num">출금</th><th class="num">수지차</th><th class="num" title="법인 안 계좌 간 자금이동, 외화 매도·매수·환산 변동">이동·외화</th><th class="num">기말시재</th><th class="num">전월 동기</th><th class="num">증감률</th></tr></thead><tbody>'+
+    (multi?tr(T,true):'')+rows.map(function(r){ return tr(r,false); }).join("")+'</tbody>';
+  $("#dxFlowFoot").innerHTML='예금 기준(현금 별도) · <b>기말시재 = 기초시재 + 수지차 ± 이동·외화</b> · 입금·출금은 자금이동·외화 매도매수 제외 · 증감률 = (기말 − 전월 동기) ÷ 전월 동기 · 억 단위 반올림이라 합이 0.1억 다를 수 있어요(마우스를 올리면 원 단위)';
+  if(curCo==="ALL") $$("#dxFlowTbl tbody tr[data-co]").forEach(function(tr){ tr.onclick=function(){ curCo=tr.dataset.co; render(); }; });
+}
+
+/* ---- 시재 추이: 월별 콤보 — 위 = 입금·출금(월 합계) 선, 아래 = 월말 시재 막대. 두 띠는 축이 따로(겹치지 않음) ---- */
+function dxTrend(iso){
+  var cos=scopeCos(), ds=allDates().filter(function(d){ return d<=iso; });
+  var el=$("#chartBal");
+  if(!ds.length){ el.innerHTML='<div class="empty">데이터 없음</div>'; $("#legendBal").innerHTML=""; return; }
+  var ym=iso.slice(0,7), months=[]; for(var k=5;k>=0;k--) months.push(shiftMonth(ym,-k));
+  var baseYm=shiftMonth(ym,-6);
+  var byM={}; ds.forEach(function(d){ var m=d.slice(0,7); (byM[m]=byM[m]||[]).push(d); });
+  var pts=months.map(function(m){ var L=byM[m]||[], o={m:m, inT:0, outT:0, close:null, last:null, n:L.length};
+    L.forEach(function(d){ var r=scopeSummary(d); o.inT+=r.inTotal; o.outT+=r.outTotal; });
+    if(L.length){ o.last=L[L.length-1]; o.close=scopeSummary(o.last).close; }
+    return o; });
+  var baseDs=ds.filter(function(d){ return d.slice(0,7)<=baseYm; }), baseIso=baseDs.length?baseDs[baseDs.length-1]:null;
+  var base={close:baseIso?scopeSummary(baseIso).close:null, iso:baseIso};
+  var W=600, H=318, L=10, Rr=10, cols=7, cw=(W-L-Rr)/cols, cx=function(i){ return L+cw*i+cw/2; };
+  var tTop=34, tBot=158, bTop=196, bBot=278, g="";
+  var fl=[]; pts.forEach(function(p){ if(p.n){ fl.push(p.inT); fl.push(p.outT); } });
+  var fMax=fl.length?Math.max.apply(null,fl):1, fMin=fl.length?Math.min.apply(null,fl):0; if(fMax===fMin){ fMax=fMax*1.1+1; fMin=Math.max(0,fMin*0.9); }
+  var pad=(fMax-fMin)*0.12, fy=function(v){ return tBot-(v-(fMin-pad))/((fMax+pad)-(fMin-pad))*(tBot-tTop); };
+  var cl=[base.close].concat(pts.map(function(p){ return p.close; })).filter(function(v){ return v!=null; });
+  var cMax=Math.max.apply(null, cl.map(function(v){ return Math.abs(v); }).concat([1]));
+  var by=function(v){ return bBot-Math.max(0,v)/cMax*(bBot-bTop); };
+  /* 띠 구분 · 라벨 */
+  g+='<text x="'+L+'" y="16" fill="var(--muted)" font-size="12">입금·출금 (월 합계)</text>';
+  g+='<line x1="'+L+'" y1="'+(tBot+18)+'" x2="'+(W-Rr)+'" y2="'+(tBot+18)+'" stroke="var(--rule)" stroke-dasharray="2 4"/>';
+  g+='<text x="'+L+'" y="'+(tBot+34)+'" fill="var(--muted)" font-size="12">월말 시재</text>';
+  g+='<line x1="'+(L+cw)+'" y1="'+tTop+'" x2="'+(L+cw)+'" y2="'+bBot+'" stroke="var(--rule)" stroke-dasharray="2 3"/>';
+  g+='<line x1="'+L+'" y1="'+bBot+'" x2="'+(W-Rr)+'" y2="'+bBot+'" stroke="var(--rule-strong)"/>';
+  /* 막대 (기준 + 6개월) */
+  var bw=Math.min(40, cw*0.46);
+  var bar=function(i, v, isBase, tip){ if(v==null) return;
+    var x=cx(i)-bw/2, y=by(v), h=Math.max(1,bBot-y), r=Math.min(4,h);
+    g+='<path d="M'+x+' '+bBot+' V'+(y+r)+' Q'+x+' '+y+' '+(x+r)+' '+y+' H'+(x+bw-r)+' Q'+(x+bw)+' '+y+' '+(x+bw)+' '+(y+r)+' V'+bBot+' Z" fill="'+(isBase?"var(--navy)":"var(--muted)")+'" opacity="'+(isBase?".85":".38")+'"/>';
+    g+='<text x="'+cx(i)+'" y="'+(y-6)+'" text-anchor="middle" fill="var(--ink)" font-size="12.5" font-weight="700">'+eok(v)+'</text>'; };
+  bar(0, base.close, true);
+  pts.forEach(function(p,i){ bar(i+1, p.close, false); });
+  /* 선 — 입금(●) · 출금(○) */
+  var line=function(key, color, hollow){
+    var seg=[]; pts.forEach(function(p,i){ if(p.n) seg.push([cx(i+1), fy(p[key]), p]); });
+    if(!seg.length) return;
+    /* 이번 달(진행 중)로 이어지는 마지막 구간은 점선 — 월 합계가 아직 덜 찬 값 */
+    var lastPart=seg.length>1 && seg[seg.length-1][2].m===ym, solid=lastPart?seg.slice(0,-1):seg;
+    var dStr=solid.map(function(s,j){ return (j?"L":"M")+s[0].toFixed(1)+" "+s[1].toFixed(1); }).join(" ");
+    if(solid.length>1) g+='<path d="'+dStr+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round"/>';
+    if(lastPart){ var a=seg[seg.length-2], b=seg[seg.length-1]; g+='<path d="M'+a[0].toFixed(1)+' '+a[1].toFixed(1)+' L'+b[0].toFixed(1)+' '+b[1].toFixed(1)+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-dasharray="4 4"/>'; }
+    seg.forEach(function(s){ g+='<circle cx="'+s[0]+'" cy="'+s[1]+'" r="4.5" fill="'+(hollow?"var(--surface)":color)+'" stroke="'+(hollow?color:"var(--surface)")+'" stroke-width="2"/>'; });
+  };
+  line("inT","var(--navy)",false); line("outT","var(--out)",true);
+  /* 값 라벨: 큰 쪽은 점 위, 작은 쪽은 점 아래 — 글자는 본문색 */
+  pts.forEach(function(p,i){ if(!p.n) return; var x=cx(i+1), inUp=p.inT>=p.outT;
+    var lab=function(v,up){ var y=fy(v)+(up?-10:18); g+='<text x="'+x+'" y="'+y+'" text-anchor="middle" fill="var(--ink-2)" font-size="12" font-weight="600">'+eok(v)+'</text>'; };
+    lab(p.inT, inUp); lab(p.outT, !inUp); });
+  /* x축 라벨 */
+  var xl=function(i, t, sub){ g+='<text x="'+cx(i)+'" y="'+(bBot+17)+'" text-anchor="middle" fill="'+(i===0?"var(--ink)":"var(--ink-2)")+'" font-size="11.5" font-weight="'+(i===0?"700":"500")+'">'+esc(t)+'</text>'+(sub?'<text x="'+cx(i)+'" y="'+(bBot+31)+'" text-anchor="middle" fill="var(--muted)" font-size="10">'+esc(sub)+'</text>':''); };
+  xl(0,"기준", base.iso?base.iso.slice(2,7).replace("-",".")+"말":"자료 없음");
+  pts.forEach(function(p,i){ xl(i+1, (+p.m.slice(5))+"월", p.m===ym && p.last ? "~"+(+p.last.slice(8))+"일" : (!p.n?"자료 없음":"")); });
+  /* 마우스 */
+  g+=hitRect(L, 0, cw, H, '<b>기준 ('+esc(base.iso||"-")+')</b>'+tipRow("월말 시재", base.close==null?"-":fmt(base.close)+"원"));
+  pts.forEach(function(p,i){ g+=hitRect(L+cw*(i+1), 0, cw, H, '<b>'+esc(p.m)+(p.m===ym&&p.last?" (~"+p.last.slice(5)+")":"")+'</b>'+
+    tipRow("입금", fmt(p.inT)+"원")+tipRow("출금", fmt(p.outT)+"원")+tipRow("수지차", fmtSigned(p.inT-p.outT)+"원")+tipRow("월말 시재", p.close==null?"-":fmt(p.close)+"원")); });
+  el.innerHTML=svgEl(W,H+18,g);
+  $("#trendRange").textContent="기준("+(base.iso||"-")+") + 최근 6개월 · 단위 억원";
+  $("#legendBal").innerHTML='<span><i style="background:var(--navy);border-radius:50%"></i>입금</span><span><i style="background:var(--surface);border:2px solid var(--out);border-radius:50%;width:7px;height:7px"></i>출금</span><span><i style="background:var(--muted);opacity:.45"></i>월말 시재</span><span><i style="background:var(--navy);opacity:.85"></i>기준(6개월 전 월말)</span>';
+}
+
+/* ---- 지출 구성: 분류 · 막대 · 금액 · 비중 (기간 = 법인별 자금수지 탭과 같음) ---- */
+function dxMix(iso){
+  var R=dxRange(DX.p, iso), cos=scopeCos(), ds=dxScopeDates(cos, R.from, R.to), tot={};
+  OUT_CATS.forEach(function(k){ tot[k]=0; });
+  ds.forEach(function(d){ var r=rollup(cos,d); OUT_CATS.forEach(function(k){ tot[k]+=r.outBy[k]||0; }); });
+  var arr=MIX_GROUPS.map(function(g){ return {c:g.label, v:g.keys.reduce(function(s,k){ return s+(tot[k]||0); },0)}; }).filter(function(x){ return x.v>0; }).sort(function(a,b){ return b.v-a.v; });
+  $("#mixRange").textContent=R.label+" · 단위 억원";
+  if(!arr.length){ $("#chartMix").innerHTML='<div class="empty">지출 없음</div>'; return; }
+  var sum=arr.reduce(function(s,x){ return s+x.v; },0), max=arr[0].v;
+  $("#chartMix").innerHTML='<div class="dx-mixlist">'+arr.map(function(x,i){ var w=x.v/max*100, op=(0.45+0.55*(x.v/max)).toFixed(2);
+    return '<div class="dx-mrow" title="'+esc(x.c+" "+fmt(x.v)+"원")+'"><span class="n">'+esc(x.c)+'</span><span class="b"><i style="width:'+Math.max(0.6,w).toFixed(1)+'%;opacity:'+op+'"></i></span><span class="v">'+eok(x.v)+'</span><span class="p">'+dxPctTxt(x.v/sum*100)+'</span></div>'; }).join("")+
+    '<div class="dx-mrow tot"><span class="n">합계</span><span class="b"></span><span class="v" title="'+esc(fmt(sum)+"원")+'">'+eok(sum)+'</span><span class="p">100%</span></div></div>';
+}
+
+/* ---- 은행별 잔액: 계좌번호는 쓰지 않고 은행별 합계만. 외화는 원화환산(랏 장부가) ---- */
+function dxBanks(iso){
+  var cos=scopeCos(), ds=allDates(), i=ds.indexOf(iso), prevIso=i>0?ds[i-1]:null, B={}, cashT=0, cashP=0, sumClose=0;
+  var bk=function(n){ return B[n]||(B[n]={bank:n, n:0, close:0, open:0, inT:0, outT:0, mvIn:0, mvOut:0, ccy:{}}); };
+  cos.forEach(function(c){
+    if(c.endDate && iso>c.endDate) return;
+    var st=coState(c), row=st.chain[iso], ds0=st.dates.filter(function(d){ return d<=iso; }), use=row?iso:(ds0.length?ds0[ds0.length-1]:null);
+    var rw=use?st.chain[use]:null;
+    (st.accs||[]).forEach(function(a){ if(a.group==="외화") return; var o=rw&&rw[a.label]; if(!o) return;
+      var b=bk(a.bank||"기타"); if(Math.abs(o.close)>=1 || (use===iso && ((o.in||0)||(o.out||0)||(o.mvIn||0)||(o.mvOut||0)))) b.n++; b.close+=o.close; b.open+=(use===iso?o.open:o.close);
+      if(use===iso){ b.inT+=o.in||0; b.outT+=o.out||0; b.mvIn+=o.mvIn||0; b.mvOut+=o.mvOut||0; } });
+    var s=daySummary(c,iso), ps=prevIso?daySummary(c,prevIso):null;
+    (s.fxDetail||[]).forEach(function(x){ var b=bk(x.bank||"기타"); b.close+=x.krw||0; b.ccy[x.ccy||"USD"]=1; });
+    ((ps&&ps.fxDetail)||[]).forEach(function(x){ var b=bk(x.bank||"기타"); b.open+=x.krw||0; });
+    cashT+=s.cash||0; cashP+=ps?(ps.cash||0):0; sumClose+=s.close;
+  });
+  var list=Object.keys(B).map(function(k){ return B[k]; }).sort(function(a,b){ return b.close-a.close; });
+  var live=function(b){ return Math.abs(b.close)>=1 || Math.abs(b.open)>=1 || b.inT || b.outT || b.mvIn || b.mvOut; };
+  var shown=DX.bankAll?list:list.filter(live), hidden=list.length-list.filter(live).length;
+  var bankSum=list.reduce(function(a,b){ return a+b.close; },0), openSum=list.reduce(function(a,b){ return a+b.open; },0), gap=Math.round(sumClose-bankSum);
+  var max=Math.max.apply(null, shown.map(function(b){ return Math.abs(b.close); }).concat([1]));
+  var td=function(v,cls){ return '<td class="num'+(cls?" "+cls:"")+(Math.abs(v)<0.5?" zero":"")+'" title="'+esc(eokT(v))+'">'+eok(v)+'</td>'; };
+  var row=function(b){ var d=b.close-b.open, mv=b.mvIn-b.mvOut;
+    return '<tr><td><b>'+esc(b.bank)+'</b>'+Object.keys(b.ccy).map(function(c){ return ' <span class="dx-ccy">'+esc(c)+'</span>'; }).join("")+'</td><td class="num">'+b.n+'</td>'+
+      '<td class="dx-bcell"><span class="dx-bar sm"><i style="width:'+dxClamp(Math.abs(b.close)/max*100).toFixed(1)+'%"></i></span><b title="'+esc(eokT(b.close))+'">'+eok(b.close)+'</b></td>'+
+      td(b.open)+td(b.inT)+td(b.outT)+'<td class="num'+(Math.abs(mv)<0.5?" zero":"")+'" title="입 '+esc(eokT(b.mvIn))+' / 출 '+esc(eokT(b.mvOut))+'">'+(Math.abs(mv)<0.5?"-":eokS(mv))+'</td>'+
+      '<td class="num '+(d>0.5?"up":d<-0.5?"dn":"zero")+'" title="'+esc(eokT(d))+'">'+(Math.abs(d)<0.5?"-":eokS(d))+'</td></tr>'; };
+  $("#dxBankSub").textContent=(hidden&&!DX.bankAll?"잔액·거래 0원 "+hidden+"곳 숨김 · ":"")+"단위 억원 · 외화는 원화환산";
+  $("#dxBankTbl").innerHTML='<thead><tr><th>은행</th><th class="num">계좌</th><th>금일 잔액</th><th class="num">전일</th><th class="num">입금</th><th class="num">출금</th><th class="num">자금이동</th><th class="num">전일 대비</th></tr></thead><tbody>'+
+    (shown.map(row).join("")||'<tr><td colspan="8" class="empty">계좌 자료 없음</td></tr>')+
+    (Math.abs(cashT)>=1||Math.abs(cashP)>=1?'<tr><td><b>현금 시재</b></td><td class="num">-</td><td class="dx-bcell"><span class="dx-bar sm"><i style="width:'+dxClamp(Math.abs(cashT)/max*100).toFixed(1)+'%"></i></span><b>'+eok(cashT)+'</b></td>'+td(cashP)+'<td class="num zero">-</td><td class="num zero">-</td><td class="num zero">-</td><td class="num'+(Math.abs(cashT-cashP)<0.5?" zero":"")+'">'+(Math.abs(cashT-cashP)<0.5?"-":eokS(cashT-cashP))+'</td></tr>':'')+
+    (Math.abs(gap)>=1?'<tr><td colspan="2"><b>계좌 미배분</b> <span class="mini">보고서 총액 기준</span></td><td class="dx-bcell"><b title="'+esc(eokT(gap))+'">'+eok(gap)+'</b></td><td colspan="5" class="mini">계좌별 합계와 시재 차이 — 자금일보 검증에서 확인</td></tr>':'')+
+    '<tr class="dx-tot"><td title="예금 + 현금 시재">합계</td><td class="num">'+list.reduce(function(a,b){ return a+b.n; },0)+'</td><td class="dx-bcell"><b title="'+esc(eokT(sumClose+cashT))+'">'+eok(sumClose+cashT)+'</b></td>'+td(openSum+cashP)+
+    td(list.reduce(function(a,b){ return a+b.inT; },0))+td(list.reduce(function(a,b){ return a+b.outT; },0))+'<td></td><td class="num" title="'+esc(eokT(sumClose+cashT-openSum-cashP))+'">'+eokS(sumClose+cashT-openSum-cashP)+'</td></tr></tbody>';
+  var cb=$("#dxBankAll"); if(cb){ cb.checked=DX.bankAll; cb.onchange=function(){ DX.bankAll=cb.checked; dxBanks(iso); }; }
+}
+
+function renderDash(){
+  var ds=allDates();
+  if(!ds.length || !curDate){
+    $("#dxHead").innerHTML=""; $("#dxStrip").innerHTML="";
+    $("#kpis").innerHTML='<div class="kpi" style="grid-column:1/-1"><div class="empty"><b>아직 데이터가 없습니다</b>데이터 업로드 탭에서 CMS 거래내역 또는 월별 자금현황보고 파일을 올려주세요.</div></div>';
+    $("#coCardsWrap").innerHTML="";
+    ["chartBal","chartMix"].forEach(function(id){ $("#"+id).innerHTML='<div class="empty">데이터 없음</div>'; });
+    $("#legendBal").innerHTML=""; $("#dxFlowTbl").innerHTML=""; $("#dxFlowFoot").textContent=""; $("#dxBankTbl").innerHTML="";
+    renderLoans(); renderTodo(); return;
+  }
+  var iso=curDate, s=scopeSummary(iso), i=ds.indexOf(iso), prevIso=i>0?ds[i-1]:null, ps=prevIso?scopeSummary(prevIso):null;
+  dxHead(iso, dxCheck(iso));
+  dxKpis(iso, s, ps);
+  dxCoCards(iso);
+  dxFlow(iso);
+  dxTrend(iso);
+  dxMix(iso);
+  dxBanks(iso);
+  renderLoans();
+  renderTodo();   // [v79]
+}
+
 function fxKpi(s){
   var st=s.fxState||{}, keys=Object.keys(st).filter(function(k){ return (st[k].amt||0)!==0; });
   keys.sort(function(a,b){ return (st[b].krw||0)-(st[a].krw||0); });
