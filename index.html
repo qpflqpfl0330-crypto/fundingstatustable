@@ -186,6 +186,16 @@ body.cal-mode #topbar > :not(#reloadChip){display:none}
 .wb-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--wb-line);background:var(--wb-card);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--wb-ink);cursor:pointer}
 .wb-chip:hover{background:var(--wb-col)}
 .wb-month{padding:0 28px 22px}
+/* [v79] 반복 업무 관리 분류 필터 · 대시보드 오늘의 할일 */
+.wb-mbar{display:flex;gap:6px;flex-wrap:wrap;padding:12px 16px}
+.wb-mchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--wb-line);background:var(--wb-card);color:var(--wb-sub);border-radius:999px;padding:4px 11px;font-size:12.5px;cursor:pointer}
+.wb-mchip b{font-weight:600;color:var(--wb-ink);font-variant-numeric:tabular-nums}
+.wb-mchip[aria-pressed="true"]{background:var(--wb-navy);border-color:var(--wb-navy);color:var(--wb-onnavy)}
+.wb-mchip[aria-pressed="true"] b{color:var(--wb-onnavy)}
+.wb-todo-wrap{padding:12px 16px 16px;font-family:"Pretendard","Noto Sans KR",system-ui,sans-serif;color:var(--wb-ink);display:flex;flex-direction:column;gap:10px}
+.wb-todo{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;align-items:start}
+.wb-todo-late{all:unset;box-sizing:border-box;cursor:pointer;background:var(--wb-latebg);color:var(--wb-lateh);font-size:13px;font-weight:700;border-radius:8px;padding:8px 12px}
+.wb-todo-late:focus-visible{outline:2px solid var(--wb-navy);outline-offset:2px}
 .wb-month .wc-grid{border:1px solid var(--wb-line);border-radius:10px;overflow:hidden}
 .wb-month .wc-day{border-color:var(--wb-line)}
 .wb-month .wc-ev{border-left:0;background:none;padding:0;border-radius:0;display:block}
@@ -415,7 +425,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v78 · 2026-10-19</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v79 · 2026-10-19</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -471,8 +481,8 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
           <div class="chartwrap"><div id="chartMix"></div></div>
         </div>
         <div class="panel">
-          <header><h2>최근 일자별 요약</h2><span class="sub">클릭 시 해당 일자로 이동</span></header>
-          <div class="scroll" style="max-height:330px"><table class="tbl" id="recentTbl"></table></div>
+          <header><h2>오늘의 할일</h2><span class="sub" id="todoSub"></span><div class="sp"><button class="btn sm" id="todoOpen">업무캘린더</button></div></header>   <!-- [v79] 최근 일자별 요약 대신 -->
+          <div class="scroll" style="max-height:360px"><div id="todoBody" class="wb-todo-wrap"></div></div>
         </div>
       </div>
       <div class="panel">
@@ -1392,16 +1402,11 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
               <button data-p="month" aria-pressed="true">월별</button>
               <button data-p="year" aria-pressed="false">연도별</button>
             </div>
-            <div class="seg" id="segChart">
-              <button data-g="split" aria-pressed="true">흐름·잔액</button>
-              <button data-g="fall" aria-pressed="false">워터폴</button>
-            </div>
+            <!-- [v79] 그래프(흐름·잔액 / 워터폴) 제거 — 대시보드에서 확인 -->
             <button class="btn sm" id="btnMonthXlsx">엑셀 내보내기</button>
           </div>
         </header>
         <div class="pad rangebar" id="periodRange"></div>
-        <div class="chartwrap"><div id="chartPeriod"></div></div>
-        <div class="legend" id="legendPeriod"></div>
       </div>
       <div class="panel">
         <header><h2>구분별 집계표</h2><span class="sub" id="aggSub"></span></header>
@@ -4508,7 +4513,7 @@ function renderDash(){
     $("#kpis").innerHTML='<div class="kpi" style="grid-column:1/-1"><div class="empty"><b>아직 데이터가 없습니다</b>데이터 업로드 탭에서 CMS 거래내역 또는 월별 자금현황보고 파일을 올려주세요.</div></div>';
     $("#coCardsWrap").innerHTML="";
     ["chartBal","chartFlow","chartMix"].forEach(function(id){ $("#"+id).innerHTML='<div class="empty">데이터 없음</div>'; });
-    $("#recentTbl").innerHTML=""; $("#legendBal").innerHTML=""; renderLoans(); return;
+    if($("#recentTbl")) $("#recentTbl").innerHTML=""; $("#legendBal").innerHTML=""; renderLoans(); renderTodo(); return;
   }
   var s=scopeSummary(curDate);
   var i=ds.indexOf(curDate), prevIso=i>0?ds[i-1]:null;
@@ -4555,6 +4560,7 @@ function renderDash(){
   drawFlow($("#chartFlow"), rd, cos);
   drawMix($("#chartMix"), rd, cos);
 
+  if($("#recentTbl")){   // [v79] 대시보드에서 뺌(표 자리 = 오늘의 할일) — 다시 넣으면 그대로 동작
   var rows=recentDates(40).slice().reverse().map(function(d){
     var a=scopeSummary(d), rec=cos.length===1?dayRec(cos[0],d):null;
     var sr={}; cos.forEach(function(c){ var r=dayRec(c,d); if(r) sr[r.source]=1; });
@@ -4568,7 +4574,9 @@ function renderDash(){
   }).join("");
   $("#recentTbl").innerHTML='<thead><tr><th>일자</th><th style="text-align:right">입금</th><th style="text-align:right">출금</th><th style="text-align:right">수지차</th><th style="text-align:right">원화 시재</th><th>출처</th></tr></thead><tbody>'+rows+'</tbody>';
   $$("#recentTbl tbody tr").forEach(function(tr){ tr.onclick=function(){ curDate=tr.dataset.date; setView("daily"); }; });
+  }
   renderLoans();
+  renderTodo();   // [v79]
 }
 function fxKpi(s){
   var st=s.fxState||{}, keys=Object.keys(st).filter(function(k){ return (st[k].amt||0)!==0; });
@@ -5594,7 +5602,8 @@ function renderTrend(){
   var cos=scopeCos();
   renderRangeBar(period,cos);
   var b=periodBucketsRanged(period,cos);
-  if(chartKind==="fall"){
+  if(!$("#chartPeriod")){ /* [v79] 그래프 없음 */ }
+  else if(chartKind==="fall"){
     drawWaterfall($("#chartPeriod"), b);
     $("#legendPeriod").innerHTML='<span><i style="background:var(--navy)"></i>기초·기말 시재</span>'+
       '<span><i style="background:var(--in)"></i>순유입</span><span><i style="background:var(--out)"></i>순유출</span>'+
@@ -5822,7 +5831,7 @@ var WC_CATS=[
   {k:"etc", t:"기타", v:"--wc-e"}
 ];
 var WC_WD=["일","월","화","수","목","금","토"];
-var WC={ym:null, sel:null, off:{}, edit:false, mode:"week", wk:null, open:{}, filt:false};   // [v78] mode 주/월 · wk 그 주 월요일 · open 지연 카드 펼침 · filt 필터 창
+var WC={ym:null, sel:null, off:{}, edit:false, mode:"week", wk:null, open:{}, filt:false, mf:""};   // [v79] mf 반복 업무 관리 분류 필터   // [v78] mode 주/월 · wk 그 주 월요일 · open 지연 카드 펼침 · filt 필터 창
 function wcCat(k){ for(var i=0;i<WC_CATS.length;i++) if(WC_CATS[i].k===k) return WC_CATS[i]; return WC_CATS[WC_CATS.length-1]; }
 function wcColor(k){ return "var("+wcCat(k).v+")"; }
 function wcStore(){ if(!D.workCal) D.workCal={items:[], done:{}}; if(!D.workCal.items) D.workCal.items=[]; if(!D.workCal.done) D.workCal.done={}; return D.workCal; }
@@ -5953,9 +5962,17 @@ function wcProg(e){
 }
 function wcWho(){ return (typeof AUTH!=="undefined" && AUTH && AUTH.user && AUTH.user.email)||""; }
 /* 체크 토글 — 즉시 화면 반영(낙관적), 저장 실패 시 원래 상태로 되돌리고 알림 */
+function wcRefresh(){ if(view==="dash") renderTodo(); else renderCal(); }   // [v79] 대시보드 '오늘의 할일'에서도 체크
+function wcSetSt(k, val){
+  var st=wcStore();
+  if(typeof readOnly!=="undefined" && readOnly){ toast("보기 전용입니다 — 편집 권한이 없습니다."); wcRefresh(); return; }
+  var s=st.done[k]||{}; s.st=val||undefined; if(!s.st) delete s.st;
+  if(s.st){ s.by=wcWho(); s.at=new Date().toISOString(); st.done[k]=s; } else if(!(s.c||[]).filter(Boolean).length && !s.ok) delete st.done[k];
+  wcSave(s.st?"상태: "+s.st:"상태 지움").then(wcRefresh);
+}
 function wcToggle(key, i, n, val){
   var st=wcStore();
-  if(typeof readOnly!=="undefined" && readOnly){ toast("보기 전용입니다 — 편집 권한이 없어 체크할 수 없습니다."); renderCal(); return; }
+  if(typeof readOnly!=="undefined" && readOnly){ toast("보기 전용입니다 — 편집 권한이 없어 체크할 수 없습니다."); wcRefresh(); return; }
   var old=st.done[key]?JSON.parse(JSON.stringify(st.done[key])):null;
   var s=st.done[key]?JSON.parse(JSON.stringify(st.done[key])):{c:[]};
   if(i<0){ s.ok=!!val; s.c=[]; }
@@ -5963,12 +5980,12 @@ function wcToggle(key, i, n, val){
   var any=s.ok || (s.c||[]).filter(Boolean).length || s.st;
   if(s.ok){ s.by=wcWho(); s.at=new Date().toISOString(); } else { delete s.by; delete s.at; }
   if(any) st.done[key]=s; else delete st.done[key];
-  renderCal();
+  wcRefresh();
   var t0=Date.now();
   save().then(function(){
     if(wcSaveFailAt>=t0){
       if(old) st.done[key]=old; else delete st.done[key];
-      renderCal(); toast("저장되지 않아 체크를 되돌렸습니다.");
+      wcRefresh(); toast("저장되지 않아 체크를 되돌렸습니다.");
     }
   });
 }
@@ -6038,11 +6055,19 @@ function renderCal(){
   if(WC.mode==="month") body=wcMonthHtml(today);
   else body=wcWeekHtml(today);
   host.innerHTML='<div class="wb">'+top+body+'</div>'+
-    '<div class="panel"><header><h2>반복 업무 관리</h2>'+finSub(st.items.length+"개 · 대출이자·만기는 금융 › 차입/대여 약정에서 자동")+
+    '<div class="panel"><header><h2>반복 업무 관리</h2>'+finSub((WC.mf?wcCat(WC.mf).t+" "+st.items.filter(function(it){ return (it.cat||"etc")===WC.mf; }).length+"개 / 전체 ":"")+st.items.length+"개 · 대출이자·만기는 금융 › 차입/대여 약정에서 자동")+
       '<div class="sp"><button class="btn sm" id="wcAdd">업무 추가</button><button class="btn sm" id="wcToggle">'+(WC.edit?'접기':'펼치기')+'</button></div></header>'+
+      wcManageBar(st.items)+
       (WC.edit?'<div class="scroll"><table class="tbl" id="wcItemTbl">'+wcItemTable(st.items)+'</table></div>':'<p class="hint" style="padding:0 16px 14px">매월 반복·분기마감·예적금 만기·매입대금·상생파트너론 연장 같은 업무를 규칙(매월 N일·말일·N째 주 요일·분기 월·영업일 가감·휴일 처리)과 체크리스트로 등록합니다. [펼치기]로 편집. 체크·완료 기록은 공용 저장소에 남아 다른 분도 같은 상태를 봅니다.</p>')+
     '</div>';
   wcBind(host);
+}
+/* [v79] 반복 업무 관리 — 분류 필터(전체 + 등록된 분류, 건수). 누르면 표를 펼치고 그 분류만 보여준다 */
+function wcManageBar(items){
+  var cnt={}; items.forEach(function(it){ var k=it.cat||"etc"; cnt[k]=(cnt[k]||0)+1; });
+  var opts=[{k:"",t:"전체",n:items.length}].concat(WC_CATS.filter(function(c){ return cnt[c.k] || WC.mf===c.k; }).map(function(c){ return {k:c.k,t:c.t,v:c.v,n:cnt[c.k]||0}; }));
+  return '<div class="wb-mbar" role="group" aria-label="분류 필터">'+opts.map(function(o){
+    return '<button type="button" class="wb-mchip" data-wbmf="'+o.k+'" aria-pressed="'+((WC.mf||"")===o.k?'true':'false')+'">'+(o.v?'<span class="wb-dot" style="--wcc:var('+o.v+')"></span>':'')+esc(o.t)+'<b>'+o.n+'</b></button>'; }).join("")+'</div>';
 }
 function wcWeekHtml(today){
   var mon=WC.wk, fri=isoAdd(mon,4), sun=isoAdd(mon,6), nMon=isoAdd(mon,7), nSun=isoAdd(mon,13);
@@ -6117,6 +6142,7 @@ function wcItemHtml(e){
 function wcItemTable(items){
   var cos='<option value="ALL">전 법인</option>'+D.companies.map(function(c){ return '<option value="'+c.id+'">'+esc(c.short)+'</option>'; }).join("");
   var rows=items.map(function(it,n){
+    if(WC.mf && (it.cat||"etc")!==WC.mf) return "";   // [v79] 분류 필터(번호 n은 원래 위치 그대로)
     var r=it.rule||{}, kind=r.kind||"monthly";
     var dayVal=+r.bizn>0?("b"+r.bizn):(r.day==="eom"?"eom":(r.nth?("n"+r.nth):String(+r.day||1)));
     return '<tr'+(it.active===false?' style="opacity:.5"':'')+'>'+
@@ -6145,6 +6171,22 @@ function wcItemTable(items){
   return '<thead><tr><th>분류</th><th>업무</th><th>법인</th><th>반복 규칙</th><th>체크리스트</th><th>메모</th><th></th></tr></thead><tbody>'+
     (rows||'<tr><td colspan="7" class="mini" style="padding:18px;text-align:center">등록된 반복 업무가 없습니다 — [업무 추가]</td></tr>')+'</tbody>';
 }
+/* [v79] 대시보드 '오늘의 할일' — 오늘(실제 날짜) 일정 카드 + 지연 건수. 체크·상태는 업무캘린더와 같은 기록 */
+function renderTodo(){
+  var host=$("#todoBody"); if(!host || !D) return;
+  var today=todayISO(), dw=new Date(today+"T00:00:00").getDay(), hn=holidayName(today);
+  var evs=wcSortDay(wcEvents(today,today));
+  var late=wcEvents(isoAdd(today,-WC_LATE_DAYS), isoAdd(today,-1)).filter(function(e){ return !wcIsDone(e); }).length;
+  var left=evs.filter(function(e){ return !wcIsDone(e); }).length;
+  $("#todoSub").textContent=wcMD(today)+" ("+WC_WD[dw]+")"+(hn?" · "+hn:"")+" · "+evs.length+"건"+(evs.length?" 중 남은 "+left+"건":"")+(curCo==="ALL"?" · 그룹 통합":" · "+((co(curCo)||{}).short||""));
+  host.innerHTML=(late?'<button type="button" class="wb-todo-late" id="todoLate">지연 '+late+'건 · 업무캘린더에서 확인</button>':'')+
+    (evs.length?'<div class="wb-todo">'+evs.map(wcCardHtml).join("")+'</div>':'<div class="wb-empty">오늘 일정 없음</div>');
+  function openCal(){ WC.mode="week"; WC.wk=wcMon(todayISO()); setView("cal"); }
+  if($("#todoOpen")) $("#todoOpen").onclick=openCal;
+  if($("#todoLate")) $("#todoLate").onclick=openCal;
+  $$("#todoBody [data-wbk]").forEach(function(el){ el.onchange=function(){ wcToggle(el.dataset.wbk, +el.dataset.i, +el.dataset.n, el.checked); }; });
+  $$("#todoBody [data-wcst]").forEach(function(el){ el.onchange=function(){ wcSetSt(el.dataset.wcst, el.value); }; });
+}
 function wcStep(dir){
   if(WC.mode==="month"){ var p=ymShift(+WC.ym.slice(0,4),+WC.ym.slice(5,7),dir); WC.ym=p[0]+"-"+String(p[1]).padStart(2,"0"); }
   else WC.wk=isoAdd(WC.wk||wcMon(todayISO()), 7*dir);
@@ -6167,14 +6209,11 @@ function wcBind(host){
   $$("#calBody .wc-day").forEach(function(b){ b.onclick=go(function(){ WC.sel=b.dataset.d; WC.wk=wcMon(b.dataset.d); WC.mode="week"; }); });
   $$("#calBody [data-wbopen]").forEach(function(b){ b.onclick=go(function(){ var k=b.dataset.wbopen; WC.open[k]=!WC.open[k]; }); });
   $$("#calBody [data-wbk]").forEach(function(el){ el.onchange=function(){ wcToggle(el.dataset.wbk, +el.dataset.i, +el.dataset.n, el.checked); }; });
-  $$("#calBody [data-wcst]").forEach(function(el){ el.onchange=function(){
-    if(typeof readOnly!=="undefined" && readOnly){ toast("보기 전용입니다 — 편집 권한이 없습니다."); renderCal(); return; }
-    var k=el.dataset.wcst, s=st.done[k]||{}; s.st=el.value||undefined; if(!s.st) delete s.st;
-    if(s.st){ s.by=wcWho(); s.at=new Date().toISOString(); st.done[k]=s; } else if(!(s.c||[]).filter(Boolean).length && !s.ok) delete st.done[k];
-    wcSave(s.st?"상태: "+s.st:"상태 지움").then(renderCal); }; });
+  $$("#calBody [data-wcst]").forEach(function(el){ el.onchange=function(){ wcSetSt(el.dataset.wcst, el.value); }; });
+  $$("#calBody [data-wbmf]").forEach(function(b){ b.onclick=go(function(){ WC.mf=b.dataset.wbmf; WC.edit=true; }); });   // [v79] 반복 업무 분류 필터
   $("#wcToggle").onclick=function(){ WC.edit=!WC.edit; renderCal(); };
   $("#wcAdd").onclick=function(){
-    st.items.push({id:"W"+Date.now().toString(36), cat:"monthly", title:"새 업무", co:"ALL", rule:{kind:"monthly", day:"1", shift:"next"}, checklist:[], memo:"", active:true});
+    st.items.push({id:"W"+Date.now().toString(36), cat:WC.mf||"monthly", title:"새 업무", co:"ALL", rule:{kind:"monthly", day:"1", shift:"next"}, checklist:[], memo:"", active:true});
     WC.edit=true; wcSave("업무 추가됨 — 아래 표에서 편집").then(renderCal);
   };
   $$("#wcItemTbl [data-wi]").forEach(function(el){ el.onchange=function(){
