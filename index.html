@@ -60,6 +60,50 @@
   --c-sn:#8DB2E4; --c-gu:#57C4A0; --c-gd:#DCAE55; --c-gs:#C98FBC;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
 }
+/* [v75] 업무캘린더 */
+:root{--wc-c:#9C3D6E; --wc-m:#1E3E68; --wc-i:#A2342A; --wc-q:#6A4BA0; --wc-d:#0F6A52; --wc-p:#8E6410; --wc-s:#1F7A8C; --wc-e:#5B6573}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){--wc-c:#E79BC0; --wc-m:#8DB2E4; --wc-i:#EC8C77; --wc-q:#B9A2E6; --wc-d:#57C4A0; --wc-p:#DCAE55; --wc-s:#6CC6D8; --wc-e:#9AA4B2} }
+:root[data-theme="dark"]{--wc-c:#E79BC0; --wc-m:#8DB2E4; --wc-i:#EC8C77; --wc-q:#B9A2E6; --wc-d:#57C4A0; --wc-p:#DCAE55; --wc-s:#6CC6D8; --wc-e:#9AA4B2}
+.wc-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.wc-top h2{margin:0 6px;font-size:18px;min-width:118px;text-align:center}
+.wc-cats{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.wc-cat{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--rule-strong);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
+.wc-cat[aria-pressed="false"]{opacity:.45}
+.wc-dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:var(--wcc)}
+.wc-wrap{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media (max-width:1100px){ .wc-wrap{grid-template-columns:minmax(0,1fr)} }
+.wc-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--rule)}
+.wc-dow{padding:6px 8px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--rule);text-align:left}
+.wc-dow.sun,.wc-day.sun .wc-num,.wc-day.holi .wc-num{color:var(--out)}
+.wc-dow.sat,.wc-day.sat .wc-num{color:var(--wc-m)}
+.wc-day{min-height:96px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:5px 6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;background:var(--surface);text-align:left;min-width:0}
+.wc-day:nth-child(7n){border-right:0}
+.wc-day.other{background:var(--surface-2)}
+.wc-day.other .wc-num{opacity:.45}
+.wc-day.sel{outline:2px solid var(--navy);outline-offset:-2px}
+.wc-day:hover{background:var(--surface-2)}
+.wc-num{font-size:12px;font-weight:600;display:flex;gap:6px;align-items:center}
+.wc-day.today .wc-num b{background:var(--navy);color:var(--on-accent);border-radius:999px;padding:0 6px}
+.wc-hn{font-size:10px;font-weight:500;color:var(--out);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wc-ev{font-size:11px;line-height:1.35;border-left:3px solid var(--wcc);padding:1px 5px;background:color-mix(in srgb,var(--wcc) 10%,transparent);border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.wc-ev.done{text-decoration:line-through;opacity:.55}
+.wc-more{font-size:10px;color:var(--muted)}
+.wc-list{display:flex;flex-direction:column}
+.wc-item{border-top:1px solid var(--rule);padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.wc-item:first-child{border-top:0}
+.wc-item.done .wc-ttl{text-decoration:line-through;color:var(--muted)}
+.wc-row{display:flex;align-items:flex-start;gap:8px}
+.wc-ttl{font-weight:600;flex:1;min-width:0}
+.wc-meta{font-size:12px;color:var(--muted)}
+.wc-chk{display:flex;flex-direction:column;gap:4px;margin:2px 0 0 26px}
+.wc-chk label{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}
+.wc-chk label.ok span{text-decoration:line-through;color:var(--muted)}
+.wc-amt{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.wc-dd{font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.wc-dd.hot{background:var(--out-soft);color:var(--out)}
+.wc-dd.now{background:var(--navy);color:var(--on-accent)}
+#wcItemTbl td{vertical-align:top}
+#wcItemTbl textarea{width:220px;min-height:54px;resize:vertical}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-sans);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -267,7 +311,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v73 · 2026-10-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v77 · 2026-10-19</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -277,6 +321,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
       <button data-v="fep">자금업무 자동화<span class="k">6</span></button>
       <button data-v="trend">기간 추이<span class="k">7</span></button>
       <button data-v="fin">금융<span class="k">8</span></button>
+      <button data-v="cal">업무캘린더<span class="k">C</span></button>
       <button data-v="import">데이터 업로드<span class="k">9</span></button>
       <button data-v="settings">설정<span class="k">0</span></button>
     </nav>
@@ -1308,6 +1353,10 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
       </div>
     </section>
 
+    <section class="view" id="v-cal" hidden>
+      <div id="calBody"></div>
+    </section>
+
     <section class="view" id="v-settings" hidden>
       <div class="panel">
         <header><h2>법인 관리</h2><span class="sub">체크 해제 시 통합·메인에서 제외되고 데이터는 보관됩니다</span></header>
@@ -1545,7 +1594,7 @@ var SEED_LOAN_ROWS = [
 ["SN","한도","산업","2026-07-18","2026-07-18","2027-07-18",3000000000,0,0.0432,"","","한도미사용수수료 없음"],
 ["SN","한도","신한","2025-10-30","2025-10-30","2026-10-30",2000000000,0,0.0484,"CD 91일물",[0.0292,0.0192],"한도미사용수수료 없음"],
 ["SN","한도","농협","2026-04-29","2026-04-29","2027-04-29",1000000000,0,0.0364,"","","이자·한도미사용수수료 15일"],
-["SN","한도","국민","2026-05-30","2026-05-30","2027-05-29",500000000,0,0.0446,"","","이자·한도미사용수수료 5일"],
+["SN","한도","국민","2026-05-30","2026-05-30","2027-05-29",500000000,0,0.0446,"","","이자 5일 · 한도미사용수수료 면제(만기 2027-05-29까지)"],   /* [v77] 계획서 26.10 비고 '국민002590 (-)대출 한도미사용수수료 면제 (만기일까지)' */
 ["SN","한도","국민","2026-04-25","2026-04-25","2027-04-23",3000000000,0,0.0467,"","","이자·한도미사용수수료 말일"],
 ["SN","한도","농협","2026-06-07","2026-06-07","2027-06-07",2000000000,0,0.0384,"","","이자·한도미사용수수료 15일"],
 ["GU","개별","농협","2026-07-01","2026-07-01","2026-12-31",1093500000,1093500000,0.0491,"","","1일"],
@@ -1555,7 +1604,7 @@ var SEED_LOAN_ROWS = [
 ["GS","한도","산업","2019-06-27","2019-06-27","2027-06-27",1000000000,0,0.0449,"","",""]
 ];
 var SEED_LENDING_ROWS = [
-["GD","블루로터스","2026-02-02","2027-02-01","2027-02-01",2000000000,300000000,0.046,"매월 말일"]
+["GD","블루로터스","2026-02-02","2026-02-02","2027-02-01",2000000000,300000000,0.046,"매월 말일"]   /* [v74] 약정일 = 최초 실행일(종전 시드는 약정일=만기일 2027-02-01 오기) */
 ];
 /* 금융권 담당자 연락처 · 법정공휴일 (기존 금융권 거래정보 자료 이관) */
 var SEED_CONTACTS=[["하나은행","선릉역지점","지점장","우지욱","여신/수신","02-3429-0126","010-6314-2537","jiwookyoo@hanafn.com",""],["하나은행","선릉역지점","팀장","","여신/수신","","","",""],["하나은행","선릉역지점","차장","허정민","여신","02-3429-0147","","hur.jungmin@hanafn.com",""],["산업은행","안양지점","지점장","","여신/수신","","","",""],["산업은행","안양지점","부지점장","","여신/수신","","","",""],["산업은행","안양지점","팀장","고태우","여신/수신","031-380-0912","010-9892-2468","twko@kdb.co.kr",""],["산업은행","안양지점","대리","김지혜","여신/수신","031-380-0925","010-2079-6874","kjhh@kdb.co.kr",""],["신한은행","선릉역중앙금융센터","지점장","","여신/수신","","","",""],["신한은행","선릉역중앙금융센터","부지점장","고영진","여신/수신","02-569-1473","010-9077-5736","yjingo@shinhan.com",""],["신한은행","선릉역중앙금융센터","센터장","","여신/수신","","","",""],["신한은행","선릉역중앙금융센터","프로","김소연","","02-538-8036","","kimsy@shinhan.com",""],["신한은행","역삼동금융센터","팀장","강동호","","02-3452-3921","010-8525-8217","clunix@shinhan.com",""],["신한은행","역삼동금융센터","차장","박성헌","AICMS","02-3452-3681","","bluskyni@shinhan.com",""],["농협은행","선정릉역지점","지점장","박동석","여신/수신","02-3679-8747","010-3779-7310","dspark1002@nonghyup.com",""],["농협은행","선정릉역지점","팀장","김승태","여신/수신","02-3679-8745","010-6210-6212","nacf1374-1@nonghyup.com",""],["농협은행","NH통합IT센터출장소","지점장","김청","여신/수신","031-426-4085","010-2446-1088","cyh1214@nonghyup.com",""],["농협은행","의왕시지부","팀장","박종하","여신/수신","031-420-2303","010-2620-9019","pjh1113@nonghyup.com","031-425-7935"],["농협은행","의왕시지부","과장","김지선","여신/수신","031-420-2311","","gsanjs@nonghyup.com","031-425-7935"],["농협은행","안양호계금융센터","팀장","이순희","수신","031-451-8151","","nhbank0136-1@nonghyup.com",""],["강원인삼농협","홍천본점","상임이사","고영호","수신","033-439-3002","","",""],["강원인삼농협","홍천본점","과장","최선영","수신","033-439-3012","010-4416-4165","tarn-csy@hanmail.net",""],["국민은행","선릉역종합금융센터","본부장","이남규","업무총괄","02-3673-8590","010-8722-3720","",""],["국민은행","선릉역종합금융센터","팀장","송소원","여신/수신","02-55*-6547","010-8885-0465","ssw1004@kbfg.com",""],["씨티은행","강남기업금융센터","센터장","진욱수","여신/수신","02-520-7307","010-3418-1580","",""],["씨티은행","강남기업금융센터","지점장","이윤환","여신/수신","02-520-7305","010-7467-3560","",""],["씨티은행","강남기업금융센터","차장","이지연","외화","02-520-7372","","",""],["삼성증권","도곡","팀장","황호상","","02-3498-4855","010-2505-1402","",""],["신한금투","신한금투 PWM서초","센터장","변성환","","","010-4248-3227","",""],["신한금투","신한금투 PWM서초","부지점장","김재윤","","","010-2711-4402","",""],["KB증권","KB증권 판교지점","","이성우","","","010-7745-4262","",""],["삼성선물","외환전략팀","팀장","박준철","","02-3707-3699","010-6296-5603","juncheol.par@samsung.com",""],["삼성선물","이자수익 발생 시 원천징수영수증 문의","","","","02-3707-3613","","",""],["NH투자증권","강남법인센터","차장","","","","","",""],["삼성카드","","프로","이광형","총괄","02-2172-8495","010-9036-9202","kh0909.lee@samsung.com",""],["삼성카드","","프로","김시현","","","","ys1115.kim@samsung.com",""],["롯데카드","","책임","박태선","","02-2050-1959","010-4910-9150","tspark01@lottecard.co.kr",""],["롯데카드","","주임","양은희","","02-2050-1952","","un4946@lottecard.co.kr",""],["현대카드","","매니저","정윤영","","02-2167-5670","010-5207-1940","younyoung.jung@hcs.com",""]];
@@ -1606,6 +1655,121 @@ function loanAt(l, iso){
   return {rate:rate, amount:Math.max(0,amt), limit:+l.limit||0,
     avail:Math.max(0,(+l.limit||0)-Math.max(0,amt)), active:active};
 }
+/* ===================== [v74] 대여 이력 · 이자 납부 엔진 (Logic-Architect) =====================
+   ■ 대여(lendings): 차입처럼 moves(+추가 대여 / −회수, 일자별)와 rates(적용일 이자율) 이력을 둔다.
+     잔액 = 약정금액(최초 대여) + 추가 대여 − 회수(기준일까지). 기존 repaid(일자 없는 회수액)는 지우지 않고
+     '일자 미상 회수'로 계속 차감한다(v73 화면에서 열어도 잔액이 같도록). 이력 창에서 일자를 지정하면 moves로 옮긴다.
+   ■ 이자 엔진 — 「그룹사_이자납부계획서」(xlsm) 규칙:
+     · 약정납입일 Mk마다 계산기간 = [직전 약정납입일 M(k−1), Mk − 1] (계획서 T~U열, 일수 = U−T+1)
+     · 실제 납부일 = Mk가 주말·공휴일이면 익영업일(관계사차입금은 전영업일) (계획서 O~Q열)
+     · 이자 = 대상금액 × 일수 × 이자율 ÷ 365(윤년 366) — 기간 중 잔액·이자율이 바뀌면 행을 나눠 행마다 원단위 절사
+       (하나 (-)통장 · 관계사차입금은 반올림, 계획서 비고)
+     · 개별대출 전액상환: [직전 약정납입일, 상환일 − 1] 이자를 상환일에 함께 납부(계획서 U = 상환일 − 1)
+     · 관계사차입금: 법인세 25%(10원 미만 절사) · 지방세 = 법인세의 10%(10원 미만 절사) 원천징수 후 실지급
+     · 한도미사용수수료는 이자비용이 아니라 운영경비(v62 정책)이므로 예상 이자에 넣지 않는다. */
+function lendStartOf(d){ return d.start||d.firstDate||""; }
+function lendAt(d, iso){
+  var rate=+d.rate||0;
+  (d.rates||[]).slice().sort(function(a,b){return a.from<b.from?-1:1}).forEach(function(r){ if(!iso || r.from<=iso) rate=+r.rate||rate; });
+  var st=lendStartOf(d);
+  if(st && iso && iso<st) return {rate:rate, committed:+d.amount||0, lent:0, repaid:0, bal:0, started:false, active:false};
+  var principal=+d.amount||0, add=0, back=+d.repaid||0;
+  (d.moves||[]).forEach(function(m){ if(iso && m.date>iso) return; var a=+m.amount||0; if(a>=0) add+=a; else back+=-a; });
+  var bal=Math.max(0, principal+add-back);
+  return {rate:rate, committed:principal, lent:principal+add, repaid:back, bal:bal, started:true, active:bal>0};
+}
+/* 2025·2027년 공휴일(이자 납부일 판단용 내장값 — 설정의 법정공휴일 목록은 2026년부터라 과거 대사용으로 보완) */
+var KR_HOLIDAYS_BUILTIN={"2025-01-01":"신정","2025-01-27":"임시공휴일","2025-01-28":"설날","2025-01-29":"설날","2025-01-30":"설날",
+  "2025-03-03":"삼일절(대체)","2025-05-05":"어린이날·부처님오신날","2025-05-06":"대체공휴일","2025-06-03":"대통령선거","2025-06-06":"현충일",
+  "2025-08-15":"광복절","2025-10-03":"개천절","2025-10-06":"추석","2025-10-07":"추석","2025-10-08":"추석(대체)","2025-10-09":"한글날","2025-12-25":"크리스마스",
+  /* [v75] 2027년(업무캘린더·이자 납부일 — kholidayz.com 2027 목록, 설정 › 법정공휴일에 등록하면 그 이름이 우선) */
+  "2027-01-01":"신정","2027-02-06":"설날","2027-02-07":"설날","2027-02-08":"설날","2027-02-09":"설날(대체)","2027-03-01":"삼일절","2027-05-01":"근로자의 날","2027-05-03":"대체공휴일","2027-05-05":"어린이날","2027-05-13":"부처님오신날","2027-06-06":"현충일","2027-07-17":"제헌절","2027-07-19":"제헌절(대체)","2027-08-15":"광복절","2027-08-16":"광복절(대체)","2027-09-14":"추석","2027-09-15":"추석","2027-09-16":"추석","2027-10-03":"개천절","2027-10-04":"개천절(대체)","2027-10-09":"한글날","2027-10-11":"한글날(대체)","2027-12-25":"크리스마스","2027-12-27":"크리스마스(대체)"};
+function holidayName(iso){ return isHoliday(iso) || KR_HOLIDAYS_BUILTIN[iso] || null; }
+/* [v75] 이름 충돌 수정: 자금일보의 isBizDay(설정 공휴일만)가 뒤에서 덮어써 내장 2025·2027 공휴일이 무시되던 것 → 별도 이름 */
+function intIsBizDay(iso){ var w=new Date(iso+"T00:00:00").getDay(); return w!==0 && w!==6 && !holidayName(iso); }
+function bizShift(iso, dir){ var d=iso, n=0; while(!intIsBizDay(d) && n<20){ d=isoAdd(d,dir); n++; } return d; }
+function ymdISO(y,m,d){ return y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0"); }
+function ymShift(y,m,k){ var t=y*12+(m-1)+k; return [Math.floor(t/12), t-Math.floor(t/12)*12+1]; }
+/* 이자 납부 규칙 — 별도 지정(payDay)이 없으면 '이자 납부' 문구에서 읽는다 */
+function intPayRule(o){
+  var s=String(o.payDay||o.method||"");
+  if(/말일|월말/.test(s)) return {kind:"eom", txt:"매월 말일"};
+  if(/(셋째|세째|3째|3번째)\s*주\s*월요일/.test(s)) return {kind:"w3mon", txt:"매월 셋째 주 월요일"};
+  var m=s.match(/(\d{1,2})\s*일/);
+  if(m && +m[1]>=1 && +m[1]<=31) return {kind:"day", day:+m[1], txt:"매월 "+(+m[1])+"일"};
+  return {kind:"eom", txt:"매월 말일(가정)", guess:true};
+}
+/* 약정납입일 — 계획서 M열(셋째 주 월요일 = 계획서 L8 수식: 1일 + (14 − WEEKDAY(1일) + 2)) */
+function intDueDate(rule, y, m){
+  var n=new Date(y,m,0).getDate();
+  if(rule.kind==="day") return ymdISO(y,m,Math.min(rule.day,n));
+  if(rule.kind==="w3mon"){ var wd=new Date(y,m-1,1).getDay()+1; return ymdISO(y,m,17-wd); }
+  return ymdISO(y,m,n);
+}
+function intBasis(iso){ var y=+iso.slice(0,4); return (y%4===0 && (y%100!==0 || y%400===0))?366:365; }
+function intRoundMode(o){ if(o.type==="관계사") return "round"; if(/하나/.test(o.bank||"") && o.type==="한도") return "round"; return "floor"; }
+function intRound(x, mode){ return mode==="round"? Math.round(x) : Math.floor(x+1e-6); }
+/* 기간 [from, to]을 잔액·이자율·연일수가 같은 행으로 나눈다(계획서의 같은 약정 여러 행) */
+function intSegments(at, from, to, mode, splitHana){
+  var segs=[], cur=null;
+  for(var d=from; d<=to; d=isoAdd(d,1)){
+    var v=at(d), b=intBasis(d);
+    if(!(v.bal>0) || !(v.rate>0)){ cur=null; continue; }
+    if(cur && cur.bal===v.bal && cur.rate===v.rate && cur.basis===b){ cur.to=d; cur.days++; }
+    else { cur={from:d, to:d, days:1, bal:v.bal, rate:v.rate, basis:b}; segs.push(cur); }
+  }
+  /* 하나 개별대출: 기간 첫머리를 '이자 100만원 이하로 가능한 일수'만큼 먼저 자동이체 → 계획서처럼 행을 나눠 각각 절사
+     (계획서 비고 '하나개별대출 : 100만원 이하로 가능한 일수만큼 먼저 자동이체' · 25.11~26.10 시트 2+N일 / 4+N일 / 3+N일) */
+  if(splitHana && segs.length && segs[0].from===from){
+    var s0=segs[0], n=Math.floor(1000000/(s0.bal*s0.rate/s0.basis));
+    while(n>0 && Math.floor(s0.bal*n*s0.rate/s0.basis+1e-6)>1000000) n--;
+    if(n>=1 && n<s0.days){
+      var s1={from:isoAdd(s0.from,n), to:s0.to, days:s0.days-n, bal:s0.bal, rate:s0.rate, basis:s0.basis};
+      s0.to=isoAdd(s0.from,n-1); s0.days=n; s0.pre=true;
+      segs.splice(1,0,s1);
+    }
+  }
+  segs.forEach(function(s){ s.raw=s.bal*s.days*s.rate/s.basis; s.amt=intRound(s.raw, mode); });
+  return segs;
+}
+/* 개별대출(대여 포함) 전액상환일 — 잔액이 0보다 크다가 0이 되는 첫 이동일 */
+function intPayoffDate(o, at){
+  if(o.type!=="개별") return null;
+  var ms=(o.moves||[]).filter(function(m){ return m.date && (+m.amount||0)<0; }).sort(function(a,b){ return a.date<b.date?-1:1; });
+  for(var i=0;i<ms.length;i++){ if(at(ms[i].date).bal<=0 && at(isoAdd(ms[i].date,-1)).bal>0) return ms[i].date; }
+  return null;
+}
+/* 납부 이벤트(실제 납부일이 [fromIso, toIso] 안인 것) — o: {type, bank, method, payDay, moves}, at(iso) → {bal, rate} */
+function intEvents(o, at, fromIso, toIso){
+  var rule=intPayRule(o), mode=intRoundMode(o), out=[], payoff=intPayoffDate(o, at);
+  var y=+fromIso.slice(0,4), m=+fromIso.slice(5,7), last=(+toIso.slice(0,4))*12+(+toIso.slice(5,7))+1;
+  for(var k=-2; k<400; k++){
+    var p=ymShift(y,m,k), q=ymShift(y,m,k-1);
+    if(p[0]*12+p[1] > last) break;
+    var due=intDueDate(rule,p[0],p[1]), prev=intDueDate(rule,q[0],q[1]);
+    if(payoff && payoff<=prev) break;
+    var to=isoAdd(due,-1), pay=bizShift(due, o.type==="관계사"?-1:1), fin=false;
+    if(payoff && payoff<=due){ to=isoAdd(payoff,-1); pay=payoff; fin=true; }
+    if(pay<fromIso || pay>toIso) continue;
+    var segs=intSegments(at, prev, to, mode, /하나/.test(o.bank||"") && o.type==="개별");
+    var gross=segs.reduce(function(a,s){ return a+s.amt; },0);
+    if(gross<=0) continue;
+    var corp=0, local=0;
+    if(o.type==="관계사"){ corp=Math.floor(gross*0.25/10)*10; local=Math.floor(corp*0.1/10)*10; }
+    out.push({due:due, pay:pay, from:prev, to:to, days:segs.reduce(function(a,s){return a+s.days},0), segs:segs,
+      gross:gross, corp:corp, local:local, net:gross-corp-local, payoff:fin, rule:rule, mode:mode,
+      shifted:pay!==due && !fin, holi:holidayName(due)});
+  }
+  return out;
+}
+function loanIntEvents(l, fromIso, toIso){
+  return intEvents(l, function(iso){ var v=loanAt(l,iso); return {bal:v.amount, rate:v.rate}; }, fromIso, toIso);
+}
+function lendIntEvents(d, fromIso, toIso){
+  var o={type:"개별", bank:"", method:d.method, payDay:d.payDay, moves:d.moves};
+  return intEvents(o, function(iso){ var v=lendAt(d,iso); return {bal:v.bal, rate:v.rate}; }, fromIso, toIso);
+}
+function ymEnd(ym){ return ym+"-"+String(monthDays(ym)).padStart(2,"0"); }
 /* 현재 스코프(법인탭) 기준 차입 집계 — 대시보드 KPI와 차입현황 표가 항상 같은 값을 쓰도록 단일화 */
 /* [v24] 조회일 이전 가장 가까운 보고서 [금융권 차입현황] 스냅샷(45일 이내) — 있으면 등록 차입보다 우선 */
 /* [v57] 보고서 차입현황 스냅샷 검증 — 금액이 1경 원 이상·음수이거나 은행명이 아닌 행(예: GU '(-)통장' · 한도 3,020,272,359,080,900)이 하나라도 있으면
@@ -1644,8 +1808,8 @@ function loanScope(iso){
       if(d!=null && d>=0 && d<=60) soon.push({c:c, l:l, d:d});
     });
     (c.lendings||[]).forEach(function(d){
-      var bal=(+d.amount||0)-(+d.repaid||0);
-      lendBal+=bal; lendItems.push({c:c, d:d, bal:bal});
+      var v=lendAt(d, iso), bal=v.bal;   // [v74] 기준일까지의 대여·회수 이력 반영
+      lendBal+=bal; lendItems.push({c:c, d:d, bal:bal, v:v});
     });
   });
   return {used:used, limit:limit, avail:Math.max(0,limit-used), items:items,
@@ -2016,6 +2180,7 @@ function buildDocs(){
   m["app/rules"]={list:D.rules||[]};
   m["app/contacts"]={list:D.contacts||[]};
   m["app/holidays"]={list:D.holidays||[]};
+  m["app/workcal"]=D.workCal||{items:[],done:{}};   // [v75] 업무캘린더
   (D.companies||[]).forEach(function(c){
     m["co/"+c.id+"/info/main"]=coInfo(c);
     CO_KINDS.forEach(function(k){
@@ -2035,7 +2200,8 @@ function dbLoad(){
     var jobs=[
       DB.doc("app/rules").get().then(function(s){ D2.rules=(s.exists&&(s.data().list))||b.rules; }),
       DB.doc("app/contacts").get().then(function(s){ D2.contacts=(s.exists&&(s.data().list))||b.contacts; }),
-      DB.doc("app/holidays").get().then(function(s){ D2.holidays=(s.exists&&(s.data().list))||b.holidays; })
+      DB.doc("app/holidays").get().then(function(s){ D2.holidays=(s.exists&&(s.data().list))||b.holidays; }),
+      DB.doc("app/workcal").get().then(function(s){ D2.workCal=(s.exists&&s.data())||null; })   // [v75]
     ];
     b.companies.forEach(function(seed){
       var c=null;
@@ -4204,8 +4370,8 @@ function refreshDates(){
   } else { curDate=null; sel.value=""; $("#dateHint").textContent="데이터 없음"; }
 }
 function recentDates(n){ var ds=allDates(); return ds.slice(Math.max(0,ds.length-n)); }
-var TITLES={dash:"대시보드",ilbo:"자금일보 작성",daily:"일자별 보고",ledger:"거래원장",ar:"매출채권관리",fep:"자금업무 자동화",trend:"기간 추이",fin:"금융 (차입·대여·보증·연락처)",import:"데이터 업로드",settings:"설정"};
-var VIEWS=["dash","ilbo","daily","ledger","ar","fep","trend","fin","import","settings"];
+var TITLES={dash:"대시보드",ilbo:"자금일보 작성",daily:"일자별 보고",ledger:"거래원장",ar:"매출채권관리",fep:"자금업무 자동화",trend:"기간 추이",fin:"금융 (차입·대여·보증·연락처)",import:"데이터 업로드",settings:"설정",cal:"업무캘린더"};
+var VIEWS=["dash","ilbo","daily","ledger","ar","fep","trend","fin","import","settings","cal"];   // [v75] cal은 숫자키 밖(맨 뒤) — 단축키 C
 function render(){
   invalidate(); renderCoTabs(); refreshDates();
   if(view==="dash") renderDash();
@@ -4216,6 +4382,7 @@ function render(){
   else if(view==="fep") renderAutoHub();     // [v27] 허브 → 선택 업무 화면
   else if(view==="trend") renderTrend();
   else if(view==="fin") renderFin();
+  else if(view==="cal") renderCal();   // [v75]
   else if(view==="import") renderRules();
   else if(view==="settings"){ renderSettings(); cpmOnSettings(); }
 }
@@ -4328,7 +4495,7 @@ function renderLoans(){
   sc.lendItems.forEach(function(it){ var c=it.c, d=it.d, bal=it.bal;
     lendRows+='<tr><td><span class="chip nv" style="color:'+c.color+'">'+esc(c.short)+'</span></td><td>'+esc(d.partner)+'</td>'+
       '<td class="num mini">'+esc(d.start||"")+' ~ '+esc(d.end||"")+'</td><td class="num">'+fmt(d.amount)+'</td>'+
-      '<td class="num">'+fmt(d.repaid)+'</td><td class="num">'+fmt(bal)+'</td><td class="num">'+((+d.rate||0)*100).toFixed(3)+'%</td><td class="mini">'+esc(d.method||"")+'</td></tr>';
+      '<td class="num">'+fmt(it.v.repaid)+'</td><td class="num">'+fmt(bal)+'</td><td class="num">'+(it.v.rate*100).toFixed(3)+'%</td><td class="mini">'+esc(d.method||"")+'</td></tr>';
   });
   $("#loanTbl").innerHTML='<thead><tr><th>법인</th><th>구분</th><th>은행</th><th>약정 ~ 만기</th><th style="text-align:right">한도</th><th style="text-align:right">차입잔액</th><th style="text-align:right">추가가능</th><th style="text-align:right">이자율</th><th style="text-align:right">월 예상이자</th><th>이자 납부</th></tr></thead><tbody>'+
     (rows||'<tr><td colspan="10" class="mini" style="padding:20px;text-align:center">약정 없음</td></tr>')+
@@ -5533,6 +5700,372 @@ function openLoanHist(c, idx){
   $$("#modal [data-rdel]").forEach(function(b){ b.onclick=function(){ rr.splice(+b.dataset.rdel,1); l.rates=rr; invalidate(); save().then(function(){ openLoanHist(c,idx); render(); }); }; });
   $$("#modal [data-mdel]").forEach(function(b){ b.onclick=function(){ mm.splice(+b.dataset.mdel,1); l.moves=mm; invalidate(); save().then(function(){ openLoanHist(c,idx); render(); }); }; });
 }
+/* ===================== [v75] 업무캘린더 =====================
+   D.workCal = {items:[반복 업무], done:{"<id>|<iso>": {ok, c:[체크리스트 완료], by, at}}}  — 공용 저장소 app/workcal
+   · 반복 규칙(rule): monthly(매월 N일·말일·N째 주 X요일, months로 분기·특정 월만) / yearly(매년 M월 D일) / once(지정일)
+     + offset(영업일 ±N, 예: 분기말 다음 5영업일) + shift(휴일이면 next 익영업일 / prev 전영업일 / none 그대로)
+   · 자동 일정: 대출이자 납부(v74 이자 엔진, 실제 납부일·금액) · 대여이자 수취 · 차입/대여 만기(60일 전 예고 포함) — 저장하지 않고 매번 계산 */
+var WC_CATS=[
+  {k:"monthly", t:"반복일정", v:"--wc-m"},
+  {k:"card", t:"법인카드", v:"--wc-c"},
+  {k:"interest", t:"대출이자 납부", v:"--wc-i"},
+  {k:"quarter", t:"분기마감", v:"--wc-q"},
+  {k:"deposit", t:"예적금마감·수금", v:"--wc-d"},
+  {k:"purchase", t:"매입대금", v:"--wc-p"},
+  {k:"winwin", t:"상생파트너론 연장", v:"--wc-s"},
+  {k:"etc", t:"기타", v:"--wc-e"}
+];
+var WC_WD=["일","월","화","수","목","금","토"];
+var WC={ym:null, sel:null, off:{}, edit:false};
+function wcCat(k){ for(var i=0;i<WC_CATS.length;i++) if(WC_CATS[i].k===k) return WC_CATS[i]; return WC_CATS[WC_CATS.length-1]; }
+function wcColor(k){ return "var("+wcCat(k).v+")"; }
+function wcStore(){ if(!D.workCal) D.workCal={items:[], done:{}}; if(!D.workCal.items) D.workCal.items=[]; if(!D.workCal.done) D.workCal.done={}; return D.workCal; }
+function wcSave(msg){ return save().then(function(){ if(msg) toast(msg); }); }
+/* 영업일 ±n (공휴일·주말 제외) */
+function wcBizAdd(iso, n){ var d=iso, s=n<0?-1:1, k=Math.abs(n); while(k>0){ d=isoAdd(d,s); if(intIsBizDay(d)) k--; } return d; }
+/* 규칙 → 그 달의 날짜(없으면 null) */
+function wcDateIn(rule, y, m){
+  var r=rule||{}, base=null;
+  if(r.kind==="once"){ if(!r.date || +r.date.slice(0,4)!==y || +r.date.slice(5,7)!==m) return null; base=r.date; }
+  else if(r.kind==="dates"){ var ym=ymdISO(y,m,1).slice(0,7), hit=(r.dates||[]).filter(function(x){ return String(x).slice(0,7)===ym; })[0]; if(!hit) return null; base=hit; }
+  else if(r.kind==="yearly"){ if(+r.month!==m) return null; base=ymdISO(y,m,Math.min(+r.day||1,new Date(y,m,0).getDate())); }
+  else {
+    if(Array.isArray(r.months) && r.months.length && r.months.indexOf(m)<0) return null;
+    var n=new Date(y,m,0).getDate();
+    if(r.day==="eom") base=ymdISO(y,m,n);
+    else if(+r.bizn>0){ var bd=ymdISO(y,m,1), cnt=intIsBizDay(bd)?1:0; while(cnt<+r.bizn){ bd=isoAdd(bd,1); if(intIsBizDay(bd)) cnt++; } base=bd; }   // 제N영업일
+    else if(r.nth){ // N째 주 X요일 (nth=-1 마지막)
+      var wd=+r.wd||1;
+      if(+r.nth>0){ var f=new Date(y,m-1,1).getDay(); var d1=1+((wd-f+7)%7)+7*(+r.nth-1); if(d1>n) return null; base=ymdISO(y,m,d1); }
+      else { var l=new Date(y,m-1,n).getDay(); base=ymdISO(y,m,n-((l-wd+7)%7)); }
+    }
+    else base=ymdISO(y,m,Math.min(+r.day||1,n));
+  }
+  if(+r.offset) base=wcBizAdd(base, +r.offset);
+  if(r.shift==="next") base=bizShift(base,1); else if(r.shift==="prev") base=bizShift(base,-1);
+  return base;
+}
+function wcRuleTxt(r){
+  r=r||{};
+  var s;
+  if(r.kind==="once") s=(r.date||"날짜 미정")+" (1회)";
+  else if(r.kind==="dates") s="지정일 "+((r.dates||[]).join(", ")||"미정");
+  else if(r.kind==="weekly") s="매주 "+WC_WD[+r.wd||1]+"요일";
+  else if(r.kind==="yearly") s="매년 "+(+r.month||1)+"월 "+(+r.day||1)+"일";
+  else {
+    var mm=(Array.isArray(r.months)&&r.months.length)? (r.months.join("·")+"월 ") : "매월 ";
+    s=mm+(+r.bizn>0?"제"+r.bizn+"영업일":r.day==="eom"?"말일":(r.nth? ((+r.nth>0?r.nth+"째":"마지막")+" 주 "+WC_WD[+r.wd||1]+"요일") : (+r.day||1)+"일"));
+  }
+  if(+r.offset) s+=" "+(r.offset>0?"+":"")+r.offset+"영업일";
+  if(r.shift==="next") s+=" · 휴일이면 익영업일"; else if(r.shift==="prev") s+=" · 휴일이면 전영업일";
+  return s;
+}
+/* 한 달(앞뒤 주 포함 범위)의 일정 — 등록 업무 + 자동(이자·만기) */
+function wcEvents(from, to){
+  var out=[], st=wcStore(), cos=scopeCos(), ids={}; cos.forEach(function(c){ ids[c.id]=1; });
+  var y=+from.slice(0,4), m=+from.slice(5,7), last=(+to.slice(0,4))*12+(+to.slice(5,7));
+  st.items.forEach(function(it){
+    if(it.active===false) return;
+    if(it.co && it.co!=="ALL" && !ids[it.co]) return;
+    if(it.rule && it.rule.kind==="weekly"){
+      for(var wdd=from; wdd<=to; wdd=isoAdd(wdd,1)){ if(new Date(wdd+"T00:00:00").getDay()!==(+it.rule.wd||1)) continue;
+        var wd2=it.rule.shift==="next"?bizShift(wdd,1):(it.rule.shift==="prev"?bizShift(wdd,-1):wdd);
+        if(wd2>=from && wd2<=to) out.push({key:it.id+"|"+wd2, date:wd2, cat:it.cat, title:it.title, co:it.co||"ALL", memo:it.memo||"", checklist:it.checklist||[], item:it, rule:wcRuleTxt(it.rule)}); }
+      return;
+    }
+    for(var k=-1; ; k++){
+      var p=ymShift(y,m,k); if(p[0]*12+p[1]>last+1) break;
+      var d=wcDateIn(it.rule,p[0],p[1]);
+      if(d && d>=from && d<=to) out.push({key:it.id+"|"+d, date:d, cat:it.cat, title:it.title, co:it.co||"ALL", memo:it.memo||"", checklist:it.checklist||[], item:it, rule:wcRuleTxt(it.rule)});
+    }
+  });
+  /* 자동: 대출이자 납부(실제 납부일) */
+  intPlanFor(cos, from, to).forEach(function(e){
+    out.push({key:"auto-int|"+e.c.id+"|"+(e.l.id||e.l.bank)+"|"+e.pay, date:e.pay, cat:"interest", auto:true, co:e.c.id,
+      title:e.c.short+" "+e.l.bank+" "+e.l.type+" 이자", amt:e.net,
+      memo:"계산기간 "+e.from+" ~ "+e.to+" ("+e.days+"일)"+(e.payoff?" · 전액상환일 함께 납부":"")+(e.shifted?" · 약정일 "+e.due+(e.holi?"("+e.holi+")":"")+" → 영업일":""),
+      checklist:["출금계좌 잔액 확인","이자 출금 확인(CMS)","이자비용 전표"], rule:intPayRule(e.l).txt});
+  });
+  cos.forEach(function(c){
+    /* 자동: 대여이자 수취 */
+    (c.lendings||[]).forEach(function(d){
+      lendIntEvents(d, from, to).forEach(function(e){
+        out.push({key:"auto-lend|"+c.id+"|"+(d.id||d.partner)+"|"+e.pay, date:e.pay, cat:"interest", auto:true, co:c.id,
+          title:c.short+" "+(d.partner||"대여")+" 대여이자 수취", amt:e.net, inflow:true,
+          memo:"계산기간 "+e.from+" ~ "+e.to+" ("+e.days+"일)", checklist:["입금 확인","이자수익 전표"], rule:intPayRule(d).txt});
+      });
+      if(d.end && d.end>=from && d.end<=to) out.push({key:"auto-lend-end|"+c.id+"|"+(d.id||d.partner), date:d.end, cat:"interest", auto:true, co:c.id,
+        title:c.short+" "+(d.partner||"대여")+" 대여 만기", memo:"잔액 "+fmt(lendAt(d,d.end).bal), checklist:["회수 또는 연장 결정","약정서 갱신"]});
+    });
+    /* 자동: 한도미사용수수료 — (한도 − 사용액) × 수수료율 × 일수 ÷ 365, 이자와 같은 계산기간·납부일(계획서 AD열).
+       '이자 납부' 문구에 '한도미사용수수료'가 있고 '없음/면제'가 없는 한도 약정만. 수수료율 = 약정의 unusedFeeRate, 없으면 0.5%
+       (계획서 26.10: 농협007994 10억 30일 410,958 · 농협6890 20억 821,917 · 국민247484 30억 31일 1,273,972 = 0.5%). 운영경비 구분이라 이자비용 대사에는 넣지 않는다. */
+    (c.loans||[]).forEach(function(l){
+      var mt=String(l.method||"");
+      if(l.type==="개별" || !/한도미사용수수료/.test(mt) || /없음|면제/.test(mt)) return;
+      var fr=+l.unusedFeeRate||0.005;
+      intEvents({type:"한도", bank:l.bank, method:l.method, payDay:l.payDay, moves:[]}, function(iso){
+        var v=loanAt(l,iso); return {bal: v.active? Math.max(0,(+l.limit||0)-v.amount):0, rate:fr}; }, from, to).forEach(function(e){
+        out.push({key:"auto-fee|"+c.id+"|"+(l.id||l.bank)+"|"+e.pay, date:e.pay, cat:"interest", auto:true, fee:true, co:c.id,
+          title:c.short+" "+l.bank+" 한도미사용수수료", amt:e.net,
+          memo:"계산기간 "+e.from+" ~ "+e.to+" ("+e.days+"일) · 미사용 "+fmt(e.segs[0]?e.segs[0].bal:0)+" × "+(fr*100).toFixed(2)+"%"+(l.unusedFeeRate?"":"(가정)")+" · 운영경비",
+          checklist:["수수료 출금 확인(CMS)","전표(운영경비)"], rule:intPayRule(l).txt});
+      });
+    });
+    /* 자동: 차입 만기 */
+    (c.loans||[]).forEach(function(l){
+      if(!l.end) return;
+      var v=loanAt(l,l.end); if(l.type==="개별" && !v.amount) return;
+      var pre=isoAdd(l.end,-30);
+      if(l.end>=from && l.end<=to) out.push({key:"auto-end|"+c.id+"|"+(l.id||l.bank), date:l.end, cat:"interest", auto:true, co:c.id,
+        title:c.short+" "+l.bank+" "+l.type+" 만기", memo:"한도 "+fmt(+l.limit||0)+(v.amount?" · 잔액 "+fmt(v.amount):""), checklist:["연장 서류 제출","금리 조건 확인","연장 후 약정 상세(만기일·금리) 수정"]});
+      if(pre>=from && pre<=to) out.push({key:"auto-pre|"+c.id+"|"+(l.id||l.bank), date:pre, cat:"interest", auto:true, co:c.id,
+        title:c.short+" "+l.bank+" "+l.type+" 만기 D-30", memo:"만기 "+l.end, checklist:["은행 연장 의사 전달","연장 서류 목록 받기"]});
+    });
+  });
+  return out.sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:(a.auto===b.auto?0:(a.auto?1:-1))); });
+}
+function wcDone(key){ return wcStore().done[key]||null; }
+var WC_INT_ST=["미발생","확인필요","작성예정","진행중","납부완료"];   // 노션 [그룹사_대출이자납부] 상태값
+function wcIsDone(ev){ var s=wcDone(ev.key); if(!s) return false; if(s.ok) return true; if(s.st==="납부완료"||s.st==="미발생") return true; var n=(ev.checklist||[]).length; return n>0 && (s.c||[]).filter(Boolean).length>=n; }
+function wcDD(iso){ var t=todayISO(); var n=Math.round((new Date(iso+"T00:00:00")-new Date(t+"T00:00:00"))/86400000); return n; }
+function wcDDchip(iso){ var n=wcDD(iso); return '<span class="wc-dd'+(n===0?' now':(n>0&&n<=3?' hot':''))+'">'+(n===0?'오늘':(n>0?'D-'+n:'D+'+(-n)))+'</span>'; }
+function renderCal(){
+  var host=$("#calBody"); if(!host) return;
+  var st=wcStore();
+  if(!WC.ym) WC.ym=(todayISO()).slice(0,7);
+  if(!WC.sel) WC.sel=todayISO();
+  var y=+WC.ym.slice(0,4), m=+WC.ym.slice(5,7);
+  var first=new Date(y,m-1,1), gStart=isoAdd(ymdISO(y,m,1), -first.getDay());
+  var n=new Date(y,m,0).getDate(), lastDow=new Date(y,m-1,n).getDay(), gEnd=isoAdd(ymdISO(y,m,n), 6-lastDow);
+  var upTo=isoAdd(todayISO(),21), rangeEnd=gEnd>upTo?gEnd:upTo, rangeStart=gStart<todayISO()?gStart:todayISO();
+  var all=wcEvents(rangeStart, rangeEnd).filter(function(e){ return !WC.off[e.cat]; });
+  var byDay={}; all.forEach(function(e){ (byDay[e.date]=byDay[e.date]||[]).push(e); });
+  var today=todayISO();
+  /* 달력 */
+  var cells=WC_WD.map(function(w,i){ return '<div class="wc-dow'+(i===0?' sun':(i===6?' sat':''))+'">'+w+'</div>'; }).join("");
+  for(var d=gStart; d<=gEnd; d=isoAdd(d,1)){
+    var dw=new Date(d+"T00:00:00").getDay(), hn=holidayName(d), evs=byDay[d]||[];
+    cells+='<button type="button" class="wc-day'+(d.slice(0,7)!==WC.ym?' other':'')+(dw===0?' sun':'')+(dw===6?' sat':'')+(hn?' holi':'')+(d===today?' today':'')+(d===WC.sel?' sel':'')+'" data-d="'+d+'">'+
+      '<span class="wc-num"><b>'+(+d.slice(8))+'</b>'+(hn?'<span class="wc-hn">'+esc(hn)+'</span>':'')+'</span>'+
+      evs.slice(0,3).map(function(e){ return '<span class="wc-ev'+(wcIsDone(e)?' done':'')+'" style="--wcc:'+wcColor(e.cat)+'" title="'+esc(e.title)+'">'+esc(e.title)+'</span>'; }).join("")+
+      (evs.length>3?'<span class="wc-more">+'+(evs.length-3)+'건</span>':'')+'</button>';
+  }
+  /* 선택일 목록 */
+  var selEv=byDay[WC.sel]||[];
+  if(!selEv.length && (WC.sel<rangeStart || WC.sel>rangeEnd)) selEv=wcEvents(WC.sel,WC.sel).filter(function(e){ return !WC.off[e.cat]; });
+  var selHtml=selEv.map(wcItemHtml).join("")||'<div class="empty" style="padding:22px"><b>일정 없음</b>'+esc(WC.sel)+' ('+WC_WD[new Date(WC.sel+"T00:00:00").getDay()]+')'+(holidayName(WC.sel)?' · '+esc(holidayName(WC.sel)):'')+'</div>';
+  /* 다가오는 일정(오늘 ~ 21일) + 지난 미완료(7일) */
+  var past=isoAdd(today,-7);
+  var pend=all.filter(function(e){ return e.date>=past && e.date<today && !wcIsDone(e); });
+  var up=all.filter(function(e){ return e.date>=today && e.date<=upTo; });
+  var upHtml=(pend.length?'<div class="wc-meta" style="padding:10px 16px 0;color:var(--out);font-weight:600">지난 7일 미완료 '+pend.length+'건</div>'+pend.map(wcItemHtml).join(""):"")+
+    (up.map(wcItemHtml).join("")||'<div class="empty" style="padding:22px">3주 안에 일정이 없습니다</div>');
+  var monthCnt={}; all.forEach(function(e){ if(e.date.slice(0,7)===WC.ym) monthCnt[e.cat]=(monthCnt[e.cat]||0)+1; });
+  var intSum=all.filter(function(e){ return e.date.slice(0,7)===WC.ym && e.cat==="interest" && e.amt && !e.inflow && !e.fee; }).reduce(function(a,e){ return a+e.amt; },0);
+  var feeSum=all.filter(function(e){ return e.date.slice(0,7)===WC.ym && e.fee; }).reduce(function(a,e){ return a+e.amt; },0);
+  host.innerHTML=
+    '<div class="panel"><div class="pad wc-top">'+
+      '<button class="btn sm" id="wcPrev" aria-label="이전 달">◀</button><h2>'+y+'년 '+m+'월</h2><button class="btn sm" id="wcNext" aria-label="다음 달">▶</button>'+
+      '<button class="btn sm" id="wcToday">오늘</button>'+
+      '<span class="wc-meta" style="margin-left:8px">이달 '+Object.keys(monthCnt).reduce(function(a,k){return a+monthCnt[k]},0)+'건 · 대출이자 '+fmt(intSum)+(feeSum?' · 한도미사용수수료 '+fmt(feeSum):'')+'</span>'+
+      '<div class="wc-cats">'+WC_CATS.map(function(c){ return '<button type="button" class="wc-cat" data-cat="'+c.k+'" aria-pressed="'+(WC.off[c.k]?'false':'true')+'"><span class="wc-dot" style="--wcc:var('+c.v+')"></span>'+esc(c.t)+(monthCnt[c.k]?' <b>'+monthCnt[c.k]+'</b>':'')+'</button>'; }).join("")+'</div>'+
+    '</div></div>'+
+    '<div class="wc-wrap">'+
+      '<div class="panel"><div class="wc-grid">'+cells+'</div></div>'+
+      '<div style="display:flex;flex-direction:column;gap:16px;min-width:0">'+
+        '<div class="panel"><header><h2>'+esc(WC.sel)+' ('+WC_WD[new Date(WC.sel+"T00:00:00").getDay()]+')</h2>'+finSub(selEv.length+"건")+'</header><div class="wc-list">'+selHtml+'</div></div>'+
+        '<div class="panel"><header><h2>다가오는 일정</h2>'+finSub("오늘 ~ "+upTo)+'</header><div class="wc-list" style="max-height:520px;overflow:auto">'+upHtml+'</div></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="panel"><header><h2>반복 업무 관리</h2>'+finSub(st.items.length+"개 · 대출이자·만기는 금융 › 차입/대여 약정에서 자동")+
+      '<div class="sp"><button class="btn sm" id="wcAdd">업무 추가</button><button class="btn sm" id="wcToggle">'+(WC.edit?'접기':'펼치기')+'</button></div></header>'+
+      (WC.edit?'<div class="scroll"><table class="tbl" id="wcItemTbl">'+wcItemTable(st.items)+'</table></div>':'<p class="hint" style="padding:0 16px 14px">매월 반복·분기마감·예적금 만기·매입대금·상생파트너론 연장 같은 업무를 규칙(매월 N일·말일·N째 주 요일·분기 월·영업일 가감·휴일 처리)과 체크리스트로 등록합니다. [펼치기]로 편집하세요.</p>')+
+    '</div>';
+  wcBind(host, selEv.concat(pend, up));
+}
+function wcItemHtml(e){
+  var s=wcDone(e.key)||{}, done=wcIsDone(e), co0=e.co&&e.co!=="ALL"?co(e.co):null;
+  return '<div class="wc-item'+(done?' done':'')+'">'+
+    '<div class="wc-row"><input type="checkbox" data-wcok="'+esc(e.key)+'"'+(done?' checked':'')+' aria-label="완료" style="margin-top:4px">'+
+      '<span class="wc-dot" style="--wcc:'+wcColor(e.cat)+';margin-top:7px"></span>'+
+      '<span class="wc-ttl">'+esc(e.title)+(co0&&!e.auto?' <span class="chip nv" style="color:'+co0.color+'">'+esc(co0.short)+'</span>':'')+(e.auto?' <span class="chip auto" title="금융 약정에서 자동 계산">자동</span>':'')+'</span>'+
+      (e.amt?'<span class="wc-amt" style="color:var('+(e.inflow?'--in':'--out')+')">'+(e.inflow?'+':'−')+fmt(e.amt)+'</span>':'')+
+      (e.auto&&e.cat==="interest"&&e.amt&&!e.inflow?'<select class="cellsel" data-wcst="'+esc(e.key)+'" title="진행중 = ERP 전표 작성 완료·납부 전 / 납부완료 = 이자·수수료 납부 완료">'+['<option value="">상태</option>'].concat(WC_INT_ST.map(function(x){ return '<option'+(s.st===x?' selected':'')+'>'+x+'</option>'; })).join('')+'</select>':'')+
+      '<span class="mini">'+esc(e.date.slice(5))+'</span>'+wcDDchip(e.date)+'</div>'+
+    '<div class="wc-meta" style="margin-left:26px">'+esc(wcCat(e.cat).t)+(e.rule?' · '+esc(e.rule):'')+(e.memo?' · '+esc(e.memo):'')+'</div>'+
+    ((e.checklist||[]).length?'<div class="wc-chk">'+e.checklist.map(function(t,i){ var ok=!!(s.c&&s.c[i]);
+      return '<label class="'+(ok?'ok':'')+'"><input type="checkbox" data-wcc="'+esc(e.key)+'" data-i="'+i+'" data-n="'+e.checklist.length+'"'+(ok?' checked':'')+'><span>'+esc(t)+'</span></label>'; }).join("")+'</div>':'')+
+    (s.at?'<div class="wc-meta" style="margin-left:26px">완료 '+esc(s.by||"")+' · '+esc(String(s.at).slice(0,16).replace("T"," "))+'</div>':'')+
+  '</div>';
+}
+function wcItemTable(items){
+  var cos='<option value="ALL">전 법인</option>'+D.companies.map(function(c){ return '<option value="'+c.id+'">'+esc(c.short)+'</option>'; }).join("");
+  var rows=items.map(function(it,n){
+    var r=it.rule||{}, kind=r.kind||"monthly";
+    var dayVal=+r.bizn>0?("b"+r.bizn):(r.day==="eom"?"eom":(r.nth?("n"+r.nth):String(+r.day||1)));
+    return '<tr'+(it.active===false?' style="opacity:.5"':'')+'>'+
+      '<td><select class="cellsel" data-wi="'+n+'" data-f="cat">'+WC_CATS.filter(function(c){return c.k!=="interest"||it.cat==="interest";}).map(function(c){ return '<option value="'+c.k+'"'+(c.k===it.cat?' selected':'')+'>'+esc(c.t)+'</option>'; }).join("")+'</select></td>'+
+      '<td><input class="cellsel" data-wi="'+n+'" data-f="title" value="'+esc(it.title||"")+'" style="width:200px"></td>'+
+      '<td><select class="cellsel" data-wi="'+n+'" data-f="co">'+cos.replace('value="'+(it.co||"ALL")+'"','value="'+(it.co||"ALL")+'" selected')+'</select></td>'+
+      '<td style="white-space:nowrap"><select class="cellsel" data-wi="'+n+'" data-f="kind"><option value="monthly"'+(kind==="monthly"?' selected':'')+'>매월/분기</option><option value="yearly"'+(kind==="yearly"?' selected':'')+'>매년</option><option value="once"'+(kind==="once"?' selected':'')+'>1회</option><option value="weekly"'+(kind==="weekly"?' selected':'')+'>매주</option><option value="dates"'+(kind==="dates"?' selected':'')+'>지정일(여러 날)</option></select> '+
+        (kind==="weekly"?'<select class="cellsel" data-wi="'+n+'" data-f="wd">'+WC_WD.map(function(w,i){ return '<option value="'+i+'"'+((+r.wd||1)===i?' selected':'')+'>'+w+'요일</option>'; }).join("")+'</select>':
+         kind==="dates"?'<input class="cellsel" data-wi="'+n+'" data-f="dates" value="'+esc((r.dates||[]).join(", "))+'" placeholder="2027-01-07, 2027-08-10" style="width:220px">':
+         kind==="once"?'<input class="cellsel" type="date" data-wi="'+n+'" data-f="date" value="'+esc(r.date||"")+'">':
+         kind==="yearly"?'<input class="cellsel num" type="number" min="1" max="12" data-wi="'+n+'" data-f="month" value="'+(+r.month||1)+'" style="width:52px">월 <input class="cellsel num" type="number" min="1" max="31" data-wi="'+n+'" data-f="dayn" value="'+(+r.day||1)+'" style="width:52px">일':
+         '<input class="cellsel" data-wi="'+n+'" data-f="months" value="'+esc((r.months||[]).join(","))+'" placeholder="월(비우면 매월) 예: 3,6,9,12" style="width:150px"> '+
+         '<select class="cellsel" data-wi="'+n+'" data-f="day">'+
+           '<option value="eom"'+(dayVal==="eom"?' selected':'')+'>말일</option>'+
+           Array.apply(null,{length:31}).map(function(_,i){ var v=String(i+1); return '<option value="'+v+'"'+(dayVal===v?' selected':'')+'>'+v+'일</option>'; }).join("")+
+           [1,2,3,4,-1].map(function(k){ return '<option value="n'+k+'"'+(dayVal==="n"+k?' selected':'')+'>'+(k>0?k+'째':'마지막')+' 주</option>'; }).join("")+
+           [1,2,3,4,5,6,7,8,9,10].map(function(k){ return '<option value="b'+k+'"'+(dayVal==="b"+k?' selected':'')+'>제'+k+'영업일</option>'; }).join("")+'</select>'+
+           (r.nth?' <select class="cellsel" data-wi="'+n+'" data-f="wd">'+WC_WD.map(function(w,i){ return '<option value="'+i+'"'+((+r.wd||1)===i?' selected':'')+'>'+w+'요일</option>'; }).join("")+'</select>':''))+
+        '<div style="margin-top:4px">영업일 <input class="cellsel num" type="number" data-wi="'+n+'" data-f="offset" value="'+(+r.offset||0)+'" style="width:56px" title="+N: N영업일 뒤, −N: N영업일 앞"> · 휴일이면 <select class="cellsel" data-wi="'+n+'" data-f="shift">'+
+          [["next","익영업일"],["prev","전영업일"],["none","그대로"]].map(function(o){ return '<option value="'+o[0]+'"'+((r.shift||"next")===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join("")+'</select></div>'+
+        '<div class="mini" style="margin-top:2px">'+esc(wcRuleTxt(r))+'</div></td>'+
+      '<td><textarea class="cellsel" data-wi="'+n+'" data-f="checklist" placeholder="체크할 항목(줄마다 하나)">'+esc((it.checklist||[]).join("\n"))+'</textarea></td>'+
+      '<td><textarea class="cellsel" data-wi="'+n+'" data-f="memo" placeholder="메모·참고">'+esc(it.memo||"")+'</textarea></td>'+
+      '<td class="act"><label class="mini"><input type="checkbox" data-wi="'+n+'" data-f="active"'+(it.active===false?'':' checked')+'> 사용</label><br><button class="btn sm" data-wdel="'+n+'">삭제</button></td></tr>';
+  }).join("");
+  return '<thead><tr><th>분류</th><th>업무</th><th>법인</th><th>반복 규칙</th><th>체크리스트</th><th>메모</th><th></th></tr></thead><tbody>'+
+    (rows||'<tr><td colspan="7" class="mini" style="padding:18px;text-align:center">등록된 반복 업무가 없습니다 — [업무 추가]</td></tr>')+'</tbody>';
+}
+function wcBind(host, evs){
+  var st=wcStore(), byKey={}; evs.forEach(function(e){ byKey[e.key]=e; });
+  function who(){ return (typeof AUTH!=="undefined" && AUTH && AUTH.user && AUTH.user.email)||""; }
+  $("#wcPrev").onclick=function(){ var p=ymShift(+WC.ym.slice(0,4),+WC.ym.slice(5,7),-1); WC.ym=p[0]+"-"+String(p[1]).padStart(2,"0"); renderCal(); };
+  $("#wcNext").onclick=function(){ var p=ymShift(+WC.ym.slice(0,4),+WC.ym.slice(5,7),1); WC.ym=p[0]+"-"+String(p[1]).padStart(2,"0"); renderCal(); };
+  $("#wcToday").onclick=function(){ WC.ym=todayISO().slice(0,7); WC.sel=todayISO(); renderCal(); };
+  $$("#calBody .wc-cat").forEach(function(b){ b.onclick=function(){ WC.off[b.dataset.cat]=!WC.off[b.dataset.cat]; renderCal(); }; });
+  $$("#calBody .wc-day").forEach(function(b){ b.onclick=function(){ WC.sel=b.dataset.d; if(WC.sel.slice(0,7)!==WC.ym) WC.ym=WC.sel.slice(0,7); renderCal(); }; });
+  $$("#calBody [data-wcok]").forEach(function(el){ el.onchange=function(){
+    var k=el.dataset.wcok, e=byKey[k]||{checklist:[]}, s=st.done[k]||{};
+    if(el.checked){ s.ok=true; s.c=(e.checklist||[]).map(function(){ return true; }); s.by=who(); s.at=new Date().toISOString(); st.done[k]=s; }
+    else delete st.done[k];
+    wcSave(el.checked?"완료 처리됨":"완료 취소됨").then(renderCal); }; });
+  $$("#calBody [data-wcc]").forEach(function(el){ el.onchange=function(){
+    var k=el.dataset.wcc, s=st.done[k]||{c:[]}, nn=+el.dataset.n; s.c=s.c||[]; s.c[+el.dataset.i]=el.checked;
+    var cnt=s.c.filter(Boolean).length; s.ok=cnt>=nn; if(s.ok){ s.by=who(); s.at=new Date().toISOString(); } else { delete s.by; delete s.at; }
+    if(!cnt) delete st.done[k]; else st.done[k]=s;
+    wcSave().then(renderCal); }; });
+  $$("#calBody [data-wcst]").forEach(function(el){ el.onchange=function(){
+    var k=el.dataset.wcst, s=st.done[k]||{}; s.st=el.value||undefined; if(!s.st) delete s.st;
+    if(s.st){ s.by=who(); s.at=new Date().toISOString(); st.done[k]=s; } else if(!(s.c||[]).filter(Boolean).length && !s.ok) delete st.done[k];
+    wcSave(s.st?"상태: "+s.st:"상태 지움").then(renderCal); }; });
+  $("#wcToggle").onclick=function(){ WC.edit=!WC.edit; renderCal(); };
+  $("#wcAdd").onclick=function(){
+    st.items.push({id:"W"+Date.now().toString(36), cat:"monthly", title:"새 업무", co:"ALL", rule:{kind:"monthly", day:"1", shift:"next"}, checklist:[], memo:"", active:true});
+    WC.edit=true; wcSave("업무 추가됨 — 아래 표에서 편집").then(renderCal);
+  };
+  $$("#wcItemTbl [data-wi]").forEach(function(el){ el.onchange=function(){
+    var it=st.items[+el.dataset.wi], f=el.dataset.f, r=it.rule=it.rule||{kind:"monthly"}; it.edited=true;
+    if(f==="cat"||f==="title"||f==="co"||f==="memo") it[f]=el.value;
+    else if(f==="checklist") it.checklist=el.value.split(/\n/).map(function(x){return x.trim();}).filter(Boolean);
+    else if(f==="active") it.active=el.checked;
+    else if(f==="kind"){ r.kind=el.value; if(r.kind==="yearly"){ r.month=r.month||1; r.day=+r.day||1; } if(r.kind==="weekly" && r.wd==null) r.wd=1; if(r.kind==="dates" && !Array.isArray(r.dates)) r.dates=[]; }
+    else if(f==="date") r.date=el.value;
+    else if(f==="dates") r.dates=el.value.split(/[,\s]+/).filter(function(x){ return /^\d{4}-\d{2}-\d{2}$/.test(x); }).sort();
+    else if(f==="month") r.month=+el.value;
+    else if(f==="dayn") r.day=+el.value;
+    else if(f==="months") r.months=el.value.split(/[,\s·]+/).map(Number).filter(function(x){ return x>=1&&x<=12; });
+    else if(f==="day"){ var v=el.value; delete r.bizn; if(v==="eom"){ r.day="eom"; delete r.nth; } else if(v.charAt(0)==="n"){ r.nth=+v.slice(1); r.wd=r.wd==null?1:r.wd; delete r.day; } else if(v.charAt(0)==="b"){ r.bizn=+v.slice(1); delete r.nth; delete r.day; } else { r.day=v; delete r.nth; } }
+    else if(f==="wd") r.wd=+el.value;
+    else if(f==="offset") r.offset=+el.value||0;
+    else if(f==="shift") r.shift=el.value;
+    wcSave("저장됨").then(renderCal);
+  }; });
+  $$("#wcItemTbl [data-wdel]").forEach(function(b){ b.onclick=function(){
+    var it=st.items[+b.dataset.wdel]; if(!confirm("'"+(it.title||"")+"' 업무를 삭제할까요?")) return;
+    st.items.splice(+b.dataset.wdel,1); wcSave("삭제됨").then(renderCal); }; });
+}
+
+/* [v75] 노션 「업무 일정」 페이지(2026-10-19 사용자 붙여넣기)에서 옮긴 기본 업무 — 노션 틀 그대로(규칙·문구 임의 변경 없음).
+   로그인 ID/PW는 공용 저장소에 두지 않는다(노션에서 확인). 노션 데이터베이스(그룹사_대출이자납부·분기마감·예적금 마감 및 수금품의·
+   월별 매입대금·상생파트너론 연장일정·반복일정)의 행은 붙여넣기에 없어 반영 대기. WC_SEED_V를 올리면 없는 id만 추가된다. */
+var WC_SEED_V=2;   // [v75] 2: 노션 Markdown/CSV 내보내기(2026-10-19)로 표(반복일정·분기마감·예적금·매입대금·상생 연장일정·연체자) 반영
+var WC_CARD_CHK=["결제 예정금액 확인","출금계좌 잔액 확인","출금 확인(CMS)"];
+var WC_PUR_CHK=["SN_CISCO / DELL","SN_별도업체","GU_별도업체","GD_ORACLE","별도업체대금 파일: 지급일자 지난 내역만 삭제, 나머지는 누적"];
+var WC_SEED=[
+  /* ── 법인카드: 법인 및 카드사별 납부일정(대상기간 1일~말일) ── */
+  {id:"S-card-ss", cat:"card", title:"삼성카드 결제 (공통)", co:"ALL", rule:{kind:"monthly", day:"15", shift:"next"}, checklist:WC_CARD_CHK, memo:"대상기간 1일~말일", active:true},
+  {id:"S-card-hana-sn", cat:"card", title:"하나카드 결제", co:"SN", rule:{kind:"monthly", day:"23", shift:"next"}, checklist:WC_CARD_CHK, memo:"대상기간 1일~말일", active:true},
+  {id:"S-card-lotte-sn", cat:"card", title:"롯데카드 결제", co:"SN", rule:{kind:"monthly", day:"27", shift:"next"}, checklist:WC_CARD_CHK, memo:"대상기간 1일~말일", active:true},
+  {id:"S-card-nh-sn", cat:"card", title:"농협카드 결제", co:"SN", rule:{kind:"monthly", day:"15", shift:"next"}, checklist:WC_CARD_CHK, memo:"", active:true},
+  {id:"S-card-nh-gu", cat:"card", title:"농협카드 결제", co:"GU", rule:{kind:"monthly", day:"15", shift:"next"}, checklist:WC_CARD_CHK, memo:"", active:true},
+  {id:"S-card-hd-gd", cat:"card", title:"현대카드 결제", co:"GD", rule:{kind:"monthly", day:"16", shift:"next"}, checklist:WC_CARD_CHK, memo:"대상기간 1일~말일", active:true},
+  {id:"S-card-nh-gd", cat:"card", title:"농협카드 결제", co:"GD", rule:{kind:"monthly", day:"15", shift:"next"}, checklist:WC_CARD_CHK, memo:"", active:true},
+  {id:"S-card-nh-gs", cat:"card", title:"농협카드 결제", co:"GS", rule:{kind:"monthly", day:"15", shift:"next"}, checklist:WC_CARD_CHK, memo:"", active:true},
+  {id:"S-card-slip15", cat:"card", title:"법인카드 경비 지급전표 (사원경비와 분리)", co:"ALL", rule:{kind:"monthly", day:"15", shift:"next"},
+    checklist:["사원경비와 분리하여 지급전표 작성","경비 지급 대상 = 카드 사용자가 아닌 소유자"], memo:"매월 15일", active:true},
+  {id:"S-card-late", cat:"card", title:"삼성카드 연체자 확인 (D+1~D+3)", co:"ALL", rule:{kind:"monthly", day:"15", offset:1, shift:"next"},
+    checklist:["D+1 연체내역 확인","D+2 연체내역 확인","D+3 연체내역 확인","삼성법인카드 연체내역 파일 저장","사원경비 자동화 › 연체자 관리 반영"], memo:"삼성카드 결제일(15일) 다음 영업일부터 3일 · 노션 [삼성카드 연체자 확인]", active:true},
+  {id:"S-card-reg", cat:"card", title:"삼성법인카드 등록 후 회신 (전산팀)", co:"ALL", rule:{kind:"monthly", nth:2, wd:5, shift:"prev"},
+    checklist:["삼성법인카드 등록","전산팀 회신"], memo:"노션 반복일정 — 대체로 둘째·넷째 금요일", active:true},
+  {id:"S-card-reg2", cat:"card", title:"삼성법인카드 등록 후 회신 (전산팀)", co:"ALL", rule:{kind:"monthly", nth:4, wd:5, shift:"prev"},
+    checklist:["삼성법인카드 등록","전산팀 회신"], memo:"노션 반복일정 — 대체로 둘째·넷째 금요일", active:true},
+  {id:"S-card-acct", cat:"card", title:"CMS수수료·우리은행 수수료 / 법인카드 계정대체·공용카드 금액 확인", co:"ALL", rule:{kind:"monthly", day:"10", shift:"next"},
+    checklist:["CMS수수료","우리은행 수수료","법인카드 계정대체 (자금업무 자동화 › 법인카드 계정대체)","공용카드 금액 확인"], memo:"매월 10일", active:true},
+  {id:"S-card-yearend", cat:"card", title:"연말·연초 법인카드 정리 (사간전배·임원승진)", co:"ALL", rule:{kind:"monthly", months:[1], bizn:1},
+    checklist:["사간전배자: 기존 법인 ERP [신용카드등록] 사용여부 N","사간전배자: 신규 법인카드 발급자와 동일하게 등록 (기존카드 정지O / 신규발급O / 퇴직서명O)",
+      "임원승진자: ERP [신용카드등록] [관리사원] 신규사번으로 변경 (기존카드 정지X / 신규발급X / 퇴직서명O)"],
+    memo:"사간전배 = SN → GU / GU → SN 등 소속회사 변경 · 임원승진 시 신규 사번 부여", active:true},
+  {id:"S-card-report", cat:"card", title:"전년도 법인카드 현황관리보고", co:"ALL", rule:{kind:"monthly", months:[1], bizn:1}, checklist:["법인카드 현황관리보고"], memo:"다음해 첫 영업일", active:true},
+  {id:"S-card-fee-gu", cat:"card", title:"GU 농협카드 연회비 결제 (5,000원 × 2장) 비용처리요청", co:"GU", rule:{kind:"yearly", month:7, day:15, shift:"next"}, checklist:["명세서 확인","비용처리요청"], memo:"", active:true},
+  {id:"S-card-fee-nh", cat:"card", title:"SN/GD/GS 농협카드 연회비 결제 (법인별 12,000원 × 1장) 비용처리요청", co:"ALL", rule:{kind:"yearly", month:9, day:1, shift:"next"}, checklist:["명세서 확인","비용처리요청"], memo:"", active:true},
+  {id:"S-card-fee-lotte", cat:"card", title:"SN 윤상화부회장님 롯데카드 연회비 (5,000원) — 명세서 확인 후 현금경비", co:"SN", rule:{kind:"yearly", month:3, day:4, shift:"next"}, checklist:["명세서 확인","현금경비"], memo:"", active:true},
+  {id:"S-card-fee-ss", cat:"card", title:"SN 박효대회장님 삼성카드 연회비 (2,000,000원) — 명세서 확인 후 비용처리요청", co:"SN", rule:{kind:"yearly", month:3, day:10, shift:"next"}, checklist:["명세서 확인","비용처리요청"], memo:"", active:true},
+  {id:"S-card-gift", cat:"card", title:"SN 삼성카드/롯데카드 기프트카드 신청 (명절 한달 전)", co:"SN", rule:{kind:"dates", dates:["2027-01-07","2027-08-10"]},
+    checklist:["삼성카드 기프트카드 신청","롯데카드 기프트카드 신청"], memo:"설·추석 한달 전 — 음력이라 해마다 날짜 추가 (2026: 01-08 · 08-10)", active:true},
+  /* ── 대출이자: 납부 건별·한도미사용수수료는 자동(금융 약정). 노션 [그룹사_대출이자납부] 월 추가 ── */
+  {id:"S-int-month", cat:"interest", title:"그룹사_대출이자납부 신규 월 추가", co:"ALL", rule:{kind:"monthly", bizn:1},
+    checklist:["[해당월] 구분값으로 전월내역 체크 → 복제","복제 내역 속성 일괄변경: [해당월] 익월 · [전표 및 납부여부] 변경 · 납부일자 삭제 (체크박스 풀지 않기)",
+      "관계사차입금: 상환·신규 실행 시 계획서 대상금액 수정","산업(-)대출: 대출 실행 시 생성 (실행일 = 납부일)","이자 지급 계획서 엑셀 첨부 (신규대출 반영)"],
+    memo:"상태: 미발생(차입·수수료 미발생) / 확인필요 / 작성예정 / 진행중(ERP 전표 작성 완료·납부 전) / 납부완료", active:true},
+  /* ── 예적금 마감 및 월별 수금내역 품의: 익월 5영업일 이내(분기 마감 시 3영업일 이내) ── */
+  {id:"S-dep-month", cat:"deposit", title:"예적금 마감 · SN 수금완료 품의 상신 (기한)", co:"ALL", rule:{kind:"monthly", months:[2,3,5,6,8,9,11,12], bizn:5},
+    checklist:["예적금(ERP) 마감","SN 수금완료품의 상신 (월별 자금증빙함)"], memo:"익월 5영업일 이내 · 정렬기준 [완료여부]", active:true},
+  {id:"S-dep-unwritten", cat:"deposit", title:"미작성파일 공유 (메일)", co:"ALL", rule:{kind:"weekly", wd:1, shift:"next"},
+    checklist:["그룹사 미작성분 파일 작성","메일 공유"], memo:"매주 월요일 · 2025.08 이후 노션 미작성, 메일 공유만 진행 · 월 마지막 회차는 예적금 마감과 함께", active:true},
+  /* ── 분기마감 (노션 [분기마감] 항목) ── */
+  {id:"S-q-mmt", cat:"quarter", title:"MMT 현금보유요청 메일", co:"ALL", rule:{kind:"monthly", months:[3,6,9,12], day:"eom", offset:-1},
+    checklist:["“현금보유요청” 메일 발송"], memo:"분기말 전영업일 (노션 항목명 2Q·4Q, 2025.3Q·2026.1Q도 진행)", active:true},
+  {id:"S-q-mmt-nh", cat:"quarter", title:"농협은행 MMT 이체 (2Q·4Q)", co:"ALL", rule:{kind:"monthly", months:[6,12], day:"eom", offset:-1},
+    checklist:["농협은행 MMT 이체"], memo:"반기말 전영업일", active:true},
+  {id:"S-q-newfin", cat:"quarter", title:"신규 금융기관 확인", co:"ALL", rule:{kind:"yearly", month:12, day:31, shift:"prev"},
+    checklist:["금융권 변동내역 엑셀 작성","신규 금융기관 확인"], memo:"연말", active:true},
+  {id:"S-q-trust", cat:"quarter", title:"신탁운용보고서 (1Q·3Q)", co:"ALL", rule:{kind:"monthly", months:[4,10], bizn:2},
+    checklist:["신탁운용보고서 (굿어스 3사)"], memo:"분기 다음 달 제2영업일 무렵", active:true},
+  {id:"S-q-cms", cat:"quarter", title:"CMS(PDF) / 예적금현황(엑셀) 자료", co:"ALL", rule:{kind:"monthly", months:[1,4,7,10], bizn:2},
+    checklist:["CMS(PDF)","예적금현황(엑셀)"], memo:"분기 다음 달 제2영업일 무렵", active:true},
+  {id:"S-q-close", cat:"quarter", title:"분기마감: 예적금(ERP) 마감 · SN 수금완료 품의 (기한)", co:"ALL", rule:{kind:"monthly", months:[1,4,7,10], bizn:3},
+    checklist:["예적금(ERP) 마감","SN 수금완료품의 상신"], memo:"분기 마감 시 3영업일 이내", active:true},
+  {id:"S-q-loan", cat:"quarter", title:"여신현황 (증빙자료 포함)", co:"ALL", rule:{kind:"monthly", months:[1,4,7,10], bizn:3},
+    checklist:["여신현황 작성","증빙자료 첨부"], memo:"분기 다음 달 초 (2025: 04-04 · 07-02 · 12-31)", active:true},
+  /* ── 월별 매입대금: (1차) 8일 전후 / (2차) 20일 전후 ── */
+  {id:"S-pur-1", cat:"purchase", title:"매입대금 1차 지급", co:"ALL", rule:{kind:"monthly", day:"8", shift:"next"}, checklist:WC_PUR_CHK, memo:"8일 전후 · 노션 [월별 매입대금] 업체별 1차", active:true},
+  {id:"S-pur-2", cat:"purchase", title:"매입대금 2차 지급", co:"ALL", rule:{kind:"monthly", day:"20", shift:"next"}, checklist:WC_PUR_CHK, memo:"20일 전후 · 노션 [월별 매입대금] 업체별 2차", active:true},
+  /* ── 상생파트너론 연장 (노션 [상생파트너론 연장일정]) — 결제전산원 02-703-8881 · www.kefci.com, 로그인 정보는 노션 ── */
+  {id:"S-ww-shinhan", cat:"winwin", title:"SN 강원랜드 · 신한 동반성장론 연장", co:"SN", rule:{kind:"yearly", month:1, day:9, shift:"prev"},
+    checklist:["신한은행 지점에 연장 요청 (만기 3개월 전 권장)","1. 신한동반외담대","2. 신한동반외담대 대출약정 (5천만원 미만 인지세 없음 · 금액은 적게)","3. 신한동반성장론약정","4. 신한동반성장론 대출약정 (인지세 1만원)","대출약정까지 반드시 완료 (지점 내부심사 2~3시간)","약정서 노션 첨부"],
+    memo:"연장일정 2024-04-09 · 2025-01-10 · 2026-01-09 완료, 2027-01-09 예정 · 강원랜드 프로젝트 3년 연장 · 기한 지나면 신규 약정(우편·1~2일) · 5년까지 사이트 갱신(만기 3개월 전부터)", active:true},
+  {id:"S-ww-kb", cat:"winwin", title:"SN 한국지역난방공사 · 국민 상생결제론 연장", co:"SN", rule:{kind:"yearly", month:7, day:16, shift:"next"},
+    checklist:["KB국민은행 지점에 연장 요청 (만기 3개월 전 권장)","1. KB상생결제론","2. KB상생결제론 대출약정 (5천만원 미만 인지세 없음 · 금액은 적게)","대출약정까지 반드시 완료 (지점 내부심사 2~3시간)","약정서 노션 첨부"],
+    memo:"연장일정 2024-10-16 완료 · 2025-07-16 '시작 전' — 진행 여부 확인 필요", active:true},
+  {id:"S-ww-woori", cat:"winwin", title:"GU 삼성에스디에스 · 우리 상생파트너론 연장", co:"GU", rule:{kind:"yearly", month:11, day:20, shift:"next"},
+    checklist:["우리은행 지점에 연장 요청 (연락 지점 없으면 방문)","인터넷뱅킹: 상생파트너론 대출약정 (5천만원 미만 인지세 없음 · 금액은 적게)","대출약정까지 반드시 완료 (지점 내부심사 2~3시간)","약정서 노션 첨부"],
+    memo:"연장일정 2024-02-16 완료(만기 2025-12-30) · 2025-11-20 · 2026-11-20 '시작 전'", active:true},
+  {id:"S-ww-woori-end", cat:"winwin", title:"GU 삼성에스디에스 · 우리 상생파트너론 만기", co:"GU", rule:{kind:"yearly", month:12, day:30, shift:"none"},
+    checklist:["연장 약정 완료 확인"], memo:"2024 연장분 만기 2025-12-30 기준", active:true},
+  /* ── 그 외 반복일정 (노션 [반복일정]) ── */
+  {id:"S-r-futures", cat:"monthly", title:"SN/GS 삼성선물 수수료·예탁금이용료 확인 및 전표작성", co:"ALL", rule:{kind:"monthly", bizn:1},
+    checklist:["SN 삼성선물 수수료·예탁금이용료 확인","GS 삼성선물 수수료·예탁금이용료 확인","전표작성"], memo:"매월 첫 영업일", active:true},
+  {id:"S-r-bill", cat:"monthly", title:"어음 수금처리 및 외화 입금처리", co:"ALL", rule:{kind:"monthly", day:"eom", shift:"prev"},
+    checklist:["어음 수금처리","외화 입금처리"], memo:"매월 마지막 영업일", active:true},
+  {id:"S-r-member", cat:"monthly", title:"전년도 회원권 실사보고", co:"ALL", rule:{kind:"monthly", months:[1], bizn:1}, checklist:["회원권 실사보고"], memo:"다음해 첫 영업일", active:true},
+  {id:"S-r-exec", cat:"monthly", title:"경영진 설/추석 계산서 처리 (명절달 계산서 마감)", co:"ALL", rule:{kind:"dates", dates:["2026-10-08","2027-03-08","2027-10-08"]},
+    checklist:["경영진 계산서 처리"], memo:"명절 다음 달 제5영업일 무렵(2025-02-07 · 2025-11-07 · 2026-03-09) — 음력이라 해마다 날짜 추가", active:true}
+];
+
 /* ===================== 금융 (차입·대여·보증·이자·연락처·공휴일) ===================== */
 var finTab="loan";
 function finCos(){ return scopeCos(); }
@@ -5658,37 +6191,45 @@ function bindLoanEdit(){
 
 /* --------- 대여현황 --------- */
 function finLends(host){
+  /* [v74] 기준일 기준 — 회수액·잔액·이자율은 이력(moves·rates)에서 계산. 회수는 [이력] 창에서 일자별로 입력 */
+  var iso=curDate||todayISO(), ym=iso.slice(0,7);
   var refs=[];
-  finCos().forEach(function(c){ (c.lendings||[]).forEach(function(d,i){ refs.push({c:c,d:d,i:i}); }); });
-  var tot=refs.reduce(function(a,r){ return a+((+r.d.amount||0)-(+r.d.repaid||0)); },0);
+  finCos().forEach(function(c){ (c.lendings||[]).forEach(function(d,i){ refs.push({c:c,d:d,i:i,v:lendAt(d,iso)}); }); });
+  var tot=refs.reduce(function(a,r){ return a+r.v.bal; },0);
   var com=refs.reduce(function(a,r){ return a+(+r.d.amount||0); },0);
-  var rep=refs.reduce(function(a,r){ return a+(+r.d.repaid||0); },0);
-  var yr=refs.reduce(function(a,r){ return a+((+r.d.amount||0)-(+r.d.repaid||0))*(+r.d.rate||0); },0);
+  var rep=refs.reduce(function(a,r){ return a+r.v.repaid; },0);
+  var yr=refs.reduce(function(a,r){ return a+r.v.bal*r.v.rate; },0);
+  var mon=0, undated=0;
   var rows=refs.map(function(r,n){
-    var d=r.d, bal=(+d.amount||0)-(+d.repaid||0);
-    return '<tr><td>'+coSel("co",r.c.id,'data-n="'+n+'"')+'</td>'+
+    var d=r.d, v=r.v, bal=v.bal;
+    var ev=lendIntEvents(d, ym+"-01", ymEnd(ym)), mi=ev.reduce(function(a,e){ return a+e.net; },0); mon+=mi;
+    if(+d.repaid>0) undated++;
+    var nh=(d.rates||[]).length+(d.moves||[]).length+(+d.repaid>0?1:0);
+    return '<tr'+(v.started?'':' style="opacity:.45"')+'><td>'+coSel("co",r.c.id,'data-n="'+n+'"')+'</td>'+
       '<td><input class="cellsel" data-n="'+n+'" data-f="partner" value="'+esc(d.partner||"")+'" style="width:130px"></td>'+
       '<td><input class="cellsel" type="date" data-n="'+n+'" data-f="start" value="'+esc(d.start||"")+'"></td>'+
       '<td><input class="cellsel" type="date" data-n="'+n+'" data-f="end" value="'+esc(d.end||"")+'"></td>'+
-      '<td><input class="cellsel num" type="number" data-n="'+n+'" data-f="amount" value="'+(+d.amount||0)+'" style="width:124px"></td>'+
-      '<td><input class="cellsel num" type="number" data-n="'+n+'" data-f="repaid" value="'+(+d.repaid||0)+'" style="width:124px"></td>'+
+      '<td><input class="cellsel num" type="number" data-n="'+n+'" data-f="amount" value="'+(+d.amount||0)+'" style="width:124px" title="최초 대여(약정) 금액 — 추가 대여·회수는 [이력]에서"></td>'+
+      '<td class="num'+(v.repaid?' pos':' zero')+'">'+fmt(v.repaid)+(+d.repaid>0?'<div class="mini" title="일자 없이 입력된 기존 회수액 — [이력]에서 회수일을 지정하세요">일자 미상 '+fmtShort(+d.repaid)+'</div>':'')+'</td>'+
       '<td class="num'+(bal?' pos':' zero')+'">'+fmt(bal)+'</td>'+
-      '<td><input class="cellsel num" type="number" step="0.00001" data-n="'+n+'" data-f="rate" value="'+(+d.rate||0)+'" style="width:82px"></td>'+
-      '<td class="num mini">'+fmt(Math.round(bal*(+d.rate||0)/12))+'</td>'+
+      '<td><input class="cellsel num" type="number" step="0.00001" data-n="'+n+'" data-f="rate" value="'+(+d.rate||0)+'" style="width:82px" title="최초 이자율 — 변경은 [이력]에서 적용일과 함께">'+
+        (v.rate!==(+d.rate||0)?'<div class="mini">기준일 '+(v.rate*100).toFixed(3)+'%</div>':'')+'</td>'+
+      '<td class="num mini">'+fmt(mi)+(ev.length?'<div class="mini">'+ev.map(function(e){ return esc(e.pay.slice(5)); }).join(", ")+'</div>':'')+'</td>'+
       '<td><input class="cellsel" data-n="'+n+'" data-f="method" value="'+esc(d.method||"")+'" style="width:150px"></td>'+
-      '<td class="act"><button class="btn sm" data-ddel="'+n+'">삭제</button></td></tr>';
+      '<td class="act"><button class="btn sm" data-dhist="'+n+'">이력 '+nh+'</button> <button class="btn sm" data-ddel="'+n+'">삭제</button></td></tr>';
   }).join("");
   host.innerHTML='<div class="kpis">'+
-    '<div class="kpi lead"><div class="lbl">대여 잔액</div><div class="v">'+fmt(tot)+'</div><div class="d">'+refs.length+'건</div></div>'+
+    '<div class="kpi lead"><div class="lbl">대여 잔액</div><div class="v">'+fmt(tot)+'</div><div class="d">'+iso+' 기준 · '+refs.length+'건</div></div>'+
     '<div class="kpi"><div class="lbl">약정 금액</div><div class="v">'+fmt(com)+'</div><div class="d">누적 약정</div></div>'+
-    '<div class="kpi i"><div class="lbl">회수액</div><div class="v">'+fmt(rep)+'</div><div class="d">누적 상환받은 금액</div></div>'+
-    '<div class="kpi i"><div class="lbl">연 이자 (예상)</div><div class="v">'+fmt(Math.round(yr))+'</div><div class="d">수취 이자</div></div></div>'+
+    '<div class="kpi i"><div class="lbl">회수액</div><div class="v">'+fmt(rep)+'</div><div class="d">'+iso+'까지 상환받은 금액'+(undated?' · 일자 미상 포함':'')+'</div></div>'+
+    '<div class="kpi i"><div class="lbl">연 이자 (예상)</div><div class="v">'+fmt(Math.round(yr))+'</div><div class="d">수취 이자 · 당월 수취 예정 '+fmt(mon)+'</div></div></div>'+
     '<div class="panel"><header><h2>관계사·거래처 대여</h2>'+finSub(curCo==="ALL"?"전 법인":co(curCo).name)+
     '<div class="sp"><button class="btn sm" id="btnAddLend">대여 추가</button></div></header>'+
     '<div class="scroll"><table class="tbl" id="lendEditTbl"><thead><tr><th>법인</th><th>거래처</th><th>약정일</th><th>만기일</th>'+
     '<th style="text-align:right">약정금액</th><th style="text-align:right">회수액</th><th style="text-align:right">잔액</th>'+
-    '<th style="text-align:right">이자율</th><th style="text-align:right">월 이자</th><th>이자 수취</th><th></th></tr></thead><tbody>'+
-    (rows||'<tr><td colspan="11" class="mini" style="padding:18px;text-align:center">대여 없음</td></tr>')+'</tbody></table></div></div>';
+    '<th style="text-align:right">이자율</th><th style="text-align:right">당월 수취 예정</th><th>이자 수취</th><th></th></tr></thead><tbody>'+
+    (rows||'<tr><td colspan="11" class="mini" style="padding:18px;text-align:center">대여 없음</td></tr>')+'</tbody></table></div>'+
+    '<p class="hint" style="padding:0 16px 14px">회수액·잔액은 <b>기준일('+esc(iso)+')까지</b>의 대여·회수 이력으로 계산됩니다. 회수·추가 대여·이자율 변경은 <b>[이력]</b>에서 일자와 함께 입력하세요. 당월 수취 예정은 이자 수취일 문구(예: 매월 말일)로 이자납부계획서와 같은 방식(직전 수취일 ~ 당월 수취일 전일, 원단위 절사)으로 계산합니다.</p></div>';
   $$("#lendEditTbl [data-n][data-f]").forEach(function(el){
     el.onchange=function(){
       var r=refs[+el.dataset.n], f=el.dataset.f;
@@ -5698,13 +6239,16 @@ function finLends(host){
         r.c.lendings.splice(r.i,1); to.lendings=to.lendings||[]; to.lendings.push(r.d);
         save().then(function(){ toast("대여 법인 이동됨"); render(); }); return;
       }
-      r.d[f]=(f==="amount"||f==="repaid"||f==="rate")? +el.value : el.value;
+      r.d[f]=(f==="amount"||f==="rate")? +el.value : el.value;
+      if(f==="start" && !r.d.firstDate) r.d.firstDate=el.value;
       save().then(function(){ toast("대여 저장됨"); renderFin(); });
     };
   });
   $$("#lendEditTbl [data-ddel]").forEach(function(b){ b.onclick=function(){
     var r=refs[+b.dataset.ddel]; r.c.lendings.splice(r.i,1);
     save().then(function(){ toast("대여 삭제됨"); renderFin(); }); }; });
+  $$("#lendEditTbl [data-dhist]").forEach(function(b){ b.onclick=function(){
+    var r=refs[+b.dataset.dhist]; openLendHist(r.c, r.i); }; });
   $("#btnAddLend").onclick=function(){
     var t=curCo==="ALL"?D.companies[0]:co(curCo);
     t.lendings=t.lendings||[];
@@ -5712,6 +6256,67 @@ function finLends(host){
       amount:0, repaid:0, rate:0, method:"", rates:[], moves:[]});
     save().then(function(){ toast(t.short+" 대여 추가됨"); render(); });
   };
+}
+/* [v74] 대여 이력 창 — 차입 이력(openLoanHist)과 같은 구조: 이자율 변경 이력 + 대여·회수 이력(일자별) */
+function openLendHist(c, idx){
+  var d=c.lendings[idx]; if(!d) return;
+  d.rates=d.rates||[]; d.moves=d.moves||[];
+  var rr=d.rates.slice().sort(function(a,b){return a.from<b.from?-1:1});
+  var mm=d.moves.slice().sort(function(a,b){return a.date<b.date?-1:1});
+  var st=lendStartOf(d), run=+d.amount||0;
+  var legacy=+d.repaid||0;
+  if(legacy) run-=legacy;
+  var mvRows=mm.map(function(m,i){ run+=(+m.amount||0);
+    return '<tr><td>'+esc(m.date)+'</td><td class="num '+((+m.amount||0)<0?"pos":"neg")+'">'+fmtSigned(m.amount)+'</td><td class="num mini">'+fmt(Math.max(0,run))+'</td><td class="mini">'+esc(m.note||"")+'</td><td><button class="btn sm" data-mdel="'+i+'">삭제</button></td></tr>'; }).join("");
+  var body='<div class="modbox"><header><h2>'+esc(c.short)+' · '+esc(d.partner||"대여")+' 대여 이력</h2>'+
+    '<button class="btn sm" id="modX">닫기</button></header>'+
+    '<div class="pad"><h3 class="lbl">이자율 변경 이력</h3>'+
+    '<table class="tbl"><thead><tr><th>적용일</th><th style="text-align:right">이자율</th><th>비고</th><th></th></tr></thead><tbody>'+
+    '<tr><td class="mini">'+esc(st||"약정일")+'</td><td class="num">'+((+d.rate||0)*100).toFixed(3)+'%</td><td class="mini">최초</td><td></td></tr>'+
+    rr.map(function(r,i){ return '<tr><td>'+esc(r.from)+'</td><td class="num">'+((+r.rate||0)*100).toFixed(3)+'%</td><td class="mini">'+esc(r.note||"")+'</td><td><button class="btn sm" data-rdel="'+i+'">삭제</button></td></tr>'; }).join("")+
+    '</tbody></table>'+
+    '<div class="toolbar" style="margin-top:8px"><input type="date" id="drDate"><input type="number" id="drRate" step="0.00001" placeholder="0.046" style="width:110px"><input type="text" id="drNote" placeholder="비고" style="flex:1;min-width:110px"><button class="btn sm primary" id="drAdd">금리 추가</button></div>'+
+    '<h3 class="lbl" style="margin-top:18px">대여 · 회수 이력</h3>'+
+    '<table class="tbl"><thead><tr><th>일자</th><th style="text-align:right">증감액</th><th style="text-align:right">잔액</th><th>비고</th><th></th></tr></thead><tbody>'+
+    '<tr><td class="mini">'+esc(st||"약정일")+'</td><td class="num">'+fmt(+d.amount||0)+'</td><td class="num mini">'+fmt(+d.amount||0)+'</td><td class="mini">최초 대여</td><td></td></tr>'+
+    (legacy?'<tr style="background:var(--warnbg,rgba(200,140,0,.08))"><td class="mini">일자 미상</td><td class="num pos">'+fmtSigned(-legacy)+'</td><td class="num mini">'+fmt(Math.max(0,(+d.amount||0)-legacy))+'</td>'+
+      '<td class="mini">기존 회수액(일자 없이 입력됨) — 회수일을 지정하면 이력으로 옮겨집니다</td>'+
+      '<td style="white-space:nowrap"><input type="date" id="dlgDate" style="width:132px"> <button class="btn sm" id="dlgSet">일자 지정</button></td></tr>':'')+
+    mvRows+
+    '</tbody></table>'+
+    '<div class="toolbar" style="margin-top:8px"><input type="date" id="dmDate"><input type="number" id="dmAmt" placeholder="-회수 / +추가 대여" style="width:150px"><input type="text" id="dmNote" placeholder="비고 (예: 원금 일부 회수)" style="flex:1;min-width:110px"><button class="btn sm primary" id="dmAdd">대여·회수 추가</button></div>'+
+    '<p class="hint" style="margin-top:12px">회수는 <b>음수(−)</b>, 추가 대여는 양수(+)로 입력합니다. 기준일을 바꾸면 그 날짜까지의 회수액·잔액·이자율로 대여현황과 대시보드가 다시 계산됩니다.</p>'+
+    '</div></div>';
+  var m=$("#modal"); m.innerHTML=body; m.hidden=false;
+  function done(msg){ save().then(function(){ openLendHist(c,idx); render(); if(msg) toast(msg); }); }
+  $("#modX").onclick=function(){ m.hidden=true; };
+  m.onclick=function(e){ if(e.target===m) m.hidden=true; };
+  $("#drAdd").onclick=function(){
+    var dt=$("#drDate").value, r=+$("#drRate").value;
+    if(!dt||!r){ toast("적용일과 이자율을 입력하세요."); return; }
+    d.rates.push({from:dt, rate:r, note:$("#drNote").value||""}); done("금리 이력 추가됨");
+  };
+  $("#dmAdd").onclick=function(){
+    var dt=$("#dmDate").value, a=+$("#dmAmt").value;
+    if(!dt||!a){ toast("일자와 금액을 입력하세요."); return; }
+    if(st && dt<st){ toast("약정일("+st+") 이전 일자는 입력할 수 없습니다."); return; }
+    var after=lendAt({amount:d.amount, repaid:d.repaid, start:d.start, firstDate:d.firstDate,
+      moves:d.moves.concat([{date:dt, amount:a}])}, "9999-12-31");
+    var raw=(+d.amount||0)-(+d.repaid||0)+d.moves.reduce(function(s,x){ return s+(+x.amount||0); },0)+a;
+    if(raw<0){ toast("회수액이 대여 잔액보다 큽니다(잔액 "+fmt(Math.max(0,raw-a))+")."); return; }
+    d.moves.push({date:dt, amount:a, note:$("#dmNote").value||(a<0?"회수":"추가 대여")});
+    done(a<0?"회수 "+fmt(-a)+" 반영 · 잔액 "+fmt(after.bal):"추가 대여 반영");
+  };
+  var ls=$("#dlgSet");
+  if(ls) ls.onclick=function(){
+    var dt=$("#dlgDate").value;
+    if(!dt){ toast("회수일을 입력하세요."); return; }
+    if(st && dt<st){ toast("약정일("+st+") 이전 일자는 입력할 수 없습니다."); return; }
+    d.moves.push({date:dt, amount:-(+d.repaid||0), note:"회수(기존 회수액 일자 지정)"}); d.repaid=0;
+    done("기존 회수액을 "+dt+" 회수로 옮김");
+  };
+  $$("#modal [data-rdel]").forEach(function(b){ b.onclick=function(){ rr.splice(+b.dataset.rdel,1); d.rates=rr; done(); }; });
+  $$("#modal [data-mdel]").forEach(function(b){ b.onclick=function(){ mm.splice(+b.dataset.mdel,1); d.moves=mm; done(); }; });
 }
 
 /* --------- 보증현황 --------- */
@@ -5792,55 +6397,108 @@ function actualInterest(c, ym){
   });
   return s;
 }
+/* [v74] 이자 납부 계획 — 기간 안에 '실제 납부일'이 있는 약정별 이자(이자납부계획서 방식) */
+function intPlanFor(cos, fromIso, toIso){
+  var out=[];
+  cos.forEach(function(c){ (c.loans||[]).forEach(function(l){
+    loanIntEvents(l, fromIso, toIso).forEach(function(e){ e.c=c; e.l=l; out.push(e); }); }); });
+  return out.sort(function(a,b){ return a.pay<b.pay?-1:(a.pay>b.pay?1:(a.c.id<b.c.id?-1:1)); });
+}
+function intDayActual(c, iso){
+  if(!c.days || !c.days[iso]) return null;
+  var a=dayAgg(c,iso);
+  return (a.outBy && a.outBy["이자비용"]) || 0;
+}
+var WD_KO=["일","월","화","수","목","금","토"];
 function finInterest(host){
-  var cos=finCos();
+  var cos=finCos(), iso=curDate||todayISO();
   var months={};
-  cos.forEach(function(c){ Object.keys(c.days||{}).forEach(function(iso){ months[iso.slice(0,7)]=1; }); });
-  var now=(curDate||todayISO()).slice(0,7);
+  cos.forEach(function(c){ Object.keys(c.days||{}).forEach(function(d){ months[d.slice(0,7)]=1; }); });
+  var now=iso.slice(0,7);
   months[now]=1;
   var ms=Object.keys(months).sort();
   if(ms.length>18) ms=ms.slice(-18);
+  var evAll=intPlanFor(cos, ms[0]+"-01", ymEnd(ms[ms.length-1]));
+  var byM={};
+  evAll.forEach(function(e){ var k=e.pay.slice(0,7); byM[k]=(byM[k]||0)+e.net; });
   var rows="", tE=0, tA=0;
   ms.forEach(function(ym){
-    var est=0, act=0, dd={};
+    var est=byM[ym]||0, acc=0, act=0, dd={};
     cos.forEach(function(c){
-      (c.loans||[]).forEach(function(l){ est+=accrueMonth(l,ym); });
+      (c.loans||[]).forEach(function(l){ acc+=accrueMonth(l,ym); });
       act+=actualInterest(c,ym);
-      Object.keys(c.days||{}).forEach(function(iso){ if(iso.slice(0,7)===ym) dd[iso]=1; });
+      Object.keys(c.days||{}).forEach(function(d){ if(d.slice(0,7)===ym) dd[d]=1; });
     });
-    est=Math.round(est); tE+=est; tA+=act;
+    acc=Math.round(acc); tE+=est; tA+=act;
     var diff=act-est, nd=Object.keys(dd).length, full=monthDays(ym);
     var partial = nd < full*0.8;
     var ok = act && !partial && Math.abs(diff)<=Math.max(10000,est*0.03);
-    rows+='<tr><td><b>'+esc(ym)+'</b></td><td class="num">'+fmt(est)+'</td><td class="num">'+(act?fmt(act):'<span class="mini">-</span>')+'</td>'+
+    rows+='<tr><td><b>'+esc(ym)+'</b></td><td class="num">'+fmt(est)+'</td><td class="num mini">'+fmt(acc)+'</td><td class="num">'+(act?fmt(act):'<span class="mini">-</span>')+'</td>'+
       '<td class="num '+(act&&!partial? (ok?'':'neg') :'')+'">'+(act?fmtSigned(diff):'<span class="mini">-</span>')+'</td>'+
       '<td class="num mini">'+nd+'/'+full+'</td>'+
       '<td class="mini">'+(!act?'거래내역 없음':(partial?'<span class="chip auto">일부 기간</span>':(ok?'일치':'<span class="chip out">차이 확인</span>')))+'</td></tr>';
   });
+
+  /* 당월 납부 계획(계획서 한 장과 같은 모양) */
+  var cur=evAll.filter(function(e){ return e.pay.slice(0,7)===now; });
+  var grp={};
+  cur.forEach(function(e){ var k=e.c.id+"|"+e.pay; (grp[k]=grp[k]||{net:0,n:0,shown:false}); grp[k].net+=e.net; grp[k].n++; });
+  var planRows="", planTot=0;
+  cur.forEach(function(e){
+    planTot+=e.net;
+    var k=e.c.id+"|"+e.pay, g=grp[k], act=null, actCell='';
+    if(!g.shown){ g.shown=true; act=intDayActual(e.c, e.pay);
+      actCell = act==null ? '<span class="mini">-</span>' :
+        fmt(act)+(g.n>1?'<div class="mini">같은 날 '+g.n+'건 합 '+fmt(g.net)+'</div>':'')+
+        (Math.abs(act-g.net)<=1?' <span class="chip in">일치</span>':' <span class="chip out">'+fmtSigned(act-g.net)+'</span>');
+    } else actCell='<span class="mini">〃</span>';
+    var notes=[];
+    if(e.payoff) notes.push("전액상환 — 상환일에 이자 함께 납부");
+    if(e.shifted) notes.push((e.holi||WD_KO[new Date(e.due+"T00:00:00").getDay()]+"요일")+" → "+(e.l.type==="관계사"?"전":"익")+"영업일");
+    if(e.mode==="round") notes.push("원단위 반올림");
+    if(e.rule.guess) notes.push("납부일 미기재 — 말일 가정");
+    if(e.corp) notes.push("법인세 "+fmt(e.corp)+" · 지방세 "+fmt(e.local)+" 원천징수");
+    var rs=e.segs.length;
+    e.segs.forEach(function(s,i){
+      planRows+='<tr>'+
+        (i===0?'<td rowspan="'+rs+'"><span class="chip nv" style="color:'+e.c.color+'">'+esc(e.c.short)+'</span></td><td rowspan="'+rs+'">'+esc(e.l.bank)+' '+esc(e.l.type)+'<div class="mini">'+esc(e.rule.txt)+'</div></td>':'')+
+        '<td class="mini">'+esc(s.from)+' ~ '+esc(s.to)+(s.pre?' <span class="chip auto" title="하나 개별대출: 100만원 이하로 가능한 일수만큼 먼저 자동이체">선이체</span>':'')+'</td><td class="num">'+s.days+'</td><td class="num">'+fmt(s.bal)+'</td>'+
+        '<td class="num">'+(s.rate*100).toFixed(3)+'%'+(s.basis===366?'<div class="mini">366일</div>':'')+'</td><td class="num">'+fmt(s.amt)+'</td>'+
+        (i===0?'<td rowspan="'+rs+'" class="mini">'+(e.payoff?'상환일 <b>'+esc(e.pay)+'</b>':esc(e.due)+(e.pay!==e.due?' → <b>'+esc(e.pay)+'</b>':''))+'</td>'+
+          '<td rowspan="'+rs+'" class="num"><b>'+fmt(e.net)+'</b></td><td rowspan="'+rs+'" class="num">'+actCell+'</td>'+
+          '<td rowspan="'+rs+'" class="mini">'+esc(notes.join(" · "))+'</td>':'')+'</tr>';
+    });
+  });
+
   var detail="";
   cos.forEach(function(c){
     (c.loans||[]).forEach(function(l){
-      var v=loanAt(l, curDate||todayISO());
+      var v=loanAt(l, iso);
       if(!v.amount && !v.active) return;
+      var mon=cur.filter(function(e){ return e.l===l; }).reduce(function(a,e){ return a+e.net; },0);
       detail+='<tr><td><span class="chip nv" style="color:'+c.color+'">'+esc(c.short)+'</span></td><td>'+esc(l.bank)+'</td><td>'+esc(l.type)+'</td>'+
         '<td class="num">'+fmt(v.amount)+'</td><td class="num">'+(v.rate*100).toFixed(3)+'%</td>'+
         '<td class="num">'+fmt(Math.round(v.amount*v.rate/365))+'</td>'+
-        '<td class="num">'+fmt(Math.round(accrueMonth(l,now)))+'</td>'+
-        '<td class="num">'+fmt(Math.round(v.amount*v.rate))+'</td><td class="mini">'+esc(l.method||"")+'</td></tr>';
+        '<td class="num">'+fmt(mon)+'</td>'+
+        '<td class="num">'+fmt(Math.round(v.amount*v.rate))+'</td><td class="mini">'+esc(intPayRule(l).txt)+(l.method?' <span title="이자 납부 문구">('+esc(l.method)+')</span>':'')+'</td></tr>';
     });
   });
   host.innerHTML='<div class="kpis">'+
-    '<div class="kpi o"><div class="lbl">당월 예상 이자</div><div class="v">'+fmt(Math.round(cos.reduce(function(a,c){ return a+(c.loans||[]).reduce(function(x,l){return x+accrueMonth(l,now)},0); },0)))+'</div><div class="d">'+now+'</div></div>'+
+    '<div class="kpi o"><div class="lbl">당월 예상 이자</div><div class="v">'+fmt(byM[now]||0)+'</div><div class="d">'+now+' 납부 예정 · '+cur.length+'건</div></div>'+
     '<div class="kpi"><div class="lbl">누계 예상</div><div class="v">'+fmt(tE)+'</div><div class="d">'+(ms[0]||"")+' ~ '+(ms[ms.length-1]||"")+'</div></div>'+
     '<div class="kpi"><div class="lbl">누계 실지급</div><div class="v">'+fmt(tA)+'</div><div class="d">거래원장 이자비용 분류</div></div>'+
     '<div class="kpi '+(Math.abs(tA-tE)<=Math.max(50000,tE*0.03)?'i':'o')+'"><div class="lbl">차이</div><div class="v">'+fmtSigned(tA-tE)+'</div><div class="d">실지급 − 예상</div></div></div>'+
-    '<div class="panel"><header><h2>월별 이자비용 대사</h2>'+finSub("약정 이자 계산 vs 거래원장 실지급")+'</header>'+
-    '<div class="scroll"><table class="tbl"><thead><tr><th>월</th><th style="text-align:right">예상 이자</th><th style="text-align:right">실지급</th><th style="text-align:right">차이</th><th style="text-align:right">보유 일수</th><th>판정</th></tr></thead><tbody>'+
-    (rows||'<tr><td colspan="6" class="mini" style="padding:18px;text-align:center">데이터 없음</td></tr>')+'</tbody></table></div>'+
-    '<p class="hint" style="padding:0 16px 14px">예상 이자는 <b>일할(잔액 × 이자율 ÷ 365)</b> 누적입니다. 실지급은 거래원장에서 구분이 <b>이자비용</b>인 출금 합계이며, 한도미사용수수료·중도상환수수료가 섞이면 차이가 납니다. 그 달의 CMS 거래내역이 일부만 올라온 경우 <b>일부 기간</b>으로 표시되고 차이 판정은 하지 않습니다.</p></div>'+
-    '<div class="panel"><header><h2>약정별 이자 (기준일 잔액)</h2>'+finSub(curDate||todayISO())+'</header>'+
+    '<div class="panel"><header><h2>월별 이자비용 대사</h2>'+finSub("납부일 기준 예상 이자 vs 거래원장 실지급")+'</header>'+
+    '<div class="scroll"><table class="tbl"><thead><tr><th>월</th><th style="text-align:right">예상 이자 (납부 기준)</th><th style="text-align:right">발생 이자 (일할·참고)</th><th style="text-align:right">실지급</th><th style="text-align:right">차이</th><th style="text-align:right">보유 일수</th><th>판정</th></tr></thead><tbody>'+
+    (rows||'<tr><td colspan="7" class="mini" style="padding:18px;text-align:center">데이터 없음</td></tr>')+'</tbody></table></div>'+
+    '<p class="hint" style="padding:0 16px 14px">예상 이자는 <b>이자납부계획서 방식</b>입니다. 약정납입일마다 <b>직전 납입일 ~ 이번 납입일 전일</b>의 이자(대상금액 × 일수 × 이자율 ÷ 365, 행마다 원단위 절사)를 <b>실제 납부일</b>(주말·공휴일이면 익영업일)이 속한 달에 넣습니다. 기간 중 상환·금리 변경이 있으면 행을 나눠 계산하고, 개별대출을 전액상환하면 상환일 전일까지의 이자를 상환일에 넣습니다. 발생 이자(일할)는 달력 월 기준 참고값입니다. 실지급은 거래원장에서 구분이 <b>이자비용</b>인 출금 합계입니다. 한도미사용수수료는 운영경비라 양쪽 모두에서 빠지고, 중도상환수수료가 섞이면 차이가 납니다. 그 달 CMS 거래내역이 일부만 올라왔으면 <b>일부 기간</b>으로 표시하고 차이를 판정하지 않습니다.</p></div>'+
+    '<div class="panel"><header><h2>이자 납부 계획</h2>'+finSub(now+" · 실제 납부일 기준 · 합계 "+fmt(planTot))+'</header>'+
+    '<div class="scroll"><table class="tbl"><thead><tr><th>법인</th><th>약정</th><th>계산기간</th><th style="text-align:right">일수</th><th style="text-align:right">대상금액</th><th style="text-align:right">이자율</th><th style="text-align:right">계산금액</th>'+
+    '<th>약정납입일 → 실제납부일</th><th style="text-align:right">실지급 예정</th><th style="text-align:right">원장 실지급(그날)</th><th>비고</th></tr></thead><tbody>'+
+    (planRows||'<tr><td colspan="11" class="mini" style="padding:18px;text-align:center">이 달에 납부할 이자가 없습니다</td></tr>')+'</tbody></table></div></div>'+
+    '<div class="panel"><header><h2>약정별 이자 (기준일 잔액)</h2>'+finSub(iso)+'</header>'+
     '<div class="scroll"><table class="tbl"><thead><tr><th>법인</th><th>은행</th><th>구분</th><th style="text-align:right">차입잔액</th><th style="text-align:right">이자율</th>'+
-    '<th style="text-align:right">1일</th><th style="text-align:right">당월</th><th style="text-align:right">연간</th><th>납부일</th></tr></thead><tbody>'+
+    '<th style="text-align:right">1일</th><th style="text-align:right">당월 납부 예정</th><th style="text-align:right">연간</th><th>납부일</th></tr></thead><tbody>'+
     (detail||'<tr><td colspan="9" class="mini" style="padding:18px;text-align:center">약정 없음</td></tr>')+'</tbody></table></div></div>';
 }
 
@@ -6214,7 +6872,7 @@ function exportFinance(){
 
   var a2=[["관계사·거래처 대여현황 · "+iso],[],["법인","거래처","약정일","만기일","약정금액","회수액","잔액","이자율","연 이자","이자 수취"]];
   sc.lendItems.forEach(function(it){ var d=it.d;
-    a2.push([it.c.name, d.partner||"", d.start||"", d.end||"", +d.amount||0, +d.repaid||0, it.bal, +d.rate||0, Math.round(it.bal*(+d.rate||0)), d.method||""]); });
+    a2.push([it.c.name, d.partner||"", d.start||"", d.end||"", +d.amount||0, it.v.repaid, it.bal, it.v.rate, Math.round(it.bal*it.v.rate), d.method||""]); });   // [v74] 기준일 회수액·이자율
   a2.push(["합계","","","","","",sc.lendBal,"","",""]);
   XLSX.utils.book_append_sheet(wb,aoaSheet(a2,[16,16,12,12,16,16,16,10,14,20]),"대여현황");
 
@@ -6634,6 +7292,14 @@ function migrate(){
     ["accounts","loans"].forEach(function(k){ if(!Array.isArray(ex[k])||!ex[k].length) ex[k]=sd[k]; });
     if(!Array.isArray(ex.mmt)||!ex.mmt.length) ex.mmt=sd.mmt;
     if(!Array.isArray(ex.lendings)) ex.lendings=mkLendingsFor(ex.id);
+    /* [v74] 대여 이력 필드 · 시드 오기 보정(약정일 = 만기일이고 최초일이 더 이르면 약정일 = 최초일, 예: GD 블루로터스 2027-02-01 → 2026-02-02) */
+    ex.lendings.forEach(function(d,i){
+      if(!d.id) d.id=ex.id+"-D"+(i+1);
+      if(!Array.isArray(d.rates)) d.rates=[];
+      if(!Array.isArray(d.moves)) d.moves=[];
+      if(d.start && d.end && d.start===d.end && d.firstDate && d.firstDate<d.start) d.start=d.firstDate;
+      if(!d.firstDate) d.firstDate=d.start||"";
+    });
     if(!Array.isArray(ex.guarantees)) ex.guarantees=[];
     var needNew = !(ex.loans||[]).length || (ex.loans[0] && ex.loans[0].used!==undefined);
     if(needNew) ex.loans=mkLoansFor(ex.id);
@@ -6644,6 +7310,19 @@ function migrate(){
       if(!Array.isArray(l.moves)) l.moves=[];
       if(!l.firstDate) l.firstDate=l.start||"";
     });
+    /* [v77] SN 국민 002590 (-)대출(한도 5억): 한도미사용수수료 면제 — 계획서 26.10 비고 '국민002590 (-)대출 한도미사용수수료 면제 (만기일까지)'·노션 비고.
+       저장된 '이자 납부' 문구가 '이자·한도미사용수수료 5일'이면 자동 수수료(10월 205,479)가 잡히므로 1회만 '면제'로 교정.
+       완료 표시(loanFixV)는 약정과 같은 법인 정보 문서(co/SN/info/main)에 저장 → 이후 사용자가 고친 문구는 그대로 둔다 */
+    if(ex.id==="SN" && (+ex.loanFixV||0) < 77){
+      (ex.loans||[]).forEach(function(l){
+        var mt=String(l.method||"");
+        if(l.type!=="한도" || !/국민/.test(l.bank||"") || +l.limit!==500000000) return;
+        if(!/한도미사용수수료/.test(mt) || /없음|면제/.test(mt)) return;
+        var m=mt.match(/^\s*이자\s*[·,\/]\s*한도미사용수수료\s*(.*)$/);
+        l.method = (m ? "이자 "+(m[1]||"5일").trim() : mt.trim()) + " · 한도미사용수수료 면제(만기 "+(l.end||"만기일")+"까지)";
+      });
+      ex.loanFixV=77;
+    }
     ["opening","days","manual","vendorMap","slips","ar"].forEach(function(k){ if(!ex[k]) ex[k]={}; });
     /* [v22] 예적금 현황표 원본 양식의 증권·선물 계좌(원화 일반 소계 포함) — 보고서 잔액(예: 미래에셋대우 4원)이 누락되지 않도록 등록 */
     if(ex.id==="SN"){
@@ -6688,6 +7367,18 @@ function migrate(){
   if(!Array.isArray(D.contacts) || !D.contacts.length) D.contacts=mkContacts();
   D.contacts.forEach(function(k,i){ if(!k.id) k.id="K"+(i+1); if(!Array.isArray(k.history)) k.history=[]; });
   if(!Array.isArray(D.holidays) || !D.holidays.length) D.holidays=mkHolidays();
+  /* [v75] 업무캘린더 — 처음이면 기본 반복 업무(WC_SEED)로 시작 */
+  if(!D.workCal || !Array.isArray(D.workCal.items)) D.workCal={items:JSON.parse(JSON.stringify(WC_SEED)), done:(D.workCal&&D.workCal.done)||{}};
+  if(!D.workCal.done) D.workCal.done={};
+  /* 기본 업무 갱신: 사용자가 고친 적 없는(edited 아님) 기본 업무(S-)는 새 내용으로 바꾸고, 새 목록에 없는 것은 빼고, 없는 것은 추가. 직접 만든 업무·고친 업무는 그대로 */
+  if((+D.workCal.seedV||0)<WC_SEED_V){
+    var seedById={}; WC_SEED.forEach(function(x){ seedById[x.id]=x; });
+    D.workCal.items=D.workCal.items.filter(function(x){ return !(String(x.id).indexOf("S-")===0 && !x.edited && !seedById[x.id]); })
+      .map(function(x){ return (seedById[x.id] && !x.edited) ? JSON.parse(JSON.stringify(seedById[x.id])) : x; });
+    var have={}; D.workCal.items.forEach(function(x){ have[x.id]=1; });
+    WC_SEED.forEach(function(x){ if(!have[x.id]) D.workCal.items.push(JSON.parse(JSON.stringify(x))); });
+    D.workCal.seedV=WC_SEED_V;
+  }
   D.companies.forEach(function(c){ try{ rollHolidaySheets(c); }catch(e){ console.warn("rollHolidaySheets", e); } });   // [v61] 휴일 금일 보고서 시트 이중 반영 정리
   try{ fxPostAll(); }catch(e){ console.warn("fxPostAll", e); }      // [v53] 저장된 데이터에 외화매도 연결·전표 정리·고정 구분 규칙
   purgeFuture();
@@ -7202,6 +7893,7 @@ document.addEventListener("keydown",function(e){
   if(tag==="input"||tag==="select"||tag==="textarea") return;
   var ki="1234567890".indexOf(e.key);                        // [v26] 메뉴 순서와 번호 일치
   if(ki>=0 && VIEWS[ki]){ e.preventDefault(); setView(VIEWS[ki]); }
+  if(e.key==="c"||e.key==="C"){ e.preventDefault(); setView("cal"); }   // [v75] 업무캘린더
   if(e.key==="l"||e.key==="L") lock();
 });
 
@@ -7751,7 +8443,7 @@ function matchSlipCms(c, iso){
     if(t.fxSlip0){ var z=t.fxSlip0; t.fxRate=z.fxRate; t.fxKrw=z.fxKrw; t.fxConfirmed=!!z.fxConfirmed; if("fxInternal" in z){ if(z.fxInternal==null) delete t.fxInternal; else t.fxInternal=z.fxInternal; } }
     delete t.fxLots;   // [v58]
     if(t.slip && t.slipCat0!==undefined && !t.catManual){ t.cat=t.slipCat0; t.auto=!!t.slipAuto0; }
-    delete t.fxSlip0; delete t.fxFromSlip; delete t.fxKrwSlipOnly; delete t.slipCat0; delete t.slipAuto0; delete t.slip; if(t.catSrc==="전표") delete t.catSrc;
+    delete t.fxSlip0; delete t.fxFromSlip; delete t.slipCat0; delete t.slipAuto0; delete t.slip; if(t.catSrc==="전표") delete t.catSrc;
     delete t.slipVoucher; delete t.planMemo; delete t.planVendor;
   });
   var sl=(c.slips||{})[iso]; if(!sl) return 0;
@@ -7880,13 +8572,12 @@ function matchSlipCms(c, iso){
   (function(){ var gp={};
     lines.forEach(function(L){ if(usedL[L.key] || L.fx || L.kind==="cash" || L.kind==="move" || !L.amt) return; var ac=acctOf(c,L.acct); if(!(ac && ac.group==="외화")) return;
       (gp[L.acct+"|"+L.dir]=gp[L.acct+"|"+L.dir]||[]).push(L); });
-    Object.keys(gp).forEach(function(k){ var GL=gp[k], L=GL[0];   // 줄 여러 개(랏별, 07-15 $147 = 5,043 + 9,835 + 196,825)도 CMS가 1건이면 합계
+    Object.keys(gp).forEach(function(k){ var GL=gp[k]; if(GL.length!==1) return; var L=GL[0];
       var C=[]; T.forEach(function(t,i){ if(!usedT[i] && (t.kind==="외화(입금)"||t.kind==="외화(출금)") && !t.fxTrade && !t.fxTradeFrom && t.acct===L.acct && smDir(t)===L.dir) C.push(i); });
       if(C.length!==1) return; var t=T[C[0]], fa=smAmt(t); if(!(fa>0)) return;
-      var sum=GL.reduce(function(a,x){ return a+(+x.amt||0); },0); if(!(sum>0)) return;
-      var Ls=GL.map(function(x){ return Object.assign({}, x, {fx:{ccy:t.ccy||"USD", rate:Math.round(sum/fa*100)/100, amt:fa*x.amt/sum}}); });
-      GL.forEach(function(x){ usedL[x.key]=1; }); usedT[C[0]]=1;
-      res.push({L:Ls[0], lines:Ls, ids:[C[0]], type:"외화", fxLs:Ls, fxMove:false, krwOnly:true}); });
+      var Lc=Object.assign({}, L, {fx:{ccy:t.ccy||"USD", rate:Math.round(L.amt/fa*100)/100, amt:fa}});
+      usedL[L.key]=1; usedT[C[0]]=1;
+      res.push({L:Lc, lines:[Lc], ids:[C[0]], type:"외화", fxLs:[Lc], fxMove:false, krwOnly:true}); });
   })();
   var rest=function(){ return lines.filter(function(L){ return !usedL[L.key] && L.kind!=="move" && L.kind!=="cash" && !L.fx; }); };
   /* [v56] 짝 없는 CMS 자금이동 찾기: ①에서 전표 자금이동과 맞지 않았고, 같은 날 반대 방향 자금이동 중 금액 차 3,000원 이내가 없는 건.
@@ -8339,9 +9030,7 @@ function ilboModel(c, iso){
   m.fxDetail=ps.fxDetail||[];
 
   /* 검증 */
-  /* [v73] 보고서상 거래가 없고 잔액도 그대로인 날은 CMS 파일에 행이 없다 — 미반영이 아니라 무거래일 */
-  var noTx=!!(prec && prec.source==="sheet" && !(prec.txns||[]).length && !((((c.sheetRef||{})[prev]||{}).txns)||[]).length && (function(){ try{ var s0=daySummary(c,prev); return Math.round(s0.open)===Math.round(s0.close); }catch(e){ return false; } })());
-  chk(!!(prec && (prec.source==="cms" || noTx)), prev+" CMS 거래내역 "+(prec&&prec.source==="cms"?"반영됨":noTx?"거래 없음(무거래일 · 잔액 변동 없음)":"미반영 — ① CMS 파일을 올려주세요"));
+  chk(!!(prec && prec.source==="cms"), prev+" CMS 거래내역 "+(prec&&prec.source==="cms"?"반영됨":"미반영 — ① CMS 파일을 올려주세요"));
   if(prevEnd>prev) chk(true, "전일 실적 기간 "+ilboRangeText(m,"iso")+" — 비영업일 거래 "+rdays.filter(function(d){return d>prev}).length+"일분 합산");
   chk(!!sl, iso+" 전표 "+(sl?"반영됨 ("+L.length+"건)":"미반영 — ② 칸 또는 [데이터 업로드]에 전표자료조회 파일을 올려주세요(월 통합본 가능)"));
   chk(!bad.length, bad.length ? "시재표 1원 검증 불일치: "+bad.join(", ") : "시재표 계좌별 전일시재+입금−출금±자금이동 = 금일시재 (1원 단위 일치)");
@@ -13269,7 +13958,7 @@ function cpmOnSettings(){ if(CPMS.dirty){ renderCpMaster(); return; } cpMasterLo
 window.__tr={fxInferLots:fxInferLots, fxAnchorOk:fxAnchorOk, cmsOwnish:cmsOwnish, slipKindFix:slipKindFix, clientIsOther:clientIsOther, fixMoveKinds:fixMoveKinds, loanSnapOk:loanSnapOk, loanScope:loanScope, classifyKind:classifyKind, slipMergeDay:slipMergeDay, matchSlipCms:matchSlipCms, slipCashLines:slipCashLines, slipText:slipText, nameKey:nameKey, nameScore:nameScore, subsetSum:subsetSum, get SLIP_MATCH(){return SLIP_MATCH}, linkFxTrades:linkFxTrades, fxTradeInfo:fxTradeInfo, fxTradesOf:fxTradesOf, slipFxSellFix:slipFxSellFix, parseSlip:parseSlip, buildSlip:buildSlip, slipDaysOf:slipDaysOf, saveSlipDays:saveSlipDays, relinkFxTrade:relinkFxTrade, fxPostAll:fxPostAll, applyFixedCats:applyFixedCats, unlinkFxTrade:unlinkFxTrade, CP:CP, get CPS(){return CPS}, cpAddFiles:cpAddFiles, renderCardpay:renderCardpay, cpRecalc:cpRecalc, cpMaster:cpMaster, cpMasterLoad:cpMasterLoad, get CPM(){return CPM}, get CPMS(){return CPMS}, renderCpMaster:renderCpMaster, cpXlsx:cpXlsx, cpSave:cpSave, cpLoadSaved:cpLoadSaved, get D(){return D}, AUTH:AUTH, renderAdminUsers:renderAdminUsers, updateUserStatus:updateUserStatus, save:save, get DB(){return DB}, get SB(){return SB}, get myRev(){return myRev}, parseArLedger:parseArLedger, parseBondExcel:parseBondExcel, renderBondView:renderBondView, bankKey:bankKey, TC:TC, EXP:EXP, get TCS(){return TCS}, get EXS(){return EXS}, AUTO:AUTO, renderAutoHub:renderAutoHub, execResultModel:execResultModel, FER:FER, get FERS(){return FERS}, ferRecalc:ferRecalc, ferPlan:ferPlan, ferCfg:ferCfg, renderExecResult:renderExecResult, parseCardIssue:parseCardIssue, cardTargets:cardTargets, cardErpRows:cardErpRows, get CARDS(){return CARDS}, filterCardIssue:filterCardIssue, buildCardErpXls:buildCardErpXls, buildCardCmsFile:buildCardCmsFile, generateCardFiles:generateCardFiles, completeCardIssue:completeCardIssue, cardLoadFile:cardLoadFile, cardRun:cardRun, cardSetCo:cardSetCo, renderCards:renderCards, cardExport:cardExport, cardSaveStart:cardSaveStart, buildCardIssueXlsx:buildCardIssueXlsx, cardIssueRows:cardIssueRows, biffPatchRows:biffPatchRows, biffShiftAnchors:biffShiftAnchors, cardErpCompany:cardErpCompany, cardReset:cardReset, arRows:arRows, arModel:arModel, get AR(){return AR}, FEP:FEP, get FEPS(){return FEPS}, get FEPT(){return FEPT}, get FEPR(){return FEPR}, fepRowAdd:fepRowAdd, fepRowRename:fepRowRename, fepRowMove:fepRowMove, fepRowDelete:fepRowDelete, fepRowMap:fepRowMap, fepRowsSave:fepRowsSave, fepRowsLoad:fepRowsLoad, fepTplUpload:fepTplUpload, fepTplRevert:fepTplRevert, fepEnsureLoaded:fepEnsureLoaded, renderAr:renderAr, renderFep:renderFep, get view(){return view}, slipDaysOf:slipDaysOf, gotoDate:gotoDate, openCal:openCal, parseSlip:parseSlip, buildSlip:buildSlip, slipTotals:slipTotals, applySlipToCms:applySlipToCms, ilboModel:ilboModel, ilboSheetsData:ilboSheetsData, commitImport:commitImport, calPrevBiz:calPrevBiz, ILBO:ILBO, renderIlbo:renderIlbo, ilboExcel:ilboExcel, ilboPrint:ilboPrint, setView:setView, co:co, setCo:function(x){curCo=x}, setDate:function(x){curDate=x},
   daySummary:daySummary, dayAgg:dayAgg, rollup:rollup, scopeSummary:scopeSummary, allDates:allDates,
   parseCMS:parseCMS, parseFxLedger:parseFxLedger, fxTxnsOf:fxTxnsOf, parseDailySheet:parseDailySheet, guessCoFromName:guessCoFromName, loanAt:loanAt, parseCashBook:parseCashBook, parseLoanHtml:parseLoanHtml, processRows:processRows, coState:coState, periodBuckets:periodBuckets,
-  loanScope:loanScope, isHoliday:isHoliday, setChart:function(x){chartKind=x}, autoGroups:autoGroups, openAutoFix:openAutoFix, toISO:toISO, accrueMonth:accrueMonth, setFinTab:function(x){finTab=x}, get finTab(){return finTab}, purgeFuture:purgeFuture,
+  loanScope:loanScope, isHoliday:isHoliday, setChart:function(x){chartKind=x}, autoGroups:autoGroups, openAutoFix:openAutoFix, toISO:toISO, accrueMonth:accrueMonth, lendAt:lendAt, loanIntEvents:loanIntEvents, lendIntEvents:lendIntEvents, intPlanFor:intPlanFor, openLendHist:openLendHist, setFinTab:function(x){finTab=x}, get finTab(){return finTab}, purgeFuture:purgeFuture,
   parseContactHtml:parseContactHtml, parseHolidayHtml:parseHolidayHtml,
   buildDailyReport:buildDailyReport, dailyReportHTML:dailyReportHTML, openDailyReport:openDailyReport, manualOf:manualOf, buildSheetDay:buildSheetDay};
 })();
