@@ -545,7 +545,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v81 · 2026-10-19</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v82 · 2026-10-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -2065,7 +2065,7 @@ function seedCompanies(){
     {id:"SN", name:"에스넷시스템", short:"에스넷", color:"var(--c-sn)", active:true, endDate:"", successor:"",
      keywords:["에스넷시스템","에스넷"], others:[], costLabel:"재료비", mmt:["165-910003-67952"],
      accounts:mkAccts(SEED_SN).concat(snSecAccts()), loans:mkLoansFor("SN"), lendings:mkLendingsFor("SN"), opening:{}, days:{}, manual:{}, vendorMap:{}},
-    {id:"GU", name:"굿어스", short:"굿어스", color:"var(--c-gu)", active:true, endDate:"2026-10-19", successor:"굿어스스마트솔루션",   /* [v80] 2026-10-20부로 소멸(마지막 날 10-19) */
+    {id:"GU", name:"굿어스", short:"굿어스", color:"var(--c-gu)", active:true, endDate:"2026-10-20", formEnd:"2026-10-19", slipActual:true, successor:"굿어스스마트솔루션",   /* [v82] 자금 자료 마지막 날 10-20(실제 거래 있음) · 계획서·결과보고서 양식은 10-19까지(10-20부터 GU 없는 양식) · CMS 없는 계좌는 전표로 실적 */
      keywords:["굿어스"], others:["굿어스데이터","굿어스데이타","굿어스스마트솔루션","굿어스스마트","굿스솔"], costLabel:"하도대금", mmt:["165-910025-11852","032-0116-3929-41"],
      accounts:mkAccts(SEED_GU), loans:mkLoansFor("GU"), lendings:mkLendingsFor("GU"), opening:{}, days:{}, manual:{}, vendorMap:{}},
     {id:"GD", name:"굿어스데이터", short:"데이터", color:"var(--c-gd)", active:true, endDate:"", successor:"",
@@ -2563,6 +2563,8 @@ function activeCos(iso){
   });
 }
 function scopeCos(){ return curCo==="ALL" ? activeCos(null) : [co(curCo)].filter(Boolean); }
+/* [v82] 자금집행계획서·결과보고서 양식에서 법인이 빠지는 기준일(없으면 자금 자료 종료일) */
+function coFormEnd(c){ return (c && (c.formEnd||c.endDate))||""; }
 function allDates(cos){
   var t=todayISO(), s={};
   (cos||scopeCos()).forEach(function(c){ Object.keys(c.days).forEach(function(d){ if(d<=t) s[d]=1; }); });
@@ -3875,8 +3877,32 @@ function rcApply(c){
   });
   return st;
 }
+/* [v82] 전표 실적(slipActual) 법인 — 그달 CMS에 한 번도 나오지 않은 계좌(해지·CMS 미등록)의 전표 입·출금을 실적으로 쓴다.
+   CMS에 나오는 계좌는 CMS가 실적(전표는 계획·매칭용) — 날짜가 어긋난 전표로 이중 계상하지 않는다 */
+var SLIP_NOCMS={};
+function slipNoCms(c, acct, iso){
+  if(!c || !c.slipActual || !acct || acct==="현금") return false;
+  var ac=acctOf(c, acct); if(ac && ac.group==="외화") return false;   // 외화 계좌의 전표(외화평가 결산분개 등)는 현금 흐름이 아님
+  var ym=iso.slice(0,7), k=c.id+"|"+ym, m=SLIP_NOCMS[k];
+  if(!m){ m={}; Object.keys(c.days||{}).forEach(function(d){ if(d.slice(0,7)!==ym) return; var r=dayRec(c,d); if(!r || r.source!=="cms") return;
+      (r.txns||[]).forEach(function(t){ if(!t.fromSlip && !t.fromSheet) m[t.acct]=1; }); });
+    SLIP_NOCMS[k]=m; }
+  return !m[acct];
+}
+/* 전표만 있고 그날 기록이 없는 날(주말 결산·이자 등) — CMS에 없는 계좌 줄이 있으면 빈 CMS 날을 만들어 전표 실적을 받는다 */
+function slipOnlyDays(c){
+  if(!c.slipActual) return 0;
+  var t=todayISO(), n=0;
+  Object.keys(c.slips||{}).forEach(function(d){
+    if(d>t || (c.endDate && d>c.endDate) || c.days[d]) return;
+    var has=((c.slips[d]||{}).lines||[]).some(function(L){ return L.acct && L.acct!=="현금" && !L.fx && !L.fxTrade && !L.fxTradeSyn && slipNoCms(c, L.acct, d); });
+    if(has){ c.days[d]={source:"cms", txns:[], asOf:null, slipOnly:true}; n++; }
+  });
+  return n;
+}
 function fxPostAll(){
   var r={trade:0, slip:0, fixed:0, match:0, kfix:0, lotInf:0};
+  SLIP_NOCMS={};   // [v82]
   (D.companies||[]).forEach(function(c){ rcRevert(c); });   // [v70] 자동 보정은 매번 원래 값에서 다시
   (D.companies||[]).forEach(function(c){ fxInferRevert(c); });   // [v58]
   (D.companies||[]).forEach(function(c){
@@ -3886,6 +3912,7 @@ function fxPostAll(){
     r.kfix+=fixSheetAccts(c);    // [v58]
     r.kfix+=injectSheetSec(c);   // [v58]
     r.fixed+=applyFixedCats(c);
+    r.slipOnly=(r.slipOnly||0)+slipOnlyDays(c);   // [v82]
     /* [v55] 전표 ↔ CMS 매칭 — 업로드·로드 때마다 전 기간 소급(매도·매수 연결·고정 규칙 다음) */
     Object.keys(c.days||{}).forEach(function(d){
       if((c.slips||{})[d] || txnsOf(c,d).some(function(t){ return t.slip||t.slipVoucher||t.fromSlip; })) r.match+=matchSlipCms(c, d); });
@@ -8023,6 +8050,14 @@ function migrate(){
       if(ex.endDate==="2026-10-21" || !ex.endDate) ex.endDate="2026-10-19";
       ex.endFixV=80;
     }
+    /* [v82] 사용자 확인 2026-10-20: 굿어스 자금 자료는 10-20까지(그날 거래·전표 있음), 양식은 10-20부터 GU 제외.
+       계좌 해지로 CMS가 없는 계좌는 전표로 실적 처리(slipActual). 1회만 — 이후 설정에서 바꾼 값은 그대로 */
+    if(ex.id==="GU" && (+ex.endFixV||0) < 82){
+      if(!ex.endDate || ex.endDate==="2026-10-19" || ex.endDate==="2026-10-21") ex.endDate="2026-10-20";
+      if(!ex.formEnd) ex.formEnd="2026-10-19";
+      if(ex.slipActual==null) ex.slipActual=true;
+      ex.endFixV=82;
+    }
     if(ex.id==="SN" && (+ex.loanFixV||0) < 77){
       (ex.loans||[]).forEach(function(l){
         var mt=String(l.method||"");
@@ -9427,7 +9462,9 @@ function matchSlipCms(c, iso){
   /* 증권 계좌 — CMS에 없는 계좌의 전표 입·출금은 전표값으로 실적 행을 만든다(파일 끝에 붙여 기존 행 번호 유지) */
   var SEC_RE=/증권|금융투자|미래에셋|선물/, secPrior=0;
   lines.forEach(function(L){
-    if(usedL[L.key] || L.kind==="cash" || L.fx || !SEC_RE.test(String(L.acct||""))) return;   // [v58] 자금이동 줄도
+    if(usedL[L.key] || L.kind==="cash" || L.fx || !(SEC_RE.test(String(L.acct||"")) || slipNoCms(c, L.acct, iso))) return;   // [v58] 자금이동 줄도 · [v82] 전표 실적 법인의 CMS 없는 계좌
+    /* [v82] 전표 실적 계좌: 같은 날 다른 계좌 CMS에 같은 방향·같은 금액이 있으면 계좌 귀속만 다른 같은 거래(예: 전표 농협 0352 ↔ CMS 농협 0372 이자 4,529,786) → 만들지 않음 */
+    if(!SEC_RE.test(String(L.acct||"")) && T.some(function(t){ return !t.fromSlip && smDir(t)===L.dir && Math.abs(smAmt(t)-L.amt)<0.5; })) return;
     if(T.some(function(t){ return t.acct===L.acct && !t.fromSlip && smDir(t)===L.dir && Math.abs(smAmt(t)-L.amt)<0.5; })) return;   // [v58] 같은 방향·금액 행이 있을 때만 생략
     /* [v61] 월말 일괄 전표(08-31 인성정보 주식매수 KB 997,450,507 · 삼성 177,307,217)의 실제 거래가 이미 그달 보고서·CMS(08-19~08-27)에 있으면 다시 만들지 않는다
        — 종전엔 08-31에 한 번 더 출금돼 09-01 시재표 1원 검증·08월 월간실적이 1,174,757,724원 어긋났다 */
@@ -9742,6 +9779,12 @@ function ilboModel(c, iso){
   m.fxDetail=ps.fxDetail||[];
 
   /* 검증 */
+  if(c.slipActual){   // [v82] 굿어스 등 — 계좌 해지로 CMS가 없는 날·계좌는 전표로 실적
+    var nSyn=rdays.reduce(function(a,d){ return a+txnsOf(c,d).filter(function(t){ return t.fromSlip; }).length; },0);
+    chk(true, prec && prec.slipOnly ? prev+" CMS 거래 없음 — 전표 "+nSyn+"건으로 실적 처리" :
+      prec && prec.source==="cms" ? prev+" CMS 거래내역 반영됨"+(nSyn?" · CMS 없는 계좌는 전표 "+nSyn+"건으로 실적":"") :
+      prec && prec.source==="sheet" ? prev+" 자금현황보고 기준(CMS 거래 없음)" : prev+" CMS·전표 거래 없음 — 거래 없는 날로 처리");
+  } else
   chk(!!(prec && prec.source==="cms"), prev+" CMS 거래내역 "+(prec&&prec.source==="cms"?"반영됨":"미반영 — ① CMS 파일을 올려주세요"));
   if(prevEnd>prev) chk(true, "전일 실적 기간 "+ilboRangeText(m,"iso")+" — 비영업일 거래 "+rdays.filter(function(d){return d>prev}).length+"일분 합산");
   chk(!!sl, iso+" 전표 "+(sl?"반영됨 ("+L.length+"건)":"미반영 — ② 칸 또는 [데이터 업로드]에 전표자료조회 파일을 올려주세요(월 통합본 가능)"));
@@ -10099,9 +10142,10 @@ function ilboDropState(c, m){
   var cs=$("#ilboCmsState"), ss=$("#ilboSlipState");
   if(!c||!m){ cs.textContent=""; ss.textContent=""; $("#ilboDropCms").classList.remove("done"); $("#ilboDropSlip").classList.remove("done"); return; }
   var pr=dayRec(c,m.prev), okC=!!(pr&&pr.source==="cms"), okS=!!m.slip;
-  cs.innerHTML=okC ? '✓ '+m.prev+' '+txnsOf(c,m.prev).length+'건 반영' : m.prev+' 미반영';
+  if(c.slipActual && !okC) cs.innerHTML='✓ '+m.prev+' '+(pr&&pr.source==="sheet"?'자금현황보고 기준':'CMS 거래 없음 · 전표 기준');   // [v82]
+  else cs.innerHTML=okC ? '✓ '+m.prev+' '+txnsOf(c,m.prev).length+'건 반영'+(pr&&pr.slipOnly?' (전표 기준)':'') : m.prev+' 미반영';
   ss.innerHTML=okS ? '✓ '+m.iso+' '+m.slip.lines.length+'건 · '+esc(m.slip.file||"") : m.iso+' 미반영 · 여기 또는 [데이터 업로드]에 올리세요';
-  $("#ilboDropCms").classList.toggle("done",okC); $("#ilboDropSlip").classList.toggle("done",okS);
+  $("#ilboDropCms").classList.toggle("done",okC || !!c.slipActual);   // [v82] $("#ilboDropSlip").classList.toggle("done",okS);
 }
 function ilboLog(html, bad){ $("#ilboLog").insertAdjacentHTML("beforeend",'<div class="filerow"'+(bad?' style="border-color:var(--out);color:var(--out)"':'')+'>'+html+'</div>'); }
 /* 두 드롭존 모두 파일 내용으로 CMS/전표를 자동 판별 — 어느 칸에 놓아도 됨 */
@@ -11659,7 +11703,7 @@ function fepRefDate(){
   var best=""; Object.keys(ds).forEach(function(d){ if(!best||ds[d]>ds[best]) best=d; });
   return best||todayISO();
 }
-function fepNeedCos(d){ return FEP.CORP_KEYS.filter(function(k){ var c=(D&&D.companies)?co(k):null; return !(c && c.endDate && d>c.endDate); }); }
+function fepNeedCos(d){ return FEP.CORP_KEYS.filter(function(k){ var c=(D&&D.companies)?co(k):null; return !(c && coFormEnd(c) && d>coFormEnd(c)); }); }
 function fepTplFor(d){
   var need=fepNeedCos(d).join(","), cands=[];
   if(FEPT.session) cands.push(FEPT.session);
@@ -11931,7 +11975,7 @@ function renderFep(){
     box.textContent = f ? f.name : "전표자료조회 엑셀 (선택)"; box.classList.toggle("done",!!f);
     var gone=needK.indexOf(k)<0; if(gone) goneK.push(k); it.hidden=gone && !f && !FEPS.showGone; });
   var gb=$("#btnFepGone"); if(gb){ gb.hidden=!goneK.length;
-    gb.textContent=FEPS.showGone?"종료된 법인 칸 숨기기":goneK.map(function(k){ var c=co(k)||{}; return (c.name||k)+"("+k+")"; }).join("·")+" 칸 보이기 — "+goneK.map(function(k){ return (co(k)||{}).endDate||""; })[0]+" 이전 집행일 처리용"; }
+    gb.textContent=FEPS.showGone?"종료된 법인 칸 숨기기":goneK.map(function(k){ var c=co(k)||{}; return (c.name||k)+"("+k+")"; }).join("·")+" 칸 보이기 — "+goneK.map(function(k){ return coFormEnd(co(k)); })[0]+" 이전 집행일 처리용"; }
   var hasErp=FEP.CORP_KEYS.some(function(k){ return !!FEPS.files[k]; });
   $("#btnFepRun").disabled=!hasErp;
   $("#fepResults").hidden=!FEPS.result;
@@ -12625,7 +12669,7 @@ var FER_TPL_B64="UEsDBBQAAAAIAIaYQl1Gx01IlQAAAM0AAAAQAAAAZG9jUHJvcHMvYXBwLnhtbE3
 var FER_TPL_B64_V4="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";
 var FER_ALL=["SN","GU","GD","GS"], FER_COS=FER_ALL.slice();   // [v80] FER_COS = 집행일(없으면 오늘)에 존재하는 법인 — ferSyncCos()
 function ferSyncCos(){
-  var d=FERS.date||todayISO(), list=FER_ALL.filter(function(k){ var c=ferCo(k); return !(c && c.endDate && d>c.endDate); });
+  var d=FERS.date||todayISO(), list=FER_ALL.filter(function(k){ var c=ferCo(k); return !(c && coFormEnd(c) && d>coFormEnd(c)); });
   FER_COS.length=0; list.forEach(function(k){ FER_COS.push(k); });
 }
 var FER_DEFAULTS={
@@ -12908,7 +12952,7 @@ var FER=(function(){
       var c=coObj(co), erp=st.erp[co]&&st.erp[co].parsed, cmsAll=st.cms[co]&&st.cms[co].rows;
       /* 집행일 외 날짜는 집계에서 뺀다(여러 날짜가 든 CMS·전표 파일도 집행일 분만 사용) */
       var erpLines=erp?erp.lines.filter(function(L){ return !date || L.date===date; }):[], cmsRows=cmsAll?cmsAll.filter(function(t){ return !date || t.date===date; }):null;
-      var gone=!!(c && c.endDate && date && date>c.endDate);
+      var gone=!!(c && coFormEnd(c) && date && date>coFormEnd(c));
       var m={co:co, c:c, gone:gone, hasErp:!!erp && !gone, hasCms:!!cmsRows && !gone, erpOut:erp?erp.lines.length-erpLines.length:0, cmsOut:cmsAll?cmsAll.length-cmsRows.length:0,
         erp:{move:blank(), spend:blank(), parts:{}, fxMove:blank(), fxXfer:blank(), excl:[], all:[]},
         cms:{move:blank(), spend:blank(), fxMove:blank(), fxXfer:blank(), excl:[], all:[]}, fee:{total:0,items:[]}, att:[], susp:{va:[], fee:[]}};
@@ -13045,7 +13089,7 @@ function ferSaveFepPlan(P){
 function ferRecalc(){
   var dd=ferDates(); FERS.date=dd.date; FERS.warn=dd.warn||[];
   ferSyncCos();   // [v80] 종료된 법인(굿어스 2026-10-19까지)은 집행일이 그 뒤면 표·보고서에서 뺀다
-  FER_ALL.forEach(function(k){ if(FER_COS.indexOf(k)<0 && (FERS.erp[k]||FERS.cms[k])){ var c=ferCo(k); FERS.warn.push((c.name||k)+"("+k+")는 "+(c.endDate||"")+"까지라 집행일 "+FERS.date+" 계산·보고서에서 뺐습니다"); } });
+  FER_ALL.forEach(function(k){ if(FER_COS.indexOf(k)<0 && (FERS.erp[k]||FERS.cms[k])){ var c=ferCo(k); FERS.warn.push((c.name||k)+"("+k+")는 "+coFormEnd(c)+"까지라 집행일 "+FERS.date+" 계산·보고서에서 뺐습니다"); } });
   FERS.model=(Object.keys(FERS.erp).length||Object.keys(FERS.cms).length)?FER.compute(FERS):null;
   if(FERS.model){ FERS.ran=true; ferAutoNotes(); }
 }
