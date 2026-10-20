@@ -538,6 +538,7 @@ tr.adm-pend td{background:var(--move-soft)}
 .pl-chk input{margin-top:3px}
 body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:none;opacity:.45}
 @media(max-width:560px){.adm-badges{max-width:none}.adm-filter>*{flex:1 1 100%}}
+.linkbtn{background:none;border:0;padding:6px 0;margin-top:6px;color:var(--navy);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer}
 </style>
 
 <div id="lock">
@@ -549,7 +550,7 @@ body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:non
     <div id="lockAuth" hidden>
       <div class="seg auth-tabs" id="authTabs" role="tablist"><button data-t="login" aria-pressed="true">로그인</button><button data-t="signup" aria-pressed="false">회원가입</button></div>
       <label class="field"><span class="lbl">이메일</span><input type="email" id="authEmail" autocomplete="username" placeholder="name@snetsystems.co.kr"></label>
-      <label class="field"><span class="lbl">비밀번호</span><input type="password" id="authPw" autocomplete="current-password"></label>
+      <label class="field" id="authPwWrap"><span class="lbl">비밀번호</span><input type="password" id="authPw" autocomplete="current-password"></label>
       <label class="field" id="authPw2Wrap" hidden><span class="lbl">비밀번호 확인 (8자 이상)</span><input type="password" id="authPw2" autocomplete="new-password"></label>
       <div id="authProfWrap" hidden>
         <label class="field"><span class="lbl">이름</span><input type="text" id="authName" autocomplete="name" maxlength="30"></label>
@@ -557,6 +558,7 @@ body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:non
         <label class="field"><span class="lbl">직급</span><input type="text" id="authTitle" maxlength="20"></label>
       </div>
       <button class="btn primary wide" id="btnAuth">로그인</button>
+      <button type="button" class="linkbtn" id="btnForgot">비밀번호를 잊으셨나요?</button>
       <div class="msg" id="authMsg" role="status"></div>
       <p class="hint" style="margin-top:12px">회원가입 후 <b>마스터 관리자가 승인</b>해야 자금 데이터를 볼 수 있습니다.</p>
     </div>
@@ -576,6 +578,14 @@ body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:non
       <button class="btn wide" id="btnPledgeOut" style="margin-top:8px">로그아웃</button>
       <div class="msg" id="pledgeMsg" role="status"></div>
     </div>
+    <div id="lockNewPw" hidden>
+      <p class="hint" style="margin:0 0 4px;font-size:13px;color:var(--ink)"><b>새 비밀번호 정하기</b></p>
+      <p class="mini" id="npWho" style="margin:0 0 12px"></p>
+      <label class="field"><span class="lbl">새 비밀번호 (8자 이상)</span><input type="password" id="npPw" autocomplete="new-password"></label>
+      <label class="field"><span class="lbl">새 비밀번호 확인</span><input type="password" id="npPw2" autocomplete="new-password"></label>
+      <button class="btn primary wide" id="btnNewPw">저장하고 시작</button>
+      <div class="msg" id="npMsg" role="status"></div>
+    </div>
     <div id="lockLoad" hidden>
       <p class="hint" style="margin:0 0 6px">공용 저장소에서 데이터를 불러오는 중입니다…</p>
       <div class="loadbar"><i></i></div>
@@ -592,7 +602,7 @@ body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:non
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v84 · 2026-10-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v84.1 · 2026-10-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -609,6 +619,7 @@ body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:non
     </nav>
     <div class="railfoot">
       <button class="btn sm" id="btnLock">로그아웃</button>
+      <button class="btn sm" id="btnPw" title="비밀번호 변경">비밀번호</button>
       <button class="btn sm primary" id="btnAdminUsers" hidden>사용자 승인 관리</button>
       <button class="btn sm" id="btnTheme">테마</button>
     </div>
@@ -2303,8 +2314,9 @@ function showAuth(mode,msg,cls){
   $$("#authTabs button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.t===AUTH.mode?"true":"false"); });
   $("#authPw2Wrap").hidden=AUTH.mode!=="signup";
   $("#authProfWrap").hidden=AUTH.mode!=="signup";   // [v84] 가입 때 이름·부서·직급
+  $("#authPwWrap").hidden=AUTH.mode==="reset"; $("#btnForgot").hidden=AUTH.mode!=="login";   // [v84.1] 비밀번호 찾기
   $("#authPw").setAttribute("autocomplete", AUTH.mode==="signup"?"new-password":"current-password");
-  $("#btnAuth").textContent=AUTH.mode==="signup"?"가입 신청":"로그인";
+  $("#btnAuth").textContent=AUTH.mode==="signup"?"가입 신청":AUTH.mode==="reset"?"재설정 메일 보내기":"로그인";
   authMsg(msg||"",cls);
   setTimeout(function(){ var e=$("#authEmail"); (e.value?$("#authPw"):e).focus(); },30);
 }
@@ -2464,7 +2476,24 @@ function coInfo(c){
     if(k==="days"||k==="cashBook"||k==="sheetRef"||k==="slips"||k==="ar") return;
     o[k]=c[k];
   });
+  /* [v84.1] 팀원·보기 전용: 관리자 전용 값·보정 완료 표시는 DB에서 불러온 값으로(없던 값은 빼고) 저장 */
+  if(typeof ROLE!=="undefined" && !ROLE.admin && AUTH.user && INFO0[c.id]){
+    var z=INFO0[c.id];
+    Object.keys(o).concat(Object.keys(z)).forEach(function(k){
+      if(INFO_ADMIN_KEYS.indexOf(k)<0 && !/FixV$/.test(k)) return;
+      if(k in z) o[k]=z[k]; else delete o[k];
+    });
+  }
   return o;
+}
+/* DB 보호 장치(docs_guard)와 같은 목록 */
+var INFO_ADMIN_KEYS=["loans","lendings","guarantees","loanFixV","name","short","color","active","endDate","formEnd","slipActual","successor","keywords","others","costLabel","mmt"];
+var INFO0={};   // 불러온 직후(보정 전) 법인 정보 중 관리자 전용 값·…FixV
+function snapInfo0(){
+  INFO0={};
+  (D.companies||[]).forEach(function(c){ var z={};
+    Object.keys(c).forEach(function(k){ if(INFO_ADMIN_KEYS.indexOf(k)>=0 || /FixV$/.test(k)) z[k]=JSON.parse(JSON.stringify(c[k])); });
+    INFO0[c.id]=z; });
 }
 /* D 전체를 문서 묶음으로 펼칩니다 (저장 시 바뀐 문서만 기록) */
 function buildDocs(){
@@ -3833,6 +3862,26 @@ function rcApply(c){
     Object.keys(last).forEach(function(k){ B[k]=last[k]; });
     if(r.repAccts && r.asOf===d) Object.keys(r.repAccts).forEach(function(k){ if(!seen[k]) B[k]=+r.repAccts[k]||0; }); };
   var dates=Object.keys(c.days).sort().filter(function(d){ return !fy || d>fy.asOf; });
+  /* [v84.1] R7·R8 — 같은 거래 중복 */
+  var MON={Jan:"01",Feb:"02",Mar:"03",Apr:"04",May:"05",Jun:"06",Jul:"07",Aug:"08",Sep:"09",Oct:"10",Nov:"11",Dec:"12"};
+  var atDay=function(t){ var m=/^\w{3} (\w{3}) (\d{2}) (\d{4})/.exec(String(t.at||"")); return m&&MON[m[1]] ? m[3]+"-"+MON[m[1]]+"-"+m[2] : null; };
+  var sameT=function(a,b){ return a.acct===b.acct && smDir(a)===smDir(b) && Math.abs(smAmt(a)-smAmt(b))<0.5; };
+  dates.forEach(function(d, di){
+    var r=c.days[d]; if(!r || r.source!=="cms") return;
+    (r.txns||[]).forEach(function(t){
+      if(t.rcSyn || t.fromSlip || t.rcDup || (t.ccy&&t.ccy!=="KRW") || !t.hasAfter) return;
+      var d0=atDay(t);
+      if(d0 && d0<d && isoAdd(d0,3)>=d && c.days[d0] && (c.days[d0].txns||[]).some(function(u){ return sameT(u,t) && (u.fromSlip || (!u.rcSyn && String(u.at||"").slice(0,21)===String(t.at||"").slice(0,21))); })){
+        t.rcDup=true; t.rcWhy=d0+" 에 이미 있는 거래(전표 실적 또는 같은 거래일시 CMS 행) — 이 행 거래일시 "+d0; st.r8=(st.r8||0)+1; return; }
+      if(t.kind!=="수입" && t.kind!=="지출") return;
+      for(var q=di-1; q>=0 && q>=di-3; q--){ var p=dates[q], rp=c.days[p]; if(!rp) continue;
+        if(rp.source!=="sheet") break;
+        var sa=(rp.accts||[]).filter(function(x){ return x.label===t.acct && !x.isFx; })[0];
+        if(sa && Math.abs((+sa.close||0)-(+t.after||0))<1 && (rp.txns||[]).some(function(u){ return sameT(u,t); })){
+          t.rcDup=true; t.rcWhy=p+" 보고서에 이미 반영(같은 계좌·금액, 거래후잔액 = 보고서 마감)"; st.r7=(st.r7||0)+1; }
+        break; }
+    });
+  });
   dates.forEach(function(d){
     var r=c.days[d]; if(!r||!r.txns||r.source==="sheet"||r.source==="xlsm"){ if(r) endDay(r,d); return; }
     var T=r.txns.filter(function(t){ return !t.rcSyn && (!t.ccy||t.ccy==="KRW"); });
@@ -3950,7 +3999,34 @@ function slipNoCms(c, acct, iso){
   if(!m){ m={}; Object.keys(c.days||{}).forEach(function(d){ if(d.slice(0,7)!==ym) return; var r=dayRec(c,d); if(!r || r.source!=="cms") return;
       (r.txns||[]).forEach(function(t){ if(!t.fromSlip && !t.fromSheet) m[t.acct]=1; }); });
     SLIP_NOCMS[k]=m; }
-  return !m[acct];
+  return !m[acct] || slipRepEvidence(c, acct, iso);   // [v84.1]
+}
+/* [v84.1] 그날 그 계좌 CMS 행이 없고, 보고서 잔액 변화(직전 보고서 마감 → 그날 마감)가 그 계좌 전표 줄 합과 1원 안으로 같으면 전표가 실적이다.
+   직전 보고서까지 사이에 그 계좌 CMS 행이 있으면(잔액이 CMS로 움직임) 판단하지 않는다. 결과는 SLIP_NOCMS에 날짜별로 기억 */
+function slipRepBal(c, d, acct){
+  var r=c.days[d]; if(!r) return undefined;
+  if(r.source==="sheet"){ var a=(r.accts||[]).filter(function(x){ return x.label===acct && !x.isFx; })[0]; return a ? +a.close||0 : undefined; }
+  if(r.source==="cms" && r.repAccts && r.asOf===d && (acct in r.repAccts)) return +r.repAccts[acct]||0;
+  return undefined;
+}
+function slipRepEvidence(c, acct, iso){
+  var k="ev|"+c.id+"|"+acct+"|"+iso; if(k in SLIP_NOCMS) return SLIP_NOCMS[k];
+  var ok=false;
+  (function(){
+    var r=c.days[iso]; if(!r || r.source!=="cms") return;
+    if((r.txns||[]).some(function(t){ return t.acct===acct && !t.fromSlip && !t.fromSheet && !t.rcSyn; })) return;
+    var cur=slipRepBal(c, iso, acct); if(cur===undefined) return;
+    var ds=Object.keys(c.days).filter(function(d){ return d<iso; }).sort(), prev, n=0;
+    for(var i=ds.length-1; i>=0 && n<15; i--, n++){
+      var b=slipRepBal(c, ds[i], acct); if(b!==undefined){ prev=b; break; }
+      if(((c.days[ds[i]]||{}).txns||[]).some(function(t){ return t.acct===acct && !t.fromSlip && !t.rcSyn; })) return;
+    }
+    if(prev===undefined) return;
+    var L=slipCashLines(c, iso).filter(function(x){ return x.acct===acct && x.kind!=="cash" && !x.fx; }); if(!L.length) return;
+    var net=L.reduce(function(s,x){ return s+(x.dir==="in"?1:-1)*(+x.amt||0); },0);
+    ok=Math.abs((cur-prev)-net)<1 && L.some(function(x){ return (+x.amt||0)>=1; });
+  })();
+  SLIP_NOCMS[k]=ok; return ok;
 }
 /* 전표만 있고 그날 기록이 없는 날(주말 결산·이자 등) — CMS에 없는 계좌 줄이 있으면 빈 CMS 날을 만들어 전표 실적을 받는다 */
 function slipOnlyDays(c){
@@ -8129,6 +8205,12 @@ function migrate(){
       if(ex.slipActual==null) ex.slipActual=true;
       ex.endFixV=82;
     }
+    /* [v84.1] 위 1회 보정이 끝난 표시(endFixV)만 남고 값이 빠진 경우(팀원 저장 → DB가 관리자 전용 값만 되돌림)에도 다시 채운다.
+       설정에서 끈 값(false)·바꾼 날짜는 그대로 둔다 */
+    if(ex.id==="GU"){
+      if(!ex.formEnd) ex.formEnd="2026-10-19";
+      if(ex.slipActual==null) ex.slipActual=true;
+    }
     /* [v83] 굿어스데이터 2026-10-07 정기예금 가입(신한 695222 → 561593 30억 · 561718 20억, 사용자 확인 2026-10-20).
        561718이 계좌 목록에 없어 미등록 계좌로 잡히던 것 — 없으면 1회 추가(이미 있으면 그대로) */
     if(ex.id==="GD" && (+ex.acctFixV||0) < 83){
@@ -8332,7 +8414,7 @@ var ADM_ACTS=[["","전체 동작"],["view","메뉴 열람"],["co_switch","법인
   ["doc_write","자료 저장"],["doc_delete","자료 삭제"],["blocked_edit","차단된 수정"],["account","가입·승인·권한"]];
 var ADM_ACT_LABEL={view:"메뉴 열람", co_switch:"법인 탭 전환", login:"접속", export:"내보내기", classify_edit:"구분 수정", doc_write:"자료 저장", doc_delete:"자료 삭제",
   blocked_edit:"차단된 수정", signup:"가입 신청", approve:"승인", reject:"거절·차단", status_change:"상태 변경", role_change:"역할 변경", perm_change:"메뉴·법인 변경",
-  privacy_agree:"서약 동의", profile_edit:"정보 수정"};
+  privacy_agree:"서약 동의", profile_edit:"정보 수정", password_change:"비밀번호 변경"};
 var ADM_DOCK={m:"거래(CMS)", slip:"전표", ref:"보고서 참조", ar:"매출채권", cash:"현금출납", info:"법인 정보"};
 var CO_NAME={SN:"에스넷", GU:"굿어스", GD:"데이터", GS:"솔루션"};
 function admDateDefault(){ if(!ADM.f.to) ADM.f.to=todayISO(); if(!ADM.f.from) ADM.f.from=isoAdd(todayISO(),-6); }
@@ -8435,7 +8517,7 @@ function admLogs(){
 function admLogsLoad(){
   var f=ADM.f, q=SB.from("audit_log").select("*").gte("ts", f.from+"T00:00:00+09:00").lte("ts", f.to+"T23:59:59.999+09:00").order("ts",{ascending:false}).order("id",{ascending:false}).limit(3000);
   if(f.who) q=q.eq("user_id", f.who);
-  if(f.act==="account") q=q.in("action",["signup","approve","reject","status_change","role_change","perm_change","privacy_agree","profile_edit"]);
+  if(f.act==="account") q=q.in("action",["signup","approve","reject","status_change","role_change","perm_change","privacy_agree","profile_edit","password_change"]);
   else if(f.act) q=q.eq("action", f.act);
   q.then(function(r){
     if(r.error){
@@ -8485,6 +8567,7 @@ function admContent(g){
     case "blocked_edit": return '<span style="color:var(--out)">관리자 전용 항목 되돌림</span> · '+esc(admPathText(x.target))+(d.keys?' <span class="mini">'+esc((d.keys||[]).join(", "))+'</span>':'');
     case "signup": return esc(x.target||"")+' <span class="mini">'+esc([d.name,d.dept,d.title].filter(Boolean).join(" · "))+'</span>';
     case "privacy_agree": return esc(x.target||"");
+    case "password_change": return '<span class="mini">'+esc(d.how||"")+'</span>';
     default: return esc(x.target||"")+(d.before||d.after?' <span class="mini">'+ba(d.before)+' → '+ba(d.after)+'</span>':'');
   }
 }
@@ -8534,6 +8617,80 @@ function lockRulesUi(){
   };
 })();
 
+/* ===================== [v84.1] 비밀번호 변경 · 찾기 =====================
+   - 로그인 후: 왼쪽 아래 [비밀번호] → 현재 비밀번호 확인 → 새 비밀번호 저장(Supabase auth.updateUser)
+   - 잊었을 때: 로그인 화면 [비밀번호를 잊으셨나요?] → 이메일로 재설정 링크(resetPasswordForEmail) → 링크로 들어오면 새 비밀번호 입력 화면
+   비밀번호는 이 화면·기록 어디에도 남기지 않는다(기록에는 '비밀번호 변경' 동작만). */
+var PW_RECOVERY=/type=recovery/.test(String(location.hash||"")) || /type=recovery/.test(String(location.search||""));
+function pwRule(p){ return String(p||"").length>=8; }
+function authReset(){
+  var sb=sbClient(), email=String($("#authEmail").value||"").trim().toLowerCase();
+  if(!sb){ authMsg("Supabase 라이브러리를 불러오지 못했습니다.","err"); return Promise.resolve(); }
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ authMsg("가입한 이메일을 입력하세요.","err"); return Promise.resolve(); }
+  authMsg("메일 보내는 중…"); $("#btnAuth").disabled=true;
+  var opt=/^https?:/.test(location.protocol)?{redirectTo:location.href.split("#")[0].split("?")[0]}:{};
+  return sb.auth.resetPasswordForEmail(email, opt).then(function(r){
+    if(r && r.error) throw r.error;
+    authMsg("재설정 메일을 보냈습니다. 받은편지함(스팸함 포함)의 링크를 이 컴퓨터에서 열어 새 비밀번호를 정하세요.","ok");
+  }).catch(function(e){ authMsg(authErrText(e),"err"); }).then(function(){ $("#btnAuth").disabled=false; });
+}
+/* 재설정 링크로 들어왔을 때 */
+function showNewPw(user){
+  AUTH.user=user||AUTH.user; showLock("lockNewPw");
+  $("#npWho").textContent=(AUTH.user&&AUTH.user.email)||"";
+  $("#npPw").value=""; $("#npPw2").value=""; $("#npMsg").textContent=""; $("#npMsg").className="msg";
+  setTimeout(function(){ $("#npPw").focus(); },30);
+}
+function saveNewPw(){
+  var p=$("#npPw").value, p2=$("#npPw2").value, m=$("#npMsg");
+  if(!pwRule(p)){ m.className="msg err"; m.textContent="비밀번호는 8자 이상이어야 합니다."; return; }
+  if(p!==p2){ m.className="msg err"; m.textContent="두 비밀번호가 일치하지 않습니다."; return; }
+  $("#btnNewPw").disabled=true; m.className="msg"; m.textContent="저장 중…";
+  sbClient().auth.updateUser({password:p}).then(function(r){
+    if(r && r.error) throw r.error;
+    PW_RECOVERY=false; try{ history.replaceState(null,"",location.href.split("#")[0]); }catch(e){}
+    var u=(r&&r.data&&r.data.user)||AUTH.user;
+    m.className="msg ok"; m.textContent="새 비밀번호를 저장했습니다.";
+    PW_AUDIT_PENDING="재설정 메일";
+    return authAfterLogin(u);
+  }).catch(function(e){ m.className="msg err"; m.textContent="저장하지 못했습니다: "+authErrText(e); }).then(function(){ $("#btnNewPw").disabled=false; });
+}
+var PW_AUDIT_PENDING=null;   // 재설정 후 진입하면 기록(진입 전에는 기록 권한 없음)
+/* 로그인 후 비밀번호 변경 */
+function openPwChange(){
+  if(!SB || !AUTH.user){ toast("로그인했을 때만 바꿀 수 있습니다"); return; }
+  var m=$("#modal");
+  m.innerHTML='<div class="modbox" role="dialog" aria-modal="true" aria-labelledby="pwTitle" style="width:min(100%,420px)"><header><h2 id="pwTitle">비밀번호 변경</h2><button class="btn sm" id="modX">닫기</button></header>'+
+    '<div class="pad"><p class="mini" style="margin:0 0 12px">'+esc(AUTH.user.email||"")+'</p>'+
+    '<label class="field"><span class="lbl">현재 비밀번호</span><input type="password" id="pwCur" autocomplete="current-password"></label>'+
+    '<label class="field"><span class="lbl">새 비밀번호 (8자 이상)</span><input type="password" id="pwNew" autocomplete="new-password"></label>'+
+    '<label class="field"><span class="lbl">새 비밀번호 확인</span><input type="password" id="pwNew2" autocomplete="new-password"></label>'+
+    '<button class="btn primary wide" id="btnPwSave">변경</button><div class="msg" id="pwMsg" role="status"></div>'+
+    '<p class="hint" style="margin-top:10px">현재 비밀번호가 기억나지 않으면 로그아웃한 뒤 로그인 화면의 [비밀번호를 잊으셨나요?]로 재설정 메일을 받으세요.</p></div></div>';
+  m.hidden=false;
+  var close=function(){ m.hidden=true; m.innerHTML=""; };
+  $("#modX").onclick=close; m.onclick=function(e){ if(e.target===m) close(); };
+  setTimeout(function(){ $("#pwCur").focus(); },30);
+  ["pwCur","pwNew","pwNew2"].forEach(function(id){ $("#"+id).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#btnPwSave").click(); }); });
+  $("#btnPwSave").onclick=function(){
+    var cur=$("#pwCur").value, p=$("#pwNew").value, p2=$("#pwNew2").value, msg=$("#pwMsg");
+    var bad=function(t){ msg.className="msg err"; msg.textContent=t; };
+    if(!cur) return bad("현재 비밀번호를 입력하세요.");
+    if(!pwRule(p)) return bad("새 비밀번호는 8자 이상이어야 합니다.");
+    if(p!==p2) return bad("새 비밀번호 두 칸이 일치하지 않습니다.");
+    if(p===cur) return bad("현재 비밀번호와 다르게 정하세요.");
+    $("#btnPwSave").disabled=true; msg.className="msg"; msg.textContent="확인 중…";
+    SB.auth.signInWithPassword({email:AUTH.user.email, password:cur}).then(function(r){
+      if(r && r.error) throw new Error("현재 비밀번호가 올바르지 않습니다.");
+      return SB.auth.updateUser({password:p});
+    }).then(function(r){
+      if(r && r.error) throw r.error;
+      audit("password_change", {menu:null, detail:{how:"직접 변경"}});
+      close(); toast("비밀번호를 바꿨습니다. 다음 로그인부터 새 비밀번호를 쓰세요.");
+    }).catch(function(e){ bad(e && /현재 비밀번호/.test(e.message||"") ? e.message : "바꾸지 못했습니다: "+authErrText(e)); $("#btnPwSave").disabled=false; });
+  };
+}
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -8542,10 +8699,11 @@ function enter(){
   var ab=$("#btnAdminUsers"); ab.hidden=!AUTH.isAdmin;
   if(AUTH.isAdmin){ adminPendingCount(); watchAdminProfiles(); }
   audit("login", {menu:null});   // [v84] 접속 기록
+  if(PW_AUDIT_PENDING){ audit("password_change", {menu:null, detail:{how:PW_AUDIT_PENDING}}); PW_AUDIT_PENDING=null; }   // [v84.1]
 }
 function showLock(which){
   $("#lock").hidden=false;
-  ["lockAuth","lockPending","lockPledge","lockLoad","lockMigrate"].forEach(function(k){ var e=$("#"+k); if(e) e.hidden=(k!==which); });
+  ["lockAuth","lockPending","lockPledge","lockNewPw","lockLoad","lockMigrate"].forEach(function(k){ var e=$("#"+k); if(e) e.hidden=(k!==which); });
   var lb=$("#lock .lockbox"); if(lb) lb.classList.toggle("wide", which==="lockPledge");
 }
 /* [v30] 부팅: 저장된 로그인 세션 확인 → 없으면 로그인 화면 */
@@ -8553,10 +8711,11 @@ function boot(){
   showLock("lockLoad");
   var sb=sbClient();
   if(!sb){ showAuth("login","Supabase 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침하세요.","err"); return; }
-  sb.auth.onAuthStateChange(function(ev){ if(ev==="SIGNED_OUT" && AUTH.entered) location.reload(); });
+  sb.auth.onAuthStateChange(function(ev){ if(ev==="PASSWORD_RECOVERY") PW_RECOVERY=true; if(ev==="SIGNED_OUT" && AUTH.entered) location.reload(); });   // [v84.1]
   sb.auth.getSession().then(function(r){
     var ses=r&&r.data&&r.data.session;
     if(!ses){ showAuth("login", AUTH.bootNote||"", AUTH.bootNote?"ok":""); return; }
+    if(PW_RECOVERY) return showNewPw(ses.user);   // [v84.1] 재설정 메일 링크로 들어옴
     return authAfterLogin(ses.user);
   }).catch(function(e){ showAuth("login","세션 확인 실패: "+(e&&e.message||e),"err"); });
 }
@@ -8567,7 +8726,14 @@ function loadData(){
     DB=db; if(!DB) throw new Error("저장소에 연결할 수 없습니다");
     dbReady=true; localMode=false;
     return dbLoad().then(function(loaded){
-      if(loaded){ D=loaded; migrate(); restrictCos(); lastDocs={}; buildAll(); watchRemote(); enter(); return; }   // [v84] 법인 제한
+      if(loaded){ D=loaded; snapInfo0();   // [v84.1] 보정 전 값
+        var pre={}; (D.companies||[]).forEach(function(c){ pre[c.id]=infoSig(c); });
+        migrate(); restrictCos(); lastDocs={}; buildAll(); watchRemote(); enter();
+        if(AUTH.isAdmin && !readOnly){   // [v84.1] 보정으로 바뀐 법인 정보만 저장(관리자만 — 팀원은 DB가 관리자 전용 값을 되돌림)
+          var ch=(D.companies||[]).filter(function(c){ return pre[c.id]!==undefined && pre[c.id]!==infoSig(c); });
+          if(ch.length){ ch.forEach(function(c){ delete lastDocs["co/"+c.id+"/info/main"]; }); save(); }
+        }
+        return; }   // [v84] 법인 제한
       if(!AUTH.isAdmin) throw new Error("읽을 수 있는 자료가 없습니다 — 관리자에게 서약·법인 권한 확인을 요청하세요");   // [v84] 팀원은 빈 저장소를 새로 만들지 않음
       return (AUTH.isAdmin ? idbGet("main").catch(function(){ return null; }) : Promise.resolve(null)).then(function(rec){
         if(rec&&rec.ct){ showLock("lockMigrate"); $("#pwMig").focus(); return; }
@@ -8605,6 +8771,8 @@ function rollHolidaySheets(c){
   });
   return n;
 }
+/* [v84.1] 법인 정보 비교용(자동 보정 통계 rcStat 제외 · 키 순서 무관) */
+function infoSig(c){ var o=coInfo(c), k=Object.keys(o).filter(function(x){ return x!=="rcStat"; }).sort(), z={}; k.forEach(function(x){ z[x]=o[x]; }); return JSON.stringify(z); }
 function buildAll(){ var m=buildDocs(); lastDocs={}; Object.keys(m).forEach(function(p){ lastDocs[p]=JSON.stringify(m[p]); }); }
 /* [v59] 계좌 목록 읽기 전용 브리지 — 「그 외 이자수익전표」(int-core)용.
    window.__acctDirectory.get(법인코드) → [{num, digits, label, bank, note, isMMT}] 동결 복사본 배열 (D 객체·참조 노출 없음)
@@ -8648,7 +8816,11 @@ $("#btnMigSkip").onclick=function(){
 $("#reloadChip").onclick=function(){ location.reload(); };
 /* [v30] 인증 화면 이벤트 */
 $$("#authTabs button").forEach(function(b){ b.onclick=function(){ showAuth(b.dataset.t); }; });
-$("#btnAuth").onclick=function(){ return AUTH.mode==="signup" ? authSignUp() : authLogin(); };
+$("#btnAuth").onclick=function(){ return AUTH.mode==="signup" ? authSignUp() : AUTH.mode==="reset" ? authReset() : authLogin(); };
+$("#btnForgot").onclick=function(){ showAuth("reset","가입한 이메일을 넣고 [재설정 메일 보내기]를 누르세요. 돌아가려면 위 [로그인] 탭."); };   // [v84.1]
+$("#btnNewPw").onclick=saveNewPw;
+["npPw","npPw2"].forEach(function(id){ $("#"+id).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#btnNewPw").click(); }); });
+$("#btnPw").onclick=function(){ openPwChange(); };
 ["authEmail","authPw","authPw2","authName","authDept","authTitle"].forEach(function(id){ $("#"+id).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#btnAuth").click(); }); });
 $("#btnPendingOut").onclick=function(){ authLogout(); };
 $("#btnPendingRecheck").onclick=function(){ $("#pendingNote").textContent="확인 중…"; if(AUTH.user) authAfterLogin(AUTH.user); };
@@ -9875,7 +10047,7 @@ function matchSlipCms(c, iso){
     add(main, C, "1:N합계", {adj:GL.filter(function(L){ return L!==main; })});
   });
   /* 증권 계좌 — CMS에 없는 계좌의 전표 입·출금은 전표값으로 실적 행을 만든다(파일 끝에 붙여 기존 행 번호 유지) */
-  var SEC_RE=/증권|금융투자|미래에셋|선물/, secPrior=0;
+  var SEC_RE=/증권|금융투자|미래에셋|선물/, secPrior=0, synMv={};
   lines.forEach(function(L){
     if(usedL[L.key] || L.kind==="cash" || L.fx || !(SEC_RE.test(String(L.acct||"")) || slipNoCms(c, L.acct, iso))) return;   // [v58] 자금이동 줄도 · [v82] 전표 실적 법인의 CMS 없는 계좌
     /* [v82] 전표 실적 계좌: 같은 날 다른 계좌 CMS에 같은 방향·같은 금액이 있으면 계좌 귀속만 다른 같은 거래(예: 전표 농협 0352 ↔ CMS 농협 0372 이자 4,529,786) → 만들지 않음 */
@@ -9887,6 +10059,11 @@ function matchSlipCms(c, iso){
       for(var dd=iso.slice(0,8)+"01"; dd<=iso; dd=isoAdd(dd,1)) txnsOf(c,dd).forEach(function(t){ if(t.acct===L.acct && !t.fromSlip && smDir(t)===L.dir && (t.kind==="수입"||t.kind==="지출")) prior+=smAmt(t); });
       if(Math.abs(prior-L.amt)<0.5){ secPrior++; return; } }
     var isIn=L.dir==="in", mvS=L.kind==="move";
+    if(!mvS && L.acct!=="현금"){   // [v84.1] 짝 없는 CMS 자금이동과 금액이 같으면 그 짝(예: 신한 4원·국민 8원 → 하나 MMT 입금)
+      var opp=T.map(function(t,i){ return i; }).filter(function(i){ var t=T[i]; return !synMv[i] && t.acct!==L.acct && !t.fromSlip && String(t.kind).indexOf("자금이동")===0 && smDir(t)!==L.dir && Math.abs(smAmt(t)-L.amt)<0.5; });
+      var orphan=opp.filter(function(i){ var t=T[i]; return !T.some(function(u){ return u!==t && !u.fromSlip && String(u.kind).indexOf("자금이동")===0 && smDir(u)===L.dir && Math.abs(smAmt(u)-L.amt)<0.5; }); });
+      if(orphan.length){ synMv[orphan[0]]=1; mvS=true; }
+    }
     T.push({date:iso, at:"", acct:L.acct, bank:String(L.acct).split(" ")[0], acctNum:L.L.acctNum||"", summary:L.text, client:"", txType:"전표",
       deposit:isIn?L.amt:0, withdraw:isIn?0:L.amt, after:null, hasAfter:false, kind:mvS?(isIn?"자금이동(입금)":"자금이동(출금)"):(isIn?"수입":"지출"), cat:mvS?"자금이동":(L.cat||"기타"), auto:false, fromSlip:true, catSrc:"전표"});
     add(L, [T.length-1], "전표만", {syn:true});
