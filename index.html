@@ -505,6 +505,39 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 .seg.wrap button{flex:0 1 auto;padding:9px 16px}
 @media(max-width:560px){.seg.wrap button{flex:1 1 33%;padding:7px 6px}.seg.wrap button+button{border-left:1px solid var(--rule-strong)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* [v84] 관리자 섹션 · 역할 · 서약 */
+.adm-dot{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap;color:var(--ink-2)}
+.adm-dot i{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.adm-dot.ok i{background:var(--in)} .adm-dot.wait i{background:var(--warn)} .adm-dot.off i{background:var(--rule-strong)} .adm-dot.bad i{background:var(--out)}
+.adm-tbl td,.adm-log td{vertical-align:top}
+.adm-tbl th,.adm-tbl td{white-space:nowrap}
+.adm-tbl td.adm-badges{white-space:normal;min-width:150px}
+.adm-log th,.adm-log td.mini{white-space:nowrap}
+.adm-log td:last-child{min-width:240px}
+.adm-tbl select{font:inherit;font-size:12px;padding:3px 6px;border:1px solid var(--rule-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--ink)}
+.adm-badges{max-width:240px}
+.adm-badges .chip{margin:0 2px 3px 0}
+tr.adm-pend td{background:var(--move-soft)}
+.adm-edit td{background:var(--surface-2)}
+.adm-edit-box{display:flex;flex-direction:column;gap:12px;padding:6px 2px}
+.adm-checks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px}
+.adm-checks label{display:inline-flex;align-items:center;gap:5px;font-size:13px;white-space:nowrap}
+.adm-note{padding:12px 16px 14px;font-size:12px;line-height:1.7;color:var(--muted);border-top:1px solid var(--rule)}
+.adm-filter{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.adm-filter select,.adm-filter input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--rule-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--ink)}
+.adm-ad{font-size:10px;padding:0 6px}
+.banner.bad{border-left-color:var(--out);background:var(--out-soft)}
+.role-note{margin-bottom:10px}
+#nav .adm-n{margin-left:6px;font-size:11px;color:var(--warn);font-weight:600}
+.lockbox.wide{width:min(100%,520px)}
+#pledgeText{max-height:42vh;overflow:auto;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--surface-2);padding:12px 14px;font-size:13px;line-height:1.7;color:var(--ink-2)}
+#pledgeText p{margin:0 0 6px}
+#pledgeText .pl-lead{color:var(--ink);font-weight:600;margin-bottom:10px}
+.pl-chk{display:flex;gap:8px;align-items:flex-start;margin:14px 0 12px;font-size:13px;color:var(--ink)}
+.pl-chk input{margin-top:3px}
+body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:none;opacity:.45}
+@media(max-width:560px){.adm-badges{max-width:none}.adm-filter>*{flex:1 1 100%}}
 </style>
 
 <div id="lock">
@@ -518,6 +551,11 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
       <label class="field"><span class="lbl">이메일</span><input type="email" id="authEmail" autocomplete="username" placeholder="name@snetsystems.co.kr"></label>
       <label class="field"><span class="lbl">비밀번호</span><input type="password" id="authPw" autocomplete="current-password"></label>
       <label class="field" id="authPw2Wrap" hidden><span class="lbl">비밀번호 확인 (8자 이상)</span><input type="password" id="authPw2" autocomplete="new-password"></label>
+      <div id="authProfWrap" hidden>
+        <label class="field"><span class="lbl">이름</span><input type="text" id="authName" autocomplete="name" maxlength="30"></label>
+        <label class="field"><span class="lbl">부서</span><input type="text" id="authDept" maxlength="40" placeholder="예: 경영관리팀"></label>
+        <label class="field"><span class="lbl">직급</span><input type="text" id="authTitle" maxlength="20"></label>
+      </div>
       <button class="btn primary wide" id="btnAuth">로그인</button>
       <div class="msg" id="authMsg" role="status"></div>
       <p class="hint" style="margin-top:12px">회원가입 후 <b>마스터 관리자가 승인</b>해야 자금 데이터를 볼 수 있습니다.</p>
@@ -528,6 +566,15 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
       <button class="btn primary wide" id="btnPendingRecheck">승인 여부 다시 확인</button>
       <button class="btn wide" id="btnPendingOut" style="margin-top:8px">로그아웃</button>
       <div class="msg" id="pendingNote"></div>
+    </div>
+    <div id="lockPledge" hidden>
+      <p class="hint" style="margin:0 0 4px;font-size:13px;color:var(--ink)"><b>정보보호 서약</b> — 처음 한 번만 동의하면 됩니다.</p>
+      <p class="mini" id="pledgeWho" style="margin:0 0 10px"></p>
+      <div id="pledgeText"></div>
+      <label class="pl-chk"><input type="checkbox" id="pledgeChk"> <span>위 내용을 읽었고 지키겠습니다.</span></label>
+      <button class="btn primary wide" id="btnPledge" disabled>동의하고 시작</button>
+      <button class="btn wide" id="btnPledgeOut" style="margin-top:8px">로그아웃</button>
+      <div class="msg" id="pledgeMsg" role="status"></div>
     </div>
     <div id="lockLoad" hidden>
       <p class="hint" style="margin:0 0 6px">공용 저장소에서 데이터를 불러오는 중입니다…</p>
@@ -545,7 +592,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v83.1 · 2026-10-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v84 · 2026-10-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -558,6 +605,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
       <button data-v="cal">업무캘린더<span class="k">C</span></button>
       <button data-v="import">데이터 업로드<span class="k">9</span></button>
       <button data-v="settings">설정<span class="k">0</span></button>
+      <button data-v="admin" id="navAdmin" hidden>관리자<span class="adm-n" id="navAdminN"></span><span class="k">A</span></button>
     </nav>
     <div class="railfoot">
       <button class="btn sm" id="btnLock">로그아웃</button>
@@ -1588,6 +1636,10 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
       <div id="calBody"></div>
     </section>
 
+    <section class="view" id="v-admin" hidden>
+      <div id="adminBody"></div>
+    </section>
+
     <section class="view" id="v-settings" hidden>
       <div class="panel">
         <header><h2>법인 관리</h2><span class="sub">체크 해제 시 통합·메인에서 제외되고 데이터는 보관됩니다</span></header>
@@ -2250,6 +2302,7 @@ function showAuth(mode,msg,cls){
   showLock("lockAuth");
   $$("#authTabs button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.t===AUTH.mode?"true":"false"); });
   $("#authPw2Wrap").hidden=AUTH.mode!=="signup";
+  $("#authProfWrap").hidden=AUTH.mode!=="signup";   // [v84] 가입 때 이름·부서·직급
   $("#authPw").setAttribute("autocomplete", AUTH.mode==="signup"?"new-password":"current-password");
   $("#btnAuth").textContent=AUTH.mode==="signup"?"가입 신청":"로그인";
   authMsg(msg||"",cls);
@@ -2274,13 +2327,17 @@ function authSignUp(){
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)){ authMsg("이메일 형식을 확인하세요.","err"); return Promise.resolve(); }
   if(f.pw.length<8){ authMsg("비밀번호는 8자 이상이어야 합니다.","err"); return Promise.resolve(); }
   if(f.pw!==f.pw2){ authMsg("두 비밀번호가 일치하지 않습니다.","err"); return Promise.resolve(); }
+  var prof={name:String($("#authName").value||"").trim(), dept:String($("#authDept").value||"").trim(), title:String($("#authTitle").value||"").trim()};   // [v84]
+  if(!prof.name){ authMsg("이름을 입력하세요.","err"); $("#authName").focus(); return Promise.resolve(); }
+  if(!prof.dept){ authMsg("부서를 입력하세요.","err"); $("#authDept").focus(); return Promise.resolve(); }
   authMsg("가입 신청 중…"); $("#btnAuth").disabled=true;
   var opt=/^https?:/.test(location.protocol)?{emailRedirectTo:location.href.split("#")[0]}:{};
+  opt.data=prof;   // [v84] 가입 트리거가 user_profiles 이름·부서·직급에 저장
   return sb.auth.signUp({email:f.email, password:f.pw, options:opt}).then(function(r){
     if(r.error) throw r.error;
     var u=r.data&&r.data.user;
     if(u && Array.isArray(u.identities) && !u.identities.length) throw new Error("already registered");   // 이미 가입된 이메일(Supabase는 오류 대신 빈 identities 반환)
-    $("#authPw").value=""; $("#authPw2").value="";
+    $("#authPw").value=""; $("#authPw2").value=""; ["authName","authDept","authTitle"].forEach(function(id){ $("#"+id).value=""; });
     var needMail=!(r.data&&r.data.session);
     var done=function(){ showAuth("login","가입 신청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다."+(needMail?" (먼저 받은편지함의 인증 메일 링크를 눌러 이메일을 확인해 주세요.)":""),"ok"); };
     return needMail ? done() : sb.auth.signOut().then(done, done);   // 즉시 세션이 생기는 설정이어도 승인 전에는 로그인 화면으로
@@ -2305,7 +2362,9 @@ function authAfterLogin(user){
     var p=r.data; AUTH.profile=p;
     AUTH.isAdmin = p.is_admin===true && p.status==="approved";
     if(p.status!=="approved") return showPending(p);
-    return loadData();
+    ROLE=roleOf(p);                                                            // [v84]
+    if(!ROLE.admin && !p.privacy_agreed_at) return showPledge(p);             // 첫 로그인: 정보보호 서약(관리자 제외)
+    return startApproved();
   }).catch(function(e){ AUTH.user=null; showAuth("login", authErrText(e), "err"); });
 }
 function showPending(p){
@@ -2321,6 +2380,7 @@ function adminPendingCount(){
   if(!AUTH.isAdmin) return;
   SB.from("user_profiles").select("id",{count:"exact", head:true}).eq("status","pending").then(function(r){
     var n=(r&&r.count)||0, b=$("#btnAdminUsers"); if(b) b.textContent="사용자 승인 관리"+(n?" ("+n+")":"");
+    var nn=$("#navAdminN"); if(nn) nn.textContent=n?String(n):"";   // [v84]
   });
 }
 function renderAdminUsers(){
@@ -2372,6 +2432,7 @@ function watchAdminProfiles(){
   try{
     ADMIN_RT=SB.channel("admin:user_profiles").on("postgres_changes",{event:"*", schema:"public", table:"user_profiles"},function(){
       adminPendingCount(); var m=$("#modal"); if(m && !m.hidden && m.querySelector("#admTbl")) renderAdminUsers();
+      if(view==="admin" && ADM.tab==="users" && !ADM.edit && !ADM.confirm) admUsers();   // [v84]
     }).subscribe();
   }catch(e){}
 }
@@ -2521,7 +2582,7 @@ function renderAccess(){
     el.className="chip out"; el.textContent="보기 전용";
     el.title="편집 권한이 없습니다. 조회만 가능합니다.";
   } else {
-    el.className="chip in"; el.textContent=(AUTH.user?AUTH.user.email+(AUTH.isAdmin?" · 관리자":""):"공용 저장소");
+    el.className="chip in"; el.textContent=(AUTH.user?AUTH.user.email+" · "+roleLabel(AUTH.profile):"공용 저장소");   // [v84] 관리자/팀원
     el.title="Supabase 공용 저장소 · 승인된 계정만 접근";
     el.title="이 대시보드를 공유받은 분들이 같은 데이터를 봅니다.";
   }
@@ -4604,7 +4665,7 @@ function renderCoTabs(){
   $("#cotabs").innerHTML=tabs.map(function(t){
     return '<button data-co="'+t.id+'" style="--dot:'+t.color+'" class="'+(t.off?"off":"")+'" aria-current="'+(curCo===t.id?"true":"false")+'"><i></i>'+esc(t.name)+'</button>';
   }).join("");
-  $$("#cotabs button").forEach(function(b){ b.onclick=function(){ curCo=b.dataset.co; render(); }; });
+  $$("#cotabs button").forEach(function(b){ b.onclick=function(){ var from=curCo; curCo=b.dataset.co; render(); if(from!==curCo) audit("co_switch", {co:curCo==="ALL"?null:curCo}); }; });   // [v84] 법인 탭 전환 기록
   $("#railSub").textContent = curCo==="ALL" ? "GROUP · 4법인" : (co(curCo)||{}).name||"";
 }
 function nearestDate(ds, want){
@@ -4632,8 +4693,8 @@ function refreshDates(){
   } else { curDate=null; sel.value=""; $("#dateHint").textContent="데이터 없음"; }
 }
 function recentDates(n){ var ds=allDates(); return ds.slice(Math.max(0,ds.length-n)); }
-var TITLES={dash:"대시보드",ilbo:"자금일보 작성",daily:"일자별 보고",ledger:"거래원장",ar:"매출채권관리",fep:"자금업무 자동화",trend:"기간 추이",fin:"금융 (차입·대여·보증·연락처)",import:"데이터 업로드",settings:"설정",cal:"업무캘린더"};
-var VIEWS=["dash","ilbo","daily","ledger","ar","fep","trend","fin","import","settings","cal"];   // [v75] cal은 숫자키 밖(맨 뒤) — 단축키 C
+var TITLES={dash:"대시보드",ilbo:"자금일보 작성",daily:"일자별 보고",ledger:"거래원장",ar:"매출채권관리",fep:"자금업무 자동화",trend:"기간 추이",fin:"금융 (차입·대여·보증·연락처)",import:"데이터 업로드",settings:"설정",cal:"업무캘린더",admin:"관리자"};
+var VIEWS=["dash","ilbo","daily","ledger","ar","fep","trend","fin","import","settings","cal","admin"];   // [v84] admin은 관리자만 · 단축키 A   // [v75] cal은 숫자키 밖(맨 뒤) — 단축키 C
 function render(){
   invalidate(); renderCoTabs(); refreshDates();
   if(view==="dash") renderDash();
@@ -4647,8 +4708,10 @@ function render(){
   else if(view==="cal") renderCal();   // [v75]
   else if(view==="import") renderRules();
   else if(view==="settings"){ renderSettings(); cpmOnSettings(); }
+  else if(view==="admin") renderAdmin();   // [v84]
 }
 function setView(v){
+  if(!canView(v)){ toast("권한이 없는 메뉴입니다"); return; }   // [v84] 설정·관리자는 관리자만, 지정 메뉴 제한
   view=v;
   document.body.classList.toggle("cal-mode", v==="cal");   // [v78] 업무캘린더는 자체 상단 바(회사·주/월)
   if(v==="ilbo" && !ILBO.date && curDate) ILBO.date=curDate;   // [v23] 상단 기준일 ↔ 자금일보 집행일 동기화
@@ -4656,6 +4719,7 @@ function setView(v){
   VIEWS.forEach(function(k){ $("#v-"+k).hidden=(k!==v); });
   $("#viewTitle").textContent=TITLES[v];
   render(); window.scrollTo(0,0);
+  audit("view", {menu:v});   // [v84] 메뉴 열람 기록
 }
 
 /* ===================== 대시보드 ===================== */
@@ -5119,6 +5183,9 @@ function bindCatCells(){
     sel.onchange=function(){
       var c=co(sel.dataset.co), iso=sel.dataset.iso, t=txnsOf(c,iso)[+sel.dataset.i];
       if(!t) return;
+      if(readOnly){ toast("보기 전용입니다 — 구분을 바꿀 수 없습니다."); render(); return; }   // [v84]
+      var _before=(t.kind==="외화(입금)"||t.kind==="외화(출금)")?fxEffCat(t, t.kind==="외화(입금)"):t.cat;
+      auditCat(c, iso, t, _before, sel.value, view==="ilbo"?"자금일보":view==="ledger"?"거래원장":(TITLES[view]||view));
       t.cat=sel.value; t.auto=false; t.catManual=true;          // [v55] 사용자 지정 — 전표 재매칭이 덮어쓰지 않는다
       /* [v55] 전표 매칭 건은 같은 거래처라도 전표마다 구분이 다르므로 거래처 학습(vendorMap)을 하지 않는다 */
       var vk=t.slip?"":normalize(t.client); if(vk) c.vendorMap[vk]=sel.value;
@@ -5130,6 +5197,8 @@ function bindCatCells(){
 document.addEventListener("click", function(e){
   var b=e.target && e.target.closest ? e.target.closest(".slipcatrevert") : null; if(!b) return;
   var c=co(b.dataset.co), iso=b.dataset.iso, t=c && txnsOf(c,iso)[+b.dataset.i]; if(!t || !t.slip) return;
+  if(readOnly){ toast("보기 전용입니다 — 구분을 바꿀 수 없습니다."); return; }   // [v84]
+  auditCat(c, iso, t, t.cat, t.slip.cat, "전표값으로 되돌리기");
   delete t.catManual; t.cat=t.slip.cat; t.auto=false; t.catSrc="전표";
   invalidate(); save().then(function(){ toast("전표 구분("+t.slip.cat+")으로 되돌림"); render(); });
 });
@@ -8142,16 +8211,342 @@ function migrate(){
   purgeFuture();
   D.v=3;
 }
+/* ===================== [v84] 관리자 섹션 · 역할(관리자/팀원/보기 전용) · 정보보호 서약 · 접속·변경 기록 =====================
+   DB(1·2단계 SQL)가 실제 권한을 지키고, 이 화면은 그 규칙을 보여주고 맞춰 준다.
+   - 관리자: 전부 / 팀원: 조회 + 업로드 + 구분 수정·업무캘린더 체크·회수계획 메모 / 보기 전용: 조회만
+   - 설정 메뉴는 관리자만, 금융은 팀원도 조회만. 업무캘린더 항목 추가·삭제·편집은 관리자만.
+   - 기록(audit_log): 화면 동작(로그인·메뉴 열람·법인 탭 전환·내보내기·구분 수정)은 여기서 남기고, 저장·삭제·권한 변경은 DB 트리거가 남긴다. */
+var ROLE={admin:false, upload:true, menus:null, cos:null};
+var ADMIN_MENUS=["settings","admin"];          // 관리자만
+var AUDIT={fail:0, last:null};
+var PLEDGE_TEXT=[
+  "본인은 에스넷그룹 자금현황 대시보드에서 보는 자금·거래·차입·매출채권 등 모든 정보가 회사의 대외비임을 이해하고 다음을 지키겠습니다.",
+  "1. 업무 목적 외로 열람·복사·저장·출력하지 않습니다.",
+  "2. 화면 캡처나 내려받은 파일을 회사 밖(개인 메일·메신저·개인 클라우드 등)으로 보내지 않습니다.",
+  "3. 계정과 비밀번호를 다른 사람과 함께 쓰지 않으며, 공용 PC에서는 사용 후 반드시 로그아웃합니다.",
+  "4. 접속·열람·내보내기·수정 기록이 남는 것에 동의합니다.",
+  "5. 정보가 새어 나간 것으로 의심되면 바로 관리자(경영관리팀 자금파트)에게 알립니다."
+];
+function roleOf(p){
+  p=p||{};
+  var admin=p.is_admin===true && p.status==="approved";
+  return {admin:admin, upload:admin || p.can_upload!==false, menus:(Array.isArray(p.menus)&&p.menus.length)?p.menus.slice():null,
+          cos:(!admin && Array.isArray(p.companies) && p.companies.length)?p.companies.slice():null};
+}
+function roleLabel(p){ var r=roleOf(p); return r.admin?"관리자":(r.upload?"팀원":"보기 전용"); }
+function canView(v){
+  if(ADMIN_MENUS.indexOf(v)>=0) return ROLE.admin;
+  if(v==="import" && !ROLE.admin && !ROLE.upload) return false;   // 보기 전용은 업로드 화면 없음
+  if(ROLE.admin || !ROLE.menus) return true;
+  return v==="dash" || ROLE.menus.indexOf(v)>=0;
+}
+
+/* ---- 기록 남기기(실패해도 화면 동작은 계속 — 실패 횟수는 관리자 화면에 표시) ---- */
+function audit(action, o){
+  o=o||{};
+  if(!SB || !AUTH.user || localMode) return;
+  var row={user_id:AUTH.user.id, action:action, menu:o.menu!==undefined?o.menu:view, co:o.co!==undefined?o.co:(curCo&&curCo!=="ALL"?curCo:null),
+           target:o.target||null, detail:o.detail||null};
+  try{
+    SB.from("audit_log").insert(row).then(function(r){ if(r && r.error){ AUDIT.fail++; AUDIT.last=r.error.message||String(r.error.code||""); } },
+      function(e){ AUDIT.fail++; AUDIT.last=String(e&&e.message||e); });
+  }catch(e){ AUDIT.fail++; AUDIT.last=String(e&&e.message||e); }
+}
+function auditTail(s){ var d=String(s||"").replace(/\D/g,""); return d? "…"+d.slice(-4) : String(s||""); }
+function auditCat(c, iso, t, before, after, how){
+  if(before===after) return;
+  var amt=+(t.deposit||t.withdraw||t.amount||0);
+  audit("classify_edit", {co:c&&c.id, target:iso, detail:{before:before, after:after, how:how||"",
+    date:iso, acct:auditTail(t.acct||t.acctNum||""), amount:(t.ccy&&t.ccy!=="KRW")?(+amt).toFixed(2):Math.round(amt), ccy:t.ccy||"KRW",
+    memo:String(t.summary||t.client||t.text||t.memo||"").slice(0,30)}});
+}
+/* 내보내기(엑셀·파일) · 인쇄(PDF) */
+(function(){
+  var _od=offerDownload;
+  offerDownload=function(filename, data){ audit("export", {target:String(filename||"")}); return _od.apply(this, arguments); };
+  var _pr=window.print;
+  window.print=function(){ audit("export", {target:"인쇄·PDF ("+(TITLES[view]||view)+")"}); return _pr.apply(window, arguments); };
+})();
+
+/* ---- 로그인 화면: 가입 정보 · 정보보호 서약 ---- */
+function pledgeHtml(){ return PLEDGE_TEXT.map(function(t,i){ return '<p'+(i?'':' class="pl-lead"')+'>'+esc(t)+'</p>'; }).join(""); }
+function showPledge(p){
+  showLock("lockPledge");
+  $("#pledgeText").innerHTML=pledgeHtml();
+  $("#pledgeWho").textContent=(p.name?p.name+" · ":"")+(p.email||"");
+  $("#pledgeChk").checked=false; $("#btnPledge").disabled=true; $("#pledgeMsg").textContent="";
+}
+function pledgeAgree(){
+  var sb=sbClient(); if(!sb||!AUTH.user) return;
+  $("#btnPledge").disabled=true; $("#pledgeMsg").textContent="저장 중…";
+  sb.from("user_profiles").update({privacy_agreed_at:new Date().toISOString()}).eq("id", AUTH.user.id).select("*").single().then(function(r){
+    if(r.error) throw r.error;
+    AUTH.profile=r.data; ROLE=roleOf(r.data);
+    return startApproved();
+  }).catch(function(e){ $("#pledgeMsg").textContent="저장하지 못했습니다: "+authErrText(e); $("#btnPledge").disabled=false; });
+}
+/* 승인된 계정 진입: 보기 전용이면 처음부터 읽기 전용(저장 시도 자체를 안 함) */
+function startApproved(){
+  ROLE=roleOf(AUTH.profile);
+  if(!ROLE.admin && !ROLE.upload){ readOnly=true; }
+  return loadData();
+}
+/* 법인 제한 계정: 볼 수 없는 법인은 화면·저장 대상에서 뺀다(DB에서도 막혀 있음) */
+function restrictCos(){
+  if(!ROLE.cos || !D || !D.companies) return;
+  D.companies=D.companies.filter(function(c){ return ROLE.cos.indexOf(c.id)>=0; });
+  if(curCo!=="ALL" && ROLE.cos.indexOf(curCo)<0) curCo="ALL";
+}
+/* 메뉴 표시 */
+function applyRoleUi(){
+  $$("#nav button").forEach(function(b){ var v=b.dataset.v; b.hidden=!canView(v); });
+  var na=$("#navAdmin"); if(na) na.hidden=!ROLE.admin;
+  document.body.classList.toggle("role-admin", ROLE.admin);
+  document.body.classList.toggle("role-member", !ROLE.admin && ROLE.upload);
+  document.body.classList.toggle("role-viewer", !ROLE.admin && !ROLE.upload);
+}
+
+/* ---- 팀원 화면 잠금: 금융(조회만) · 업무캘린더(체크만) ---- */
+function lockFinUi(){
+  if(ROLE.admin) return;
+  var host=$("#finBody"); if(!host) return;
+  if(!host.querySelector(".role-note")) host.insertAdjacentHTML("afterbegin", '<div class="banner role-note">금융은 관리자만 편집할 수 있어요 — 조회 전용</div>');
+  $$("#finBody input, #finBody select, #finBody textarea").forEach(function(el){ el.disabled=true; });
+  $$("#finBody button").forEach(function(b){
+    var t=(b.id||"")+" "+(b.textContent||"");
+    if(/Xlsx|Export|엑셀|내보내기|보기|접기|펼치기|finDueAll/i.test(t)) return;
+    b.disabled=true; b.title="관리자만 편집할 수 있습니다";
+  });
+}
+function lockCalUi(){
+  if(ROLE.admin) return;
+  var a=$("#wcAdd"); if(a) a.hidden=true;
+  $$("#wcItemTbl input, #wcItemTbl select, #wcItemTbl textarea").forEach(function(el){ el.disabled=true; });
+  $$("#wcItemTbl [data-wdel]").forEach(function(b){ b.hidden=true; });
+  var t=$("#wcItemTbl"); if(t && !t.parentNode.querySelector(".role-note")) t.insertAdjacentHTML("beforebegin", '<div class="mini role-note" style="padding:8px 14px">반복 업무 추가·수정·삭제는 관리자만 할 수 있어요. 완료 체크는 누구나 할 수 있어요.</div>');
+}
+
+/* ===================== 관리자 화면 ===================== */
+var ADM={tab:"users", users:[], logs:[], f:{who:"", act:"", from:"", to:""}, edit:null, confirm:null, err:"", logErr:""};
+var ADM_ACTS=[["","전체 동작"],["view","메뉴 열람"],["co_switch","법인 탭 전환"],["login","접속"],["export","내보내기"],["classify_edit","구분 수정"],
+  ["doc_write","자료 저장"],["doc_delete","자료 삭제"],["blocked_edit","차단된 수정"],["account","가입·승인·권한"]];
+var ADM_ACT_LABEL={view:"메뉴 열람", co_switch:"법인 탭 전환", login:"접속", export:"내보내기", classify_edit:"구분 수정", doc_write:"자료 저장", doc_delete:"자료 삭제",
+  blocked_edit:"차단된 수정", signup:"가입 신청", approve:"승인", reject:"거절·차단", status_change:"상태 변경", role_change:"역할 변경", perm_change:"메뉴·법인 변경",
+  privacy_agree:"서약 동의", profile_edit:"정보 수정"};
+var ADM_DOCK={m:"거래(CMS)", slip:"전표", ref:"보고서 참조", ar:"매출채권", cash:"현금출납", info:"법인 정보"};
+var CO_NAME={SN:"에스넷", GU:"굿어스", GD:"데이터", GS:"솔루션"};
+function admDateDefault(){ if(!ADM.f.to) ADM.f.to=todayISO(); if(!ADM.f.from) ADM.f.from=isoAdd(todayISO(),-6); }
+function renderAdmin(){
+  var host=$("#adminBody"); if(!host) return;
+  if(!ROLE.admin){ host.innerHTML='<div class="panel"><div class="empty"><b>권한이 없습니다</b>관리자만 볼 수 있는 화면이에요.</div></div>'; return; }
+  if(!SB || !AUTH.user){ host.innerHTML='<div class="panel"><div class="empty"><b>공용 저장소에 로그인했을 때만 쓸 수 있어요</b>사용자 권한·기록은 Supabase에 있습니다.</div></div>'; return; }
+  admDateDefault();
+  host.innerHTML='<div class="seg wrap" id="admSeg"><button type="button" data-t="users">사용자 권한</button><button type="button" data-t="logs">접속·변경 기록</button><button type="button" data-t="uploads">업로드 이력</button></div><div id="admMain"></div>';
+  $$("#admSeg button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.t===ADM.tab?"true":"false"); b.onclick=function(){ ADM.tab=b.dataset.t; renderAdmin(); }; });
+  if(ADM.tab==="users") admUsers();
+  else if(ADM.tab==="logs") admLogs();
+  else $("#admMain").innerHTML='<div class="panel"><header><h2>업로드 이력</h2><span class="sub">CMS · 전표 · 자금현황보고 · 매출채권</span></header><div class="empty"><b>다음 단계에서 열려요</b>3단계 SQL(업로드 회차)을 적용한 뒤 v85에서 회차·검산·되돌리기가 표시됩니다.</div></div>';
+}
+/* ---- 사용자 권한 ---- */
+function admUsers(){
+  var main=$("#admMain"); main.innerHTML='<div class="panel"><div class="empty">불러오는 중…</div></div>';
+  SB.from("user_profiles").select("*").order("created_at",{ascending:true}).then(function(r){
+    if(r.error){ main.innerHTML='<div class="panel"><div class="empty"><b>목록을 불러오지 못했습니다</b>'+esc(authErrText(r.error))+'</div></div>'; return; }
+    ADM.users=r.data||[]; admUsersDraw();
+  });
+}
+function admDot(cls, t){ return '<span class="adm-dot '+cls+'"><i></i>'+esc(t)+'</span>'; }
+function admUsersDraw(){
+  var main=$("#admMain"), L=ADM.users, me=AUTH.user&&AUTH.user.id;
+  var pend=L.filter(function(u){ return u.status==="pending"; });
+  var menuName=function(k){ return (TITLES[k]||k).replace(/ \(.*\)$/,""); };
+  var row=function(u){
+    var self=u.id===me, r=roleOf(u), st=u.status;
+    var stDot=st==="approved"?admDot("ok","승인됨"):st==="pending"?admDot("wait","대기"):admDot("off","차단");
+    var pl=r.admin?'<span class="mini">관리자 예외</span>':(u.privacy_agreed_at?admDot("ok","동의")+'<div class="mini">'+esc(String(u.privacy_agreed_at).slice(0,16).replace("T"," "))+'</div>':admDot("bad","미동의"));
+    var roleSel='<select class="adm-role" data-uid="'+esc(u.id)+'"'+(self?' disabled':'')+'>'+[["admin","관리자"],["member","팀원"],["viewer","보기 전용"]].map(function(o){
+      var cur=r.admin?"admin":(r.upload?"member":"viewer"); return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'; }).join("")+'</select>';
+    var menus=r.admin||!r.menus?'<span class="mini">전체</span>':r.menus.map(function(k){ return '<span class="chip nv">'+esc(menuName(k))+'</span>'; }).join(" ");
+    var cos=r.admin||!(u.companies&&u.companies.length)?'<span class="mini">4법인 전체</span>':u.companies.map(function(k){ var c=co(k); return '<span class="chip co" style="color:'+(c?c.color:"var(--muted)")+'">'+esc(k)+'</span>'; }).join(" ");
+    var cf=ADM.confirm&&ADM.confirm.id===u.id?ADM.confirm.st:null;
+    var b=function(stv,label,cls){ return '<button type="button" class="btn sm'+(cls?" "+cls:"")+'" data-ust="'+stv+'" data-uid="'+esc(u.id)+'">'+label+'</button>'; };
+    var act = self ? '<span class="mini">본인 계정은 바꿀 수 없어요</span>' :
+      (cf ? '<span class="mini">'+(cf==="rejected"?"차단할까요?":"진행할까요?")+'</span> '+b(cf+"!","확인","primary")+' <button type="button" class="btn sm" data-ucancel="1">취소</button>' :
+       (st==="pending" ? b("approved","승인","primary")+' '+b("rejected","거절") : st==="approved" ? b("rejected","차단") : b("approved","차단 해제")) +
+       ' <button type="button" class="btn sm" data-uedit="'+esc(u.id)+'">메뉴·법인</button>');
+    var h='<tr class="'+(st==="pending"?"adm-pend":"")+'"><td><b>'+esc(u.email||"")+'</b>'+(self?' <span class="chip in">나</span>':'')+'</td><td>'+esc(u.name||"-")+'</td><td>'+esc(u.dept||"-")+'</td><td>'+esc(u.title||"-")+'</td>'+
+      '<td>'+stDot+'</td><td>'+roleSel+'</td><td>'+pl+'</td><td class="adm-badges">'+menus+'</td><td class="adm-badges">'+cos+'</td><td class="act">'+act+'</td></tr>';
+    if(ADM.edit===u.id){
+      var mset=r.menus||[], cset=u.companies||[];
+      h+='<tr class="adm-edit"><td colspan="10"><div class="adm-edit-box"><div><b>볼 수 있는 메뉴</b> <span class="mini">아무것도 안 고르면 전체 · 대시보드는 항상 보임 · 설정은 관리자만</span><div class="adm-checks">'+
+        VIEWS.filter(function(k){ return k!=="dash" && ADMIN_MENUS.indexOf(k)<0; }).map(function(k){ return '<label><input type="checkbox" data-em="'+k+'"'+(mset.indexOf(k)>=0?' checked':'')+'> '+esc(menuName(k))+'</label>'; }).join("")+'</div></div>'+
+        '<div><b>볼 수 있는 법인</b> <span class="mini">아무것도 안 고르면 4법인 전체 · DB에서도 막혀요</span><div class="adm-checks">'+
+        ["SN","GU","GD","GS"].map(function(k){ return '<label><input type="checkbox" data-ec="'+k+'"'+(cset.indexOf(k)>=0?' checked':'')+'> '+esc(k)+' '+esc((co(k)||{}).name||CO_NAME[k]||"")+'</label>'; }).join("")+'</div></div>'+
+        '<div class="adm-edit-act"><button type="button" class="btn sm primary" data-esave="'+esc(u.id)+'">저장</button> <button type="button" class="btn sm" data-ecancel="1">닫기</button></div></div></td></tr>';
+    }
+    return h;
+  };
+  main.innerHTML=(ADM.err?'<div class="banner bad">'+esc(ADM.err)+'</div>':'')+
+    '<div class="panel"><header><h2>사용자 권한</h2><span class="sub">전체 '+L.length+'명 · 처리할 신청 <b'+(pend.length?' style="color:var(--warn)"':'')+'>'+pend.length+'건</b></span><div class="sp"><button type="button" class="btn sm" id="admReload2">새로고침</button></div></header>'+
+    '<div class="scroll"><table class="tbl adm-tbl"><thead><tr><th>이메일</th><th>이름</th><th>부서</th><th>직급</th><th>상태</th><th>역할</th><th>정보보호 서약</th><th>볼 수 있는 메뉴</th><th>법인</th><th>변경</th></tr></thead><tbody>'+
+    (L.length?L.map(row).join(""):'<tr><td colspan="10" class="empty">가입한 사용자가 없습니다</td></tr>')+'</tbody></table></div>'+
+    '<div class="adm-note">역할 — <b>관리자</b>: 전부 · <b>팀원</b>: 조회 + 데이터 업로드 + 구분 수정·업무캘린더 체크·회수계획 메모 · <b>보기 전용</b>: 조회만.<br>'+
+    '차단하면 로그인은 되지만 데이터를 볼 수 없어요. 서약하지 않은 계정도 데이터를 볼 수 없어요(관리자 제외). 마지막 남은 관리자는 강등·차단할 수 없어요. 계정 자체 삭제는 Supabase → Authentication → Users에서 해요.</div></div>';
+  $("#admReload2").onclick=function(){ ADM.err=""; admUsers(); };
+  var upd=function(id, patch, msg){
+    ADM.err="";
+    return SB.from("user_profiles").update(patch).eq("id",id).select("*").then(function(r){
+      if(r.error) throw r.error;
+      if(!r.data||!r.data.length) throw new Error("바뀐 행이 없습니다 — 관리자 권한을 확인하세요");
+      toast(msg); adminPendingCount();
+    }).catch(function(e){ ADM.err="변경하지 못했어요: "+authErrText(e); }).then(admUsers);
+  };
+  $$("#admMain [data-ust]").forEach(function(b){ b.onclick=function(){
+    var v=b.dataset.ust, id=b.dataset.uid;
+    if(v.slice(-1)==="!"){ ADM.confirm=null; upd(id,{status:v.slice(0,-1)}, v.indexOf("approved")===0?"승인했어요":"차단했어요"); return; }
+    if(v==="approved"){ upd(id,{status:"approved"},"승인했어요"); return; }
+    ADM.confirm={id:id, st:v}; admUsersDraw(); }; });
+  $$("#admMain [data-ucancel]").forEach(function(b){ b.onclick=function(){ ADM.confirm=null; admUsersDraw(); }; });
+  $$("#admMain .adm-role").forEach(function(s){ s.onchange=function(){
+    var v=s.value, patch=v==="admin"?{is_admin:true, can_upload:true}:v==="member"?{is_admin:false, can_upload:true}:{is_admin:false, can_upload:false};
+    upd(s.dataset.uid, patch, "역할을 '"+(v==="admin"?"관리자":v==="member"?"팀원":"보기 전용")+"'(으)로 바꿨어요"); }; });
+  $$("#admMain [data-uedit]").forEach(function(b){ b.onclick=function(){ ADM.edit=ADM.edit===b.dataset.uedit?null:b.dataset.uedit; admUsersDraw(); }; });
+  $$("#admMain [data-ecancel]").forEach(function(b){ b.onclick=function(){ ADM.edit=null; admUsersDraw(); }; });
+  $$("#admMain [data-esave]").forEach(function(b){ b.onclick=function(){
+    var ms=$$("#admMain [data-em]").filter(function(x){ return x.checked; }).map(function(x){ return x.dataset.em; });
+    var cs=$$("#admMain [data-ec]").filter(function(x){ return x.checked; }).map(function(x){ return x.dataset.ec; });
+    ADM.edit=null; upd(b.dataset.esave, {menus:ms.length?ms:null, companies:cs.length?cs:null}, "볼 수 있는 메뉴·법인을 저장했어요"); }; });
+}
+/* ---- 접속·변경 기록 ---- */
+function admLogs(){
+  var main=$("#admMain"), f=ADM.f;
+  var who='<select id="admWho"><option value="">전체 사람</option>'+ADM.users.map(function(u){ return '<option value="'+esc(u.id)+'"'+(f.who===u.id?' selected':'')+'>'+esc((u.name||"")+" "+(u.email||""))+'</option>'; }).join("")+'</select>';
+  var act='<select id="admAct">'+ADM_ACTS.map(function(a){ return '<option value="'+a[0]+'"'+(f.act===a[0]?' selected':'')+'>'+a[1]+'</option>'; }).join("")+'</select>';
+  main.innerHTML='<div class="panel"><header><h2>접속·변경 기록</h2><span class="sub" id="admLogSub">불러오는 중…</span></header>'+
+    '<div class="pad toolbar adm-filter">'+who+act+'<label class="mini">기간 <input type="date" id="admFrom" value="'+esc(f.from)+'"> ~ <input type="date" id="admTo" value="'+esc(f.to)+'"></label><button type="button" class="btn sm primary" id="admLogGo">조회</button></div>'+
+    '<div class="scroll" style="max-height:66vh"><table class="tbl adm-log" id="admLogTbl"></table></div>'+
+    '<div class="adm-note">기록은 누구도(관리자 포함) 고치거나 지울 수 없어요. 같은 사람이 같은 날 같은 메뉴를 여러 번 연 것은 한 줄로 접고 <span class="chip nv">×n</span>으로 표시해요(원래 기록은 모두 남아 있어요). 자료 저장·삭제·권한 변경은 DB가 직접 남겨요.'+
+    (AUDIT.fail?'<br><b style="color:var(--out)">이 브라우저에서 기록 남기기 실패 '+AUDIT.fail+'건</b> — '+esc(AUDIT.last||""):'')+'</div></div>';
+  var go=function(){ f.who=$("#admWho").value; f.act=$("#admAct").value; f.from=$("#admFrom").value||isoAdd(todayISO(),-6); f.to=$("#admTo").value||todayISO(); admLogsLoad(); };
+  $("#admLogGo").onclick=go; ["admWho","admAct","admFrom","admTo"].forEach(function(id){ $("#"+id).onchange=go; });
+  if(!ADM.users.length){ SB.from("user_profiles").select("*").then(function(r){ if(!r.error){ ADM.users=r.data||[]; } admLogs(); }); return; }
+  admLogsLoad();
+}
+function admLogsLoad(){
+  var f=ADM.f, q=SB.from("audit_log").select("*").gte("ts", f.from+"T00:00:00+09:00").lte("ts", f.to+"T23:59:59.999+09:00").order("ts",{ascending:false}).order("id",{ascending:false}).limit(3000);
+  if(f.who) q=q.eq("user_id", f.who);
+  if(f.act==="account") q=q.in("action",["signup","approve","reject","status_change","role_change","perm_change","privacy_agree","profile_edit"]);
+  else if(f.act) q=q.eq("action", f.act);
+  q.then(function(r){
+    if(r.error){
+      var miss=/relation|does not exist|schema cache|audit_log/i.test(r.error.message||"");
+      $("#admLogSub").textContent=""; $("#admLogTbl").innerHTML='<tbody><tr><td class="empty">'+(miss?'<b>DB 준비 필요</b>2단계 SQL(02_기록.sql)을 실행하면 기록이 쌓여요.':'<b>불러오지 못했습니다</b>'+esc(authErrText(r.error)))+'</td></tr></tbody>'; return; }
+    ADM.logs=r.data||[]; admLogsDraw();
+  });
+}
+function admFold(L){
+  /* 열람·법인 탭 전환·접속: 같은 사람·같은 동작·같은 메뉴·같은 날이면 사이에 다른 동작이 있어도 한 줄(맨 최근 시각)로 접는다.
+     자료 저장: 같은 문서를 연달아 저장한 것만 접는다(바뀐 날짜는 합친다). 나머지는 한 건씩. */
+  var out=[], idx={};
+  var day=function(ts){ var d=new Date(new Date(ts).getTime()+9*3600000); return d.toISOString().slice(0,10); };
+  L.forEach(function(x){
+    var d=x.detail||{};
+    if(/^(view|co_switch|login)$/.test(x.action)){
+      var k=[x.user_id,x.action,x.menu||"",x.co||"",day(x.ts)].join("|");
+      if(idx[k]){ idx[k].n++; idx[k].first=x.ts; return; }
+      var g={k:k, x:x, n:1, first:x.ts, days:[]}; idx[k]=g; out.push(g); return;
+    }
+    var k2=[x.user_id,x.action,x.target||""].join("|"), last=out[out.length-1];
+    if(x.action==="doc_write" && last && last.k===k2){ last.n++; last.first=x.ts; (d.days||[]).forEach(function(z){ if(last.days.indexOf(z)<0) last.days.push(z); }); return; }
+    out.push({k:k2, x:x, n:1, first:x.ts, days:(d.days||[]).slice()});
+  });
+  return out;
+}
+function admPathText(p){
+  var s=String(p||"").split("/");
+  if(s[0]==="co"){ var kind=ADM_DOCK[s[2]]||s[2]; return (CO_NAME[s[1]]||s[1])+" · "+kind+(s[3]&&s[3]!=="main"?" ("+s[3]+")":""); }
+  return ({"app/meta":"공용 설정","app/rules":"분류 규칙","app/contacts":"금융기관 연락처","app/holidays":"법정공휴일","app/workcal":"업무캘린더","app/fep/rows":"자금집행계획서 행"})[p]||p;
+}
+function admContent(g){
+  var x=g.x, d=x.detail||{};
+  var ba=function(o){ return Object.keys(o||{}).map(function(k){ var v=o[k]; if(Array.isArray(v)) v=v.join("·"); if(v===null||v===undefined||v==="") v="-"; if(v===true) v="예"; if(v===false) v="아니오"; return esc(({status:"상태",is_admin:"관리자",can_upload:"업로드",menus:"메뉴",companies:"법인",name:"이름",dept:"부서",title:"직급"})[k]||k)+" "+esc(({approved:"승인됨",pending:"대기",rejected:"차단"})[v]||v); }).join(", "); };
+  switch(x.action){
+    case "view": return g.n>1?'<span class="mini">처음 '+esc(admTime(g.first))+' · 마지막 '+esc(admTime(x.ts))+'</span>':'';
+    case "co_switch": return esc(x.co?((co(x.co)||{}).name||x.co):"그룹 통합");
+    case "login": return g.n>1?'<span class="mini">처음 '+esc(admTime(g.first))+'</span>':'';
+    case "export": return esc(x.target||"");
+    case "classify_edit":
+      if(Array.isArray(d.groups)) return '<b>추정 정리 일괄 확정</b> <span class="mini">'+esc(d.groups.length+"개 거래처 · "+d.n+"건")+'</span><div class="mini">'+d.groups.slice(0,8).map(function(q){ return esc(q.name+" "+q.before+" → "+q.after+" ("+q.n+"건)"); }).join("<br>")+(d.groups.length>8?"<br>외 "+(d.groups.length-8)+"개":"")+'</div>';
+      if(d.before===undefined && d.after===undefined) return '<b>'+esc(d.how||"구분 확정")+'</b> <span class="mini">'+esc([d.n!=null?d.n+"건":"", d.date].filter(Boolean).join(" · "))+'</span>';
+      return '<b>'+esc(d.before||"-")+' → '+esc(d.after||"-")+'</b> <span class="mini">'+esc([d.date, d.acct, (d.ccy&&d.ccy!=="KRW"?d.ccy+" "+d.amount:fmt(d.amount)+"원"), d.memo, d.how].filter(Boolean).join(" · "))+'</span>';
+    case "doc_write": var ds=g.days.filter(function(z){ return z.charAt(0)!=="-"; }).sort(); var ks=(d.keys||[]);
+      return esc(admPathText(x.target))+(ds.length?' <span class="mini">'+esc(ds[0].slice(5)+(ds.length>1?" ~ "+ds[ds.length-1].slice(5)+" · "+ds.length+"일":""))+'</span>':'')+(ks.length?' <span class="mini">'+esc(ks.slice(0,6).join(", ")+(ks.length>6?" 외 "+(ks.length-6):""))+'</span>':'');
+    case "doc_delete": return esc(admPathText(x.target));
+    case "blocked_edit": return '<span style="color:var(--out)">관리자 전용 항목 되돌림</span> · '+esc(admPathText(x.target))+(d.keys?' <span class="mini">'+esc((d.keys||[]).join(", "))+'</span>':'');
+    case "signup": return esc(x.target||"")+' <span class="mini">'+esc([d.name,d.dept,d.title].filter(Boolean).join(" · "))+'</span>';
+    case "privacy_agree": return esc(x.target||"");
+    default: return esc(x.target||"")+(d.before||d.after?' <span class="mini">'+ba(d.before)+' → '+ba(d.after)+'</span>':'');
+  }
+}
+function admTime(ts){ return new Date(ts).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Seoul"}); }
+function admLogsDraw(){
+  var G=admFold(ADM.logs), deptOf={}; ADM.users.forEach(function(u){ deptOf[u.id]=u; });
+  $("#admLogSub").textContent=ADM.f.from+" ~ "+ADM.f.to+" · 기록 "+ADM.logs.length+"건"+(ADM.logs.length>=3000?"(최근 3,000건까지)":"")+" · 화면 "+G.length+"줄";
+  var t=function(s){ return String(s||"").replace("T"," ").slice(0,16); };
+  $("#admLogTbl").innerHTML='<thead><tr><th>일시</th><th>이름</th><th>부서</th><th>동작</th><th>메뉴</th><th>내용</th></tr></thead><tbody>'+
+    (G.length?G.map(function(g){ var x=g.x, u=deptOf[x.user_id]||{};
+      var when=new Date(x.ts), whenTxt=when.toLocaleString("ko-KR",{year:"2-digit",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Seoul"});
+      return '<tr><td class="mini" style="white-space:nowrap" title="'+esc(g.n>1?"처음 "+new Date(g.first).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"}):"")+'">'+esc(whenTxt)+'</td>'+
+        '<td style="white-space:nowrap">'+esc(x.name||u.name||x.email||(x.user_id?"":"시스템(SQL)"))+(x.is_admin?' <span class="chip in adm-ad">관리자</span>':'')+'</td>'+
+        '<td class="mini" style="white-space:nowrap">'+esc(u.dept||"")+'</td><td style="white-space:nowrap">'+esc(ADM_ACT_LABEL[x.action]||x.action)+(g.n>1?' <span class="chip nv">×'+g.n+'</span>':'')+'</td>'+
+        '<td class="mini">'+esc(x.menu?(TITLES[x.menu]||x.menu):"")+'</td><td>'+admContent(g)+'</td></tr>'; }).join("")
+     :'<tr><td colspan="6" class="empty">이 기간에 기록이 없어요</td></tr>')+'</tbody>';
+}
+
+/* ---- 팀원 화면 잠금(계속): 자금일보 수기 입력 · 분류 규칙 ---- */
+function lockIlboUi(){
+  if(ROLE.admin) return;
+  $$("#ilboBody .ilboFx, #ilboBody .ilboOra").forEach(function(el){ el.disabled=true; el.title="관리자만 입력할 수 있습니다"; });
+  $$("#ilboBody .ilboTxt").forEach(function(el){ el.setAttribute("contenteditable","false"); el.title="내역 문구 수정은 관리자만 할 수 있습니다"; });
+  if(readOnly) $$("#ilboBody .catsel, #ilboBody .ilboPlanCat, #ilboBody .ilboMergeCat, #ilboBody .slipcatrevert").forEach(function(el){ el.disabled=true; });
+}
+function lockRulesUi(){
+  if(ROLE.admin) return;
+  $$("#ruleTbl input, #ruleTbl select, #ruleTbl button").forEach(function(el){ el.disabled=true; });
+  ["btnAddRule","btnResetRules"].forEach(function(id){ var b=$("#"+id); if(b){ b.disabled=true; b.title="분류 규칙은 관리자만 바꿀 수 있습니다"; } });
+}
+/* 화면 그리기 뒤에 잠금 적용(그 화면이 스스로 다시 그려도 다시 잠근다) */
+(function(){
+  var wrap=function(f, after){ return function(){ var r=f.apply(this, arguments); try{ after(); }catch(e){} return r; }; };
+  renderFin=wrap(renderFin, lockFinUi); renderCal=wrap(renderCal, lockCalUi); renderIlbo=wrap(renderIlbo, lockIlboUi); renderRules=wrap(renderRules, lockRulesUi);
+  var watch=function(sel, fn){ var el=$(sel); if(!el || !window.MutationObserver) return; var busy=false;
+    new MutationObserver(function(){ if(busy || ROLE.admin || !AUTH.entered) return; busy=true; try{ fn(); }catch(e){} busy=false; }).observe(el, {childList:true, subtree:true}); };
+  watch("#finBody", lockFinUi); watch("#calBody", lockCalUi);
+  /* 추정 정리 일괄 확정 = 구분 수정 → 한 줄로 기록 */
+  var _aa=applyAuto;
+  applyAuto=function(groups, catOf){
+    if(readOnly){ toast("보기 전용입니다 — 구분을 바꿀 수 없습니다."); return {n:0, v:0}; }
+    var plan=(groups||[]).map(function(g){ return {name:String(g.name||"").slice(0,30), before:g.cat, after:catOf?catOf(g):g.cat, n:g.n, co:g.items&&g.items[0]&&g.items[0].c.id}; });
+    var r=_aa.apply(this, arguments);
+    if(plan.length){ var cs=plan.map(function(q){ return q.co; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; });
+      audit("classify_edit", {co:cs.length===1?cs[0]:null, target:"추정 정리", detail:{how:"추정 정리 일괄 확정", n:r.n, groups:plan.slice(0,60).map(function(q){ return {name:q.name, before:q.before, after:q.after, n:q.n}; })}}); }
+    return r;
+  };
+})();
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
+  ROLE=AUTH.profile?roleOf(AUTH.profile):{admin:true, upload:true, menus:null, cos:null}; applyRoleUi();   // [v84] 역할별 메뉴(로그인 없는 이 브라우저 저장 모드는 제한 없음)
   renderAccess(); setView("dash"); resetIdle();
   var ab=$("#btnAdminUsers"); ab.hidden=!AUTH.isAdmin;
   if(AUTH.isAdmin){ adminPendingCount(); watchAdminProfiles(); }
+  audit("login", {menu:null});   // [v84] 접속 기록
 }
 function showLock(which){
   $("#lock").hidden=false;
-  ["lockAuth","lockPending","lockLoad","lockMigrate"].forEach(function(k){ var e=$("#"+k); if(e) e.hidden=(k!==which); });
+  ["lockAuth","lockPending","lockPledge","lockLoad","lockMigrate"].forEach(function(k){ var e=$("#"+k); if(e) e.hidden=(k!==which); });
+  var lb=$("#lock .lockbox"); if(lb) lb.classList.toggle("wide", which==="lockPledge");
 }
 /* [v30] 부팅: 저장된 로그인 세션 확인 → 없으면 로그인 화면 */
 function boot(){
@@ -8172,7 +8567,8 @@ function loadData(){
     DB=db; if(!DB) throw new Error("저장소에 연결할 수 없습니다");
     dbReady=true; localMode=false;
     return dbLoad().then(function(loaded){
-      if(loaded){ D=loaded; migrate(); lastDocs={}; buildAll(); watchRemote(); enter(); return; }
+      if(loaded){ D=loaded; migrate(); restrictCos(); lastDocs={}; buildAll(); watchRemote(); enter(); return; }   // [v84] 법인 제한
+      if(!AUTH.isAdmin) throw new Error("읽을 수 있는 자료가 없습니다 — 관리자에게 서약·법인 권한 확인을 요청하세요");   // [v84] 팀원은 빈 저장소를 새로 만들지 않음
       return (AUTH.isAdmin ? idbGet("main").catch(function(){ return null; }) : Promise.resolve(null)).then(function(rec){
         if(rec&&rec.ct){ showLock("lockMigrate"); $("#pwMig").focus(); return; }
         D=blankDB(); lastDocs={};
@@ -8253,10 +8649,13 @@ $("#reloadChip").onclick=function(){ location.reload(); };
 /* [v30] 인증 화면 이벤트 */
 $$("#authTabs button").forEach(function(b){ b.onclick=function(){ showAuth(b.dataset.t); }; });
 $("#btnAuth").onclick=function(){ return AUTH.mode==="signup" ? authSignUp() : authLogin(); };
-["authEmail","authPw","authPw2"].forEach(function(id){ $("#"+id).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#btnAuth").click(); }); });
+["authEmail","authPw","authPw2","authName","authDept","authTitle"].forEach(function(id){ $("#"+id).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#btnAuth").click(); }); });
 $("#btnPendingOut").onclick=function(){ authLogout(); };
 $("#btnPendingRecheck").onclick=function(){ $("#pendingNote").textContent="확인 중…"; if(AUTH.user) authAfterLogin(AUTH.user); };
-$("#btnAdminUsers").onclick=function(){ renderAdminUsers(); };
+$("#btnAdminUsers").onclick=function(){ ADM.tab="users"; setView("admin"); };   // [v84] 관리자 화면으로(이전 팝업 renderAdminUsers는 남겨 둠)
+$("#btnPledge").onclick=function(){ pledgeAgree(); };
+$("#pledgeChk").onchange=function(){ $("#btnPledge").disabled=!this.checked; };
+$("#btnPledgeOut").onclick=function(){ authLogout(); };
 (function(){ try{ var n=sessionStorage.getItem("snetAuthNote"); if(n!=null){ sessionStorage.removeItem("snetAuthNote"); AUTH.bootNote=n||"로그아웃되었습니다."; } }catch(e){} })();
 
 $("#btnLock").onclick=lock;
@@ -8574,6 +8973,7 @@ $("#idleMin").onchange=function(){ D.settings.idleMin=Math.max(1,Math.min(120,+$
 $("#btnLedgerXlsx").onclick=exportLedger;
 $("#btnAutoFix").onclick=openAutoFix;
 $("#btnConfirmAll").onclick=function(){
+  if(readOnly){ toast("보기 전용입니다 — 구분을 바꿀 수 없습니다."); return; }   // [v84]
   var ds=allDates().filter(function(d){ return (!ldRange.from||d>=ldRange.from)&&(!ldRange.to||d<=ldRange.to); });
   var n=0;
   scopeCos().forEach(function(c){ ds.forEach(function(d){
@@ -8582,6 +8982,7 @@ $("#btnConfirmAll").onclick=function(){
       var vk=normalize(t.client); if(vk) c.vendorMap[vk]=t.cat; } });
   }); });
   if(!n){ toast("확정할 추정 건이 없습니다."); return; }
+  audit("classify_edit", {target:"기간 내 일괄 확정", detail:{how:"기간 내 일괄 확정(추정 → 지금 구분 그대로 확정)", n:n, date:(ldRange.from||"")+" ~ "+(ldRange.to||"")}});   // [v84]
   invalidate(); save().then(function(){ toast(n+"건을 현재 구분으로 확정했습니다."); render(); });
 };
 $("#btnMonthXlsx").onclick=exportPeriod;
@@ -8650,8 +9051,9 @@ document.addEventListener("keydown",function(e){
   var tag=(e.target.tagName||"").toLowerCase();
   if(tag==="input"||tag==="select"||tag==="textarea") return;
   var ki="1234567890".indexOf(e.key);                        // [v26] 메뉴 순서와 번호 일치
-  if(ki>=0 && VIEWS[ki]){ e.preventDefault(); setView(VIEWS[ki]); }
+  if(ki>=0 && VIEWS[ki] && canView(VIEWS[ki])){ e.preventDefault(); setView(VIEWS[ki]); }
   if(e.key==="c"||e.key==="C"){ e.preventDefault(); setView("cal"); }   // [v75] 업무캘린더
+  if((e.key==="a"||e.key==="A") && ROLE.admin){ e.preventDefault(); setView("admin"); }   // [v84] 관리자
   if(view==="cal" && (e.key==="ArrowLeft"||e.key==="ArrowRight")){ e.preventDefault(); wcStep(e.key==="ArrowLeft"?-1:1); renderCal(); }   // [v78]
   if(view==="cal" && (e.key==="t"||e.key==="T")){ e.preventDefault(); WC.mode="week"; WC.wk=wcMon(todayISO()); WC.ym=todayISO().slice(0,7); renderCal(); }
   if(e.key==="l"||e.key==="L") lock();
@@ -10125,7 +10527,10 @@ function renderIlbo(){
   bindCatCells();
   $$(".ilboPlanCat").forEach(function(sel){ sel.onchange=function(){
     var sl=c.slips[iso]; if(!sl) return;
-    sl.lines.forEach(function(L){ if(L.voucher===sel.dataset.v && String(L.line)===sel.dataset.l && (L.kind==="out"||L.kind==="in")){ L.cat=sel.value; L.auto=false; L.userSet=true; } });
+    if(readOnly){ toast("보기 전용입니다 — 구분을 바꿀 수 없습니다."); renderIlbo(); return; }   // [v84]
+    sl.lines.forEach(function(L){ if(L.voucher===sel.dataset.v && String(L.line)===sel.dataset.l && (L.kind==="out"||L.kind==="in")){
+      auditCat(c, iso, {amount:L.amt!=null?L.amt:L.amount, acct:L.acct, summary:L.rawMemo||L.memo, ccy:L.ccy}, L.cat, sel.value, "자금일보 당일 계획(전표 "+L.voucher+")");
+      L.cat=sel.value; L.auto=false; L.userSet=true; } });
     applySlipToCms(c, iso); invalidate(); save().then(function(){ toast("당일 계획 구분 변경 · 자금수지 반영"); renderIlbo(); });
   }; });
   /* [v55] 2p 전표 행: 문구 수정(textManual) · 펼침 · 합친 입금 구분 일괄 변경 */
@@ -10138,6 +10543,9 @@ function renderIlbo(){
   });
   $$(".ilboExp").forEach(function(b){ b.onclick=function(){ var mm=b.nextElementSibling; if(!mm) return; mm.hidden=!mm.hidden; b.textContent=(mm.hidden?"▸ ":"▾ ")+b.textContent.replace(/^[▸▾]\s*/,""); }; });
   $$(".ilboMergeCat").forEach(function(sel){ sel.onchange=function(){ var ts=txnsOf(c, sel.dataset.d);
+    if(readOnly){ toast("보기 전용입니다 — 구분을 바꿀 수 없습니다."); renderIlbo(); return; }   // [v84]
+    (function(){ var ix=sel.dataset.is.split(","), t0=ts[+ix[0]]||{}, sum=0; ix.forEach(function(i){ var t=ts[+i]; if(t) sum+=(+t.deposit||0)+(+t.withdraw||0); });
+      auditCat(c, sel.dataset.d, {amount:sum, acct:t0.acct, summary:t0.client||t0.summary}, t0.cat, sel.value, "자금일보 합친 입금 "+ix.length+"건"); })();
     sel.dataset.is.split(",").forEach(function(i){ var t=ts[+i]; if(t){ t.cat=sel.value; t.auto=false; t.catManual=true; var vk=normalize(t.client); if(vk) c.vendorMap[vk]=sel.value; } });
     invalidate(); save().then(function(){ toast("구분 변경 · "+sel.dataset.is.split(",").length+"건"); renderIlbo(); }); }; });
   $$(".ilboFx").forEach(function(inp){ inp.onchange=function(){
