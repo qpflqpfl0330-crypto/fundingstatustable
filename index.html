@@ -538,6 +538,53 @@ tr.adm-pend td{background:var(--move-soft)}
 .pl-chk input{margin-top:3px}
 body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:none;opacity:.45}
 @media(max-width:560px){.adm-badges{max-width:none}.adm-filter>*{flex:1 1 100%}}
+
+/* [v85] 매출채권 — 수금규칙·예상입금일·주간 입금 예정 */
+.ar-rulemeta{border-top:1px solid var(--rule);color:var(--muted)}
+.ar-rulemeta b{color:var(--ink-2)}
+.chip.ar-g{font-size:10px;padding:1px 7px;color:var(--ink-2);border-color:var(--rule-strong);background:var(--surface)}
+.chip.ar-g-a{color:var(--navy);border-color:var(--navy);background:var(--navy-soft)}
+.chip.ar-g-b{color:var(--navy);border-color:var(--rule-strong)}
+.chip.ar-g-c,.chip.ar-g-d,.chip.ar-g-n{color:var(--muted)}
+.chip.ar-g-rel{color:var(--move);border-color:var(--move);background:var(--move-soft)}
+.ar-exp{font-variant-numeric:tabular-nums;white-space:nowrap}
+.ar-exp.od{color:var(--out);font-weight:600}
+.chip.ar-od{color:var(--out);background:var(--out-soft);font-size:10px;padding:1px 6px}
+td.ar-expc{white-space:nowrap}
+.ar-week{min-width:880px}
+.ar-week td.ar-wco{white-space:nowrap}
+#arKpis.ar-kpis{grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}
+.kpi.ar-odk .v{color:var(--out)}
+.kpi.ar-odk .dx-bar i{background:var(--out)}
+@media(max-width:560px){#arKpis.ar-kpis{grid-template-columns:1fr 1fr}#arKpis .kpi .v{font-size:16px}}
+.ar-week th{vertical-align:bottom;white-space:nowrap}
+.ar-week th .mini{font-weight:400}
+.ar-week td[data-wk]{cursor:pointer}
+.ar-week td[data-wk]:hover{background:var(--navy-soft)}
+.ar-week td.on{background:var(--navy-soft);box-shadow:inset 0 0 0 1.5px var(--navy)}
+.ar-week .ar-odh,.ar-week td.ar-odv{color:var(--out)}
+.ar-week .zero{color:var(--muted)}
+.ar-wbar td{padding-top:6px;padding-bottom:2px;border-bottom:0}
+.ar-vbar{height:46px;display:flex;align-items:flex-end;justify-content:flex-end}
+.ar-vbar i{display:block;width:18px;background:var(--navy);border-radius:4px 4px 0 0;min-height:1px}
+.ar-wcnt td{border-top:0;color:var(--muted)}
+td.ar-odv{color:var(--out)}
+.ar-prow{cursor:pointer}
+.ar-prow:hover td{background:var(--surface-2)}
+.ar-prow .tw{display:inline-block;width:14px;color:var(--muted)}
+.ar-psub td{background:var(--surface-2);font-size:12px}
+td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#arViewSeg{margin-right:4px}
+.dx-ar{display:grid;grid-template-columns:minmax(220px,1fr) 2fr;gap:0}
+.dx-ar-k{display:flex;flex-direction:column;border-right:1px solid var(--rule)}
+.dx-ar-k>div{padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dx-ar-k>div:last-child{border-bottom:0}
+.dx-ar-k .lbl{width:78px;color:var(--muted);font-size:12px}
+.dx-ar-k b{font-size:20px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.dx-ar-k .odk b{color:var(--out)}
+.dx-ar-t td,.dx-ar-t th{padding-top:7px;padding-bottom:7px}
+.ilbo-ar .ar-memo{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:760px){.dx-ar{grid-template-columns:1fr}.dx-ar-k{border-right:0;border-bottom:1px solid var(--rule)}}
 .linkbtn{background:none;border:0;padding:6px 0;margin-top:6px;color:var(--navy);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer}
 </style>
 
@@ -602,7 +649,7 @@ body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:non
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v84.1 · 2026-10-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v85 · 2026-10-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -661,6 +708,7 @@ body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:non
           <div id="chartMix"></div>
         </div>
       </div>
+      <div class="panel" id="dxAr" hidden></div>   <!-- [v85] 매출채권 입금 예정 -->
       <div class="panel">
         <header><h2>오늘의 할일</h2><span class="sub" id="todoSub"></span><div class="sp"><button class="btn sm" id="todoOpen">업무캘린더</button></div></header>   <!-- [v79] 최근 일자별 요약 대신 -->
         <div class="scroll" style="max-height:360px"><div id="todoBody" class="wb-todo-wrap"></div></div>
@@ -736,15 +784,25 @@ body.role-viewer #ilboDropCms, body.role-viewer #ilboDropSlip{pointer-events:non
     <!-- [v26] 매출채권관리 -->
     <section class="view" id="v-ar" hidden>
       <div class="panel">
-        <header><h2>매출채권관리</h2><span class="sub" id="arSub">건별반제정리현황(외상매출금·외화외상매출금·미수금) 업로드</span>
-          <div class="sp"><button class="btn sm" id="btnArUpload">건별반제정리현황 올리기</button><button class="btn sm" id="btnArXlsx">엑셀 내보내기</button></div>
+        <header><h2>매출채권관리</h2><span class="sub" id="arSub">건별반제정리현황(외상매출금·외화외상매출금) 업로드</span>
+          <div class="sp"><button class="btn sm" id="btnArUpload">건별반제정리현황 올리기</button><button class="btn sm" id="btnArRules" title="매출처별 수금(입금) 규칙 정리 문서(.md)">수금규칙 올리기</button><button class="btn sm" id="btnArXlsx">엑셀 내보내기</button></div>
         </header>
         <input type="file" id="arIn" accept=".xls,.xlsx" multiple hidden>
+        <input type="file" id="arRuleIn" accept=".md,.txt,text/markdown" hidden>
         <div class="pad"><div class="kpis ar-kpis" id="arKpis"></div></div>
+        <div class="pad mini ar-rulemeta" id="arRuleMeta"></div>
+      </div>
+      <div class="panel">   <!-- [v85] 주간 입금 예정 -->
+        <header><h2>주간 입금 예정</h2><span class="sub" id="arWeekSub"></span></header>
+        <div class="scroll" id="arWeek"></div>
+        <div class="pad mini" id="arWeekFoot"></div>
+      </div>
+      <div class="panel">
         <div class="pad toolbar">
-          <div class="seg" id="arSeg"><button data-f="all" aria-pressed="true">전체 채권</button><button data-f="long">장기채권만 보기 (60일 초과)</button><button data-f="samsung">삼성 채권만 모아보기</button></div>
-          <select id="arKind"><option value="">전체 계정</option><option>외상매출금</option><option>외화외상매출금</option><option>미수금</option></select>
-          <input type="search" id="arQ" placeholder="거래처명 검색" style="flex:1;min-width:150px">
+          <div class="seg wrap" id="arViewSeg"><button data-v="item" aria-pressed="true">건별</button><button data-v="party">매출처별</button></div>
+          <div class="seg wrap" id="arSeg"><button data-f="all" aria-pressed="true">전체 채권</button><button data-f="od">예상일 경과</button><button data-f="long">장기 (60일 초과)</button><button data-f="samsung">삼성</button></div>
+          <select id="arKind"><option value="">전체 계정</option><option>외상매출금</option><option>외화외상매출금</option></select>
+          <input type="search" id="arQ" placeholder="거래처명·사업자번호 검색" style="flex:1;min-width:150px">
         </div>
         <div class="scroll" style="max-height:62vh"><table class="tbl" id="arTbl"></table></div>
         <div class="pad mini" id="arFoot"></div>
@@ -8401,7 +8459,7 @@ function lockFinUi(){
   });
 }
 function lockCalUi(){
-  if(ROLE.admin) return;
+  if(ROLE.admin || ROLE.upload) return;   // [v85] 팀원도 반복 업무 추가·수정·삭제(사용자 결정 2026-10-20) — 보기 전용만 잠금
   var a=$("#wcAdd"); if(a) a.hidden=true;
   $$("#wcItemTbl input, #wcItemTbl select, #wcItemTbl textarea").forEach(function(el){ el.disabled=true; });
   $$("#wcItemTbl [data-wdel]").forEach(function(b){ b.hidden=true; });
@@ -8414,7 +8472,7 @@ var ADM_ACTS=[["","전체 동작"],["view","메뉴 열람"],["co_switch","법인
   ["doc_write","자료 저장"],["doc_delete","자료 삭제"],["blocked_edit","차단된 수정"],["account","가입·승인·권한"]];
 var ADM_ACT_LABEL={view:"메뉴 열람", co_switch:"법인 탭 전환", login:"접속", export:"내보내기", classify_edit:"구분 수정", doc_write:"자료 저장", doc_delete:"자료 삭제",
   blocked_edit:"차단된 수정", signup:"가입 신청", approve:"승인", reject:"거절·차단", status_change:"상태 변경", role_change:"역할 변경", perm_change:"메뉴·법인 변경",
-  privacy_agree:"서약 동의", profile_edit:"정보 수정", password_change:"비밀번호 변경"};
+  privacy_agree:"서약 동의", profile_edit:"정보 수정", password_change:"비밀번호 변경", ar_rules:"수금규칙 올림"};
 var ADM_DOCK={m:"거래(CMS)", slip:"전표", ref:"보고서 참조", ar:"매출채권", cash:"현금출납", info:"법인 정보"};
 var CO_NAME={SN:"에스넷", GU:"굿어스", GD:"데이터", GS:"솔루션"};
 function admDateDefault(){ if(!ADM.f.to) ADM.f.to=todayISO(); if(!ADM.f.from) ADM.f.from=isoAdd(todayISO(),-6); }
@@ -8472,7 +8530,7 @@ function admUsersDraw(){
     '<div class="panel"><header><h2>사용자 권한</h2><span class="sub">전체 '+L.length+'명 · 처리할 신청 <b'+(pend.length?' style="color:var(--warn)"':'')+'>'+pend.length+'건</b></span><div class="sp"><button type="button" class="btn sm" id="admReload2">새로고침</button></div></header>'+
     '<div class="scroll"><table class="tbl adm-tbl"><thead><tr><th>이메일</th><th>이름</th><th>부서</th><th>직급</th><th>상태</th><th>역할</th><th>정보보호 서약</th><th>볼 수 있는 메뉴</th><th>법인</th><th>변경</th></tr></thead><tbody>'+
     (L.length?L.map(row).join(""):'<tr><td colspan="10" class="empty">가입한 사용자가 없습니다</td></tr>')+'</tbody></table></div>'+
-    '<div class="adm-note">역할 — <b>관리자</b>: 전부 · <b>팀원</b>: 조회 + 데이터 업로드 + 구분 수정·업무캘린더 체크·회수계획 메모 · <b>보기 전용</b>: 조회만.<br>'+
+    '<div class="adm-note">역할 — <b>관리자</b>: 전부 · <b>팀원</b>: 조회 + 데이터 업로드 + 구분 수정·업무캘린더(반복 업무 편집 포함)·회수계획 메모·수금규칙 · <b>보기 전용</b>: 조회만.<br>'+
     '차단하면 로그인은 되지만 데이터를 볼 수 없어요. 서약하지 않은 계정도 데이터를 볼 수 없어요(관리자 제외). 마지막 남은 관리자는 강등·차단할 수 없어요. 계정 자체 삭제는 Supabase → Authentication → Users에서 해요.</div></div>';
   $("#admReload2").onclick=function(){ ADM.err=""; admUsers(); };
   var upd=function(id, patch, msg){
@@ -8691,6 +8749,354 @@ function openPwChange(){
   };
 }
 
+/* ===================== [v85] 매출채권 — 매출처별 수금규칙 · 예상입금일 · 주간 입금 예정 · 매출처별 보기 =====================
+   규칙 출처: 「매출처별 수금(입금) 규칙 정리」 문서(.md, 건별반제정리현황 분석)를 매출채권 화면에서 올리면 표를 읽어 법인별로 저장(co/<법인>/arrule/main).
+   예상입금일(문서 3절 그대로)
+     A·B 등급  = 채택 규칙(발행일 구간별 입금일 또는 발행일 + N일) → 휴일이면 매출처별 휴일처리(전영업일/익영업일, 혼재·빈칸은 익영업일)
+     C 등급    = 발행일 + 소요일 중앙값 → 휴일이면 익영업일
+     D 등급    = 발행일 + 소요일 평균 / N 등급 = 발행일 + 60일 → 휴일이면 익영업일
+     관계사    = 계산 안 함(에스넷시스템·굿어스·굿어스스마트솔루션 사업자번호)
+     문서에 없는 매출처 = 분석 이후 신규로 보고 발행일 + 60일(N)
+   굿어스(GU)는 2026-10-20 종료 법인이라 계산하지 않음(사용자 결정 2026-10-20 — 솔루션 합병 후 규칙 다시 넣기).
+   연체(예상일 경과) = 예상입금일 < 파일 기준일(조회일). 악성·장기·정상 구분(회계일자 기준)은 그대로 */
+var AR_REL_BIZ={"1208186581":"에스넷시스템","1208635317":"굿어스","3368601144":"굿어스스마트솔루션"};
+var AR_CO_BY_NAME=[[/굿어스스마트솔루션/,"GS"],[/굿어스데이터/,"GD"],[/에스넷시스템/,"SN"],[/굿어스/,"GU"]];
+var AR_GRADE_NAME={A:"규칙 확인(적중 80%↑)", B:"규칙 확인(적중 60~80%)", C:"고정 규칙 없음 · 중앙값", D:"표본 부족 · 평균", N:"신규 · 발행일+60일", REL:"관계사"};
+function arDigits(s){ return String(s||"").replace(/\D/g,""); }
+function arPad(n){ return (n<10?"0":"")+n; }
+/* "1~7일→당월 17일 / 8~15일→당월 25일 / 25~말일→익월 10일" → [[1,7,0,17],[8,15,0,25],[25,99,1,10]]  (99 = 말일) */
+function arParseMap(t){
+  var out=[];
+  String(t||"").split("/").forEach(function(seg){
+    var s=seg.replace(/\s+/g,""); if(!s) return;
+    var m=/^(\d+)(?:~(\d+|말일))?일?→(당월|익월|익익월|(\d+)개월후)(\d+일|말일)$/.exec(s);
+    if(!m){ out.bad=(out.bad||0)+1; return; }
+    var to=m[2]==="말일"?99:(m[2]?+m[2]:+m[1]);
+    var off=m[3]==="당월"?0:m[3]==="익월"?1:m[3]==="익익월"?2:+m[4];
+    out.push([+m[1], to, off, m[5]==="말일"?99:parseInt(m[5],10)]);
+  });
+  return out;
+}
+/* 규칙 문서(.md) → {cos:{SN:{사업자번호:규칙}}, cnt, asOf, skipped} — 표 머리글로 표 종류를 판별(절 번호에 기대지 않음) */
+function arRulesFromMd(text){
+  var lines=String(text||"").split(/\r?\n/), co=null, hdr=null, type=null, out={}, cnt={}, skipped=[];
+  var m0=/분석일\s*(\d{4}-\d{2}-\d{2})/.exec(text||""), asOf=m0?m0[1]:"";
+  lines.forEach(function(ln){
+    var h2=/^##\s+\d+\.\s*(.+)$/.exec(ln);
+    if(h2){ co=null; AR_CO_BY_NAME.some(function(p){ if(p[0].test(h2[1])){ co=p[1]; return true; } return false; }); hdr=null; type=null; return; }
+    if(/^###\s/.test(ln)){ hdr=null; type=null; return; }
+    if(!/^\s*\|/.test(ln)){ if(ln.trim()) { hdr=null; type=null; } return; }
+    if(!co) return;
+    var cells=ln.trim().replace(/^\|/,"").replace(/\|$/,"").split("|").map(function(s){ return s.trim(); });
+    if(!hdr){ hdr=cells;
+      type = hdr.indexOf("수금 규칙")>=0 ? "AB" : hdr.indexOf("적용 소요일(중앙값)")>=0 ? "C" : hdr.indexOf("완납건 / 전체건")>=0 ? "DN" : (hdr.indexOf("구분")>=0 && hdr.indexOf("사업자번호")>=0) ? "REL" : null;
+      return; }
+    if(/^[\s:\-]*$/.test(cells.join(""))) return;   // 구분선
+    if(!type) return;
+    var g=function(k){ var i=hdr.indexOf(k); return i>=0 ? (cells[i]||"") : ""; };
+    var biz=arDigits(g("사업자번호")); if(biz.length<8) return;   // 원본에 8자리 사업자번호도 있음(넥신 08803476)
+    var r={n:g("매출처")};
+    if(type==="AB"){
+      r.g=(g("등급")||"B").toUpperCase(); r.done=parseInt(g("완납건").replace(/[^\d]/g,""),10)||0; r.rule=g("수금 규칙"); r.map=arParseMap(g("발행일 구간별 입금일"));
+      var pm=/발행일\s*\+\s*(\d+)\s*일/.exec(r.rule);
+      if(!r.map.length){ delete r.map; if(pm) r.plus=+pm[1]; }
+      r.hit=parseInt(g("적중률"),10); if(isNaN(r.hit)) delete r.hit;
+      var md=/(\d+)\s*\/\s*(\d+)/.exec(g("소요일 중앙/평균")); if(md){ r.med=+md[1]; r.avg=+md[2]; }
+      var ho=g("휴일처리"); r.hol=/전영업일/.test(ho)?"p":"n"; if(/혼재/.test(ho)) r.holMix=1;
+      if(g("비고")) r.note=g("비고");
+      if(!r.map && r.plus==null){ if(r.med!=null){ r.plus=r.med; r.fb=1; } else { skipped.push(co+" "+r.n); return; } }
+    } else if(type==="C"){
+      r.g="C"; r.done=parseInt(g("완납건"),10)||0; r.plus=parseInt(g("적용 소요일(중앙값)"),10); r.med=r.plus; r.avg=parseInt(g("평균"),10);
+      r.pm7=parseInt(g("±7일"),10); r.main=g("주 입금일"); r.hol="n"; if(g("비고")) r.note=g("비고");
+      if(isNaN(r.plus)){ skipped.push(co+" "+r.n); return; }
+    } else if(type==="DN"){
+      r.g=(g("등급")||"D").toUpperCase(); var dn=/(\d+)\s*\/\s*(\d+)/.exec(g("완납건 / 전체건")); r.done=dn?+dn[1]:0; r.all=dn?+dn[2]:0;
+      r.plus=parseInt(g("적용 소요일"),10); if(isNaN(r.plus)) r.plus=60; r.main=g("입금일"); r.hol="n";
+    } else r.g="REL";
+    (out[co]=out[co]||{})[biz]=r; cnt[co]=(cnt[co]||0)+1;
+  });
+  return {cos:out, cnt:cnt, asOf:asOf, skipped:skipped};
+}
+function arRulesUpload(file){
+  if(readOnly){ toast("보기 전용입니다 — 규칙을 올릴 수 없습니다."); return; }
+  var fr=new FileReader();
+  fr.onload=function(){
+    var P=arRulesFromMd(String(fr.result||"")), ids=Object.keys(P.cos).filter(function(id){ return id!=="GU" && co(id); });
+    if(!ids.length){ toast("수금규칙 표를 찾지 못했습니다 — '## 5. 에스넷시스템(주)'처럼 법인 제목 아래 규칙 표가 있는 문서인지 확인하세요"); return; }
+    var at=new Date().toISOString(), msg=[];
+    ids.forEach(function(id){ var c=co(id);
+      c.arRules={list:P.cos[id], file:file.name, at:at, by:wcWho(), asOf:P.asOf, n:P.cnt[id]};
+      msg.push(c.short+" "+P.cnt[id]+"곳"); });
+    audit("ar_rules", {menu:"ar", target:file.name, detail:{cos:P.cnt, asOf:P.asOf, skipped:P.skipped.length}});
+    invalidate(); save().then(function(){ toast("수금규칙 저장 · "+msg.join(" · ")+(P.skipped.length?" · 읽지 못한 "+P.skipped.length+"곳":"")); renderAr(); });
+  };
+  fr.readAsText(file, "utf-8");
+}
+/* ---- 예상입금일 ---- */
+function arMonthDay(iso, off, day){
+  var y=+iso.slice(0,4), m=+iso.slice(5,7)-1+off; y+=Math.floor(m/12); m=((m%12)+12)%12;
+  var last=new Date(y,m+1,0).getDate(), d=day>=99?last:Math.min(day,last);
+  return y+"-"+arPad(m+1)+"-"+arPad(d);
+}
+function arBizAdj(iso, mode){ var g=0, step=mode==="p"?-1:1; while(!isBizDay(iso) && g++<20) iso=isoAdd(iso, step); return iso; }
+var AR_EXP={};   // 렌더마다 비움
+function arExpect(c, x){
+  var key=c.id+"|"+arPlanKey(x); if(AR_EXP[key]) return AR_EXP[key];
+  var res=(function(){
+    if(c.id==="GU") return {k:"gu", g:"", label:"계산 안 함(굿어스 종료)"};
+    if((+x.bal||0)<=0) return {k:"neg", g:"", label:"음수 잔액(취소·수정)"};
+    var biz=arDigits(x.partyCode);
+    if(AR_REL_BIZ[biz]) return {k:"rel", g:"REL", label:"관계사 — 계산 제외"};
+    var L=c.arRules&&c.arRules.list; if(!L) return {k:"none", g:"", label:"수금규칙 미등록"};
+    var r=L[biz], d=x.date, e;
+    if(!r) return {k:"new", g:"N", date:arBizAdj(isoAdd(d,60),"n"), label:"규칙 문서에 없는 매출처 — 발행일+60일"};
+    if(r.g==="REL") return {k:"rel", g:"REL", label:"관계사 — 계산 제외", r:r};
+    if(r.map && r.map.length){
+      var dd=+d.slice(8,10), seg=null;
+      r.map.forEach(function(s){ if(!seg && dd>=s[0] && dd<=s[1]) seg=s; });
+      e = seg ? arMonthDay(d, seg[2], seg[3]) : isoAdd(d, r.med!=null?r.med:60);
+    } else e=isoAdd(d, r.plus||0);
+    return {k:"rule", g:r.g, date:arBizAdj(e, r.hol), r:r};
+  })();
+  AR_EXP[key]=res; return res;
+}
+function arAsOf(c, x){ var m=(c.arMeta||{})[x.kind]; return (m&&m.asOf)||todayISO(); }
+function arDaysBetween(a, b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+function arRuleText(r){
+  if(!r) return "";
+  if(r.g==="C") return "발행일 + "+r.plus+"일(중앙값)"+(r.main?" · 주 입금일 "+r.main:"");
+  if(r.g==="D"||r.g==="N") return "발행일 + "+r.plus+"일("+(r.g==="N"?"신규":"평균")+")";
+  return r.rule||"";
+}
+function arGradeChip(g){ if(!g) return ""; return '<span class="chip ar-g ar-g-'+(g==="REL"?"rel":g.toLowerCase())+'" title="'+esc(AR_GRADE_NAME[g]||g)+'">'+esc(g==="REL"?"관계사":g)+'</span>'; }
+function arExpCell(c, x){
+  var e=arExpect(c, x);
+  if(!e.date) return '<span class="mini" title="'+esc(e.label||"")+'">'+esc(e.k==="rel"?"관계사":e.k==="gu"?"—":e.k==="none"?"규칙 없음":"—")+'</span>';
+  var od=arDaysBetween(e.date, arAsOf(c,x)), tip=(e.r?(e.r.n+" · "+arRuleText(e.r)+(e.r.hit!=null?" · 적중 "+e.r.hit+"%":"")):e.label)||"";
+  return '<span class="ar-exp'+(od>0?" od":"")+'" title="'+esc(tip)+'">'+esc(e.date.slice(5))+'</span>'+(od>0?' <span class="chip ar-od" title="예상입금일이 파일 기준일보다 '+od+'일 지남">+'+od+'일</span>':'');
+}
+/* ---- 주간 입금 예정 (오늘이 든 주 월요일부터 8주) ---- */
+function arMonday(iso){ var p=iso.split("-"), w=new Date(+p[0],+p[1]-1,+p[2]).getDay(); return isoAdd(iso, -((w+6)%7)); }
+var AR_WEEKS=8;
+function arWeekModel(rows){
+  var t=todayISO(), m0=arMonday(t), cols=[{k:"od", l:"경과", sub:"기준일 전 예정·미입금"}];
+  var stale=rows.some(function(r){ var e=arExpect(r.c,r.x); return e.date && e.date>=arAsOf(r.c,r.x) && e.date<m0; });
+  if(stale) cols.push({k:"st", l:"입금 확인 필요", sub:"파일 기준일 이후 ~ 지난주"});
+  for(var i=0;i<AR_WEEKS;i++){ var a=isoAdd(m0,7*i), b=isoAdd(a,6); cols.push({k:"w"+i, l:i===0?"이번 주":i===1?"다음 주":"+"+i+"주", sub:a.slice(5).replace("-","/")+"~"+b.slice(5).replace("-","/"), a:a, b:b}); }
+  cols.push({k:"later", l:"이후", sub:isoAdd(m0,7*AR_WEEKS).slice(5).replace("-","/")+"~"});
+  var cell=function(r){ var e=arExpect(r.c,r.x); if(!e.date) return null; var as=arAsOf(r.c,r.x);
+    if(e.date<as) return "od"; if(e.date<m0) return "st";
+    var k=Math.floor(arDaysBetween(m0, e.date)/7); return k<AR_WEEKS?"w"+k:"later"; };
+  var by={}, tot={}, cnt={}, none=0, noneN=0;
+  rows.forEach(function(r){ var k=cell(r); if(!k){ none+=r.x.bal>0?r.x.bal:0; noneN++; return; }
+    var id=r.c.id; (by[id]=by[id]||{})[k]=(by[id][k]||0)+r.x.bal; tot[k]=(tot[k]||0)+r.x.bal; cnt[k]=(cnt[k]||0)+1; r.wk=k; });
+  return {cols:cols, by:by, tot:tot, cnt:cnt, none:none, noneN:noneN, m0:m0};
+}
+function arWeekHtml(W){
+  var cos=scopeCos().filter(function(c){ return W.by[c.id]; });
+  var max=0; W.cols.forEach(function(cl){ if(cl.k!=="od" && cl.k!=="st") max=Math.max(max, W.tot[cl.k]||0); });
+  var td=function(v,k,id){ var on=AR.wk===k && (!AR.wkCo||AR.wkCo===id);
+    return '<td class="num'+(Math.abs(v||0)<0.5?" zero":"")+(k==="od"&&v?" ar-odv":"")+(on?" on":"")+'" data-wk="'+k+'"'+(id?' data-wkco="'+id+'"':'')+' title="'+esc(fmt(v||0)+"원")+'">'+mil(v||0)+'</td>'; };
+  var head='<tr><th>법인</th>'+W.cols.map(function(cl){ return '<th class="num'+(cl.k==="od"?" ar-odh":"")+'"><div>'+esc(cl.l)+'</div><div class="mini">'+esc(cl.sub)+'</div></th>'; }).join("")+'</tr>';
+  var bars='<tr class="ar-wbar"><td class="mini">합계 막대</td>'+W.cols.map(function(cl){ var v=W.tot[cl.k]||0;
+      if(cl.k==="od"||cl.k==="st") return '<td></td>';
+      return '<td><div class="ar-vbar" title="'+esc(cl.l+" "+fmt(v)+"원 · "+(W.cnt[cl.k]||0)+"건")+'"><i style="height:'+(max?dxClamp(v/max*100):0).toFixed(1)+'%"></i></div></td>'; }).join("")+'</tr>';
+  var body=cos.map(function(c){ return '<tr><td class="ar-wco">'+coChip(c)+' '+esc(c.short||c.name)+'</td>'+W.cols.map(function(cl){ return td((W.by[c.id]||{})[cl.k], cl.k, c.id); }).join("")+'</tr>'; }).join("");
+  var tot='<tr class="total"><td>합계</td>'+W.cols.map(function(cl){ return td(W.tot[cl.k], cl.k, ""); }).join("")+'</tr>'+
+    '<tr class="ar-wcnt"><td class="mini">건수</td>'+W.cols.map(function(cl){ return '<td class="num mini">'+(W.cnt[cl.k]||"")+'</td>'; }).join("")+'</tr>';
+  return '<table class="tbl ar-week">'+'<thead>'+head+'</thead><tbody>'+bars+body+tot+'</tbody></table>';
+}
+/* ---- 매출처별 ---- */
+function arPartyGroups(rows){
+  var G={};
+  rows.forEach(function(r){ var biz=arDigits(r.x.partyCode)||("nm:"+r.x.party), k=r.c.id+"|"+biz;
+    var g=G[k]||(G[k]={k:k, c:r.c, biz:biz, name:r.x.party, rows:[], bal:0, od:0, nOd:0, next:null, oldest:null, e:null});
+    g.rows.push(r); g.bal+=r.x.bal; var e=arExpect(r.c,r.x); g.e=g.e||e;
+    if(e.date){ if(e.date<arAsOf(r.c,r.x)){ g.od+=r.x.bal; g.nOd++; } else if(!g.next || e.date<g.next) g.next=e.date; }
+    if(!g.oldest || r.x.date<g.oldest) g.oldest=r.x.date; });
+  return Object.keys(G).map(function(k){ return G[k]; });
+}
+/* ---- 화면 ---- */
+var renderBondView_v84=renderBondView;
+renderBondView=function(){
+  AR.view=AR.view||"item"; AR.wk=AR.wk||""; AR.wkCo=AR.wkCo||""; AR.popen=AR.popen||{}; AR.plim=AR.plim||40;   // AR는 뒤에서 선언 — 그릴 때 초기화
+  AR.open=AR.open||{bad:true, long:true, normal:false}; AR.lim=AR.lim||{};
+  AR_EXP={};
+  var all=arRows().filter(function(r){ return r.x.kind!=="미수금" && (!AR.kind || r.x.kind===AR.kind); });
+  all.forEach(function(r){ r.g=arBucket(r.age); });
+  var W=arWeekModel(all);
+  var K=arModel(all), G={bad:{bal:0,n:0}, long:{bal:0,n:0}, normal:{bal:0,n:0}}, OD={bal:0,n:0};
+  all.forEach(function(r){ G[r.g].bal+=r.x.bal; G[r.g].n++; if(r.wk==="od"){ OD.bal+=r.x.bal; OD.n++; } });
+  var metas=[]; scopeCos().forEach(function(c){ Object.keys(c.arMeta||{}).forEach(function(k){ if(k==="미수금") return; var m=c.arMeta[k]; metas.push(c.short+" "+k+" "+m.asOf+" 기준 "+m.n+"건"); }); });
+  $("#arSub").textContent = metas.length ? metas.join(" · ") : "건별반제정리현황(외상매출금·외화외상매출금) 파일을 올려주세요";
+  var pct=function(v){ return K.total?(v/K.total*100):0; };
+  var card=function(cls,l,v,d,badge,bar){ return '<div class="kpi '+cls+'"><div class="lbl">'+esc(l)+(badge||'')+'</div><div class="v" title="'+fmt(v)+'">'+fmt(v)+'</div><div class="d">'+esc(d)+'</div>'+
+    (bar==null?'':'<div class="dx-bar ar-bar"><i style="width:'+dxClamp(bar).toFixed(1)+'%"></i></div>')+'</div>'; };
+  $("#arKpis").innerHTML=
+    card("lead","총 채권 잔액",K.total,K.n+"건")+
+    card("o ar-warn","악성채권 (90일 초과)",G.bad.bal,G.bad.n+"건 · 비중 "+pct(G.bad.bal).toFixed(1)+"%",'',pct(G.bad.bal))+
+    card("ar-mid","장기채권 (61~90일)",G.long.bal,G.long.n+"건 · 비중 "+pct(G.long.bal).toFixed(1)+"%",'',pct(G.long.bal))+
+    card("","정상채권 (60일 이내)",G.normal.bal,G.normal.n+"건 · 비중 "+pct(G.normal.bal).toFixed(1)+"%",'',pct(G.normal.bal))+
+    card("ar-odk","예상입금일 경과",OD.bal,OD.n+"건 · 비중 "+pct(OD.bal).toFixed(1)+"% · 기준일 대비",'',pct(OD.bal))+
+    card("x","삼성 매출처 채권 잔액",K.samsung,K.nSam+"건 · 비중 "+K.samPct.toFixed(1)+"%",' <span class="chip ar-sam">SAMSUNG</span>');
+  /* 규칙 안내 */
+  var rm=scopeCos().filter(function(c){ return c.id!=="GU"; }).map(function(c){ var R=c.arRules; return R ? c.short+" "+R.n+"곳" : c.short+" 규칙 없음"; });
+  var r0=scopeCos().map(function(c){ return c.arRules; }).filter(Boolean)[0];
+  $("#arRuleMeta").innerHTML='<b>수금규칙</b> '+esc(rm.join(" · "))+(r0?' · '+esc(r0.file||"")+(r0.asOf?' (분석일 '+esc(r0.asOf)+')':'')+' · '+esc(String(r0.at||"").slice(0,10))+(r0.by?' '+esc(r0.by):''):' · 규칙 문서(.md)를 올리면 예상입금일이 계산돼요')+
+    (scopeCos().some(function(c){ return c.id==="GU"; })?' · 굿어스는 종료 법인이라 예상입금일 계산 안 함':'');
+  /* 주간 입금 예정 */
+  $("#arWeekSub").textContent="예상입금일 기준 · 단위 백만원 · "+W.m0+"(월) 주부터 "+AR_WEEKS+"주"+(W.noneN?" · 예상일 없는 "+W.noneN+"건(관계사·굿어스·규칙 없음) 제외":"");
+  $("#arWeek").innerHTML=(all.length?arWeekHtml(W):'<div class="empty">채권 데이터가 없습니다</div>');
+  $("#arWeekFoot").innerHTML='칸을 누르면 아래 목록이 그 주 채권만 보여요'+(AR.wk?' · <button type="button" class="btn sm" id="arWkClear">주 선택 해제</button>':'')+' · 경과 = 예상입금일이 파일 기준일(조회일)보다 앞인데 아직 잔액이 남은 건';
+  $$("#arWeek [data-wk]").forEach(function(td){ td.onclick=function(){ var k=td.dataset.wk, id=td.dataset.wkco||"";
+    if(AR.wk===k && AR.wkCo===id){ AR.wk=""; AR.wkCo=""; } else { AR.wk=k; AR.wkCo=id; } renderAr(); }; });
+  var wc=$("#arWkClear"); if(wc) wc.onclick=function(){ AR.wk=""; AR.wkCo=""; renderAr(); };
+  /* 목록 필터 */
+  var q=(AR.q||"").trim().toLowerCase();
+  var rows=all.filter(function(r){
+    if(AR.f==="long" && !r.isLongTerm) return false;
+    if(AR.f==="samsung" && !r.isSamsung) return false;
+    if(AR.f==="od" && r.wk!=="od") return false;
+    if(AR.wk && (r.wk!==AR.wk || (AR.wkCo && r.c.id!==AR.wkCo))) return false;
+    if(q && String(r.x.party+" "+r.x.memo+" "+(r.x.partyCode||"")).toLowerCase().indexOf(q)<0) return false;
+    return true; });
+  $$("#arSeg button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.f===AR.f?"true":"false"); });
+  $$("#arViewSeg button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.v===AR.view?"true":"false"); });
+  if(AR.view==="party") arPartyTable(rows); else arItemTable(rows);
+};
+renderAr=renderBondView;
+function arItemTable(rows){
+  var multi=scopeCos().length>1, nc=(multi?1:0)+11;
+  var sum={amt:0,paid:0,bal:0}; rows.forEach(function(r){ sum.amt+=r.x.amt; sum.paid+=r.x.paid; sum.bal+=r.x.bal; });
+  var rowHtml=function(r, idx){ var x=r.x, plan=(r.g!=="normal")?arPlanOf(r.c,x):null, e=arExpect(r.c,x);
+    var ageChip = r.g==="bad" ? '<span class="chip ar-long">'+fmt(r.age)+'일</span>' : r.g==="long" ? '<span class="chip out">'+r.age+'일</span>' : '<span class="mini">'+r.age+'일</span>';
+    var planCell = r.g==="normal" ? '<td></td>' :
+      '<td class="ar-plan"><input type="text" maxlength="200" data-ai="'+idx+'" value="'+esc(plan?plan.t:"")+'" placeholder="회수계획 입력"'+(readOnly?' disabled':'')+'>'+
+      '<button type="button" class="btn sm" data-as="'+idx+'"'+(readOnly?' disabled':'')+'>저장</button>'+(plan?'<span class="ar-ok" title="'+esc((plan.by||"")+" · "+String(plan.at||"").slice(0,16).replace("T"," "))+'">✓</span>':'')+'</td>';
+    return '<tr>'+(multi?'<td>'+coChip(r.c)+'</td>':'')+'<td class="num">'+ageChip+'</td><td class="mini ar-date">'+esc(x.date)+'</td><td class="ar-party" title="'+esc(x.party)+'">'+esc(x.party)+(r.isSamsung?' <span class="chip ar-sam">삼성</span>':'')+'</td>'+
+      '<td class="mini ar-memo" title="'+esc(x.memo)+'">'+esc(x.memo)+'</td><td class="num">'+fmt(x.amt)+'</td><td class="num">'+fmt(x.paid)+'</td><td class="num '+(x.bal<0?'neg':'')+'"><b>'+fmt(x.bal)+'</b>'+(x.ccy&&x.ccy!=="KRW"&&x.fxBal?'<div class="mini">'+esc(x.ccy)+' '+(+x.fxBal).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>':'')+'</td>'+
+      '<td class="c">'+arGradeChip(e.g)+'</td><td class="ar-expc">'+arExpCell(r.c,x)+'</td>'+
+      '<td><span class="chip nv">'+esc(x.kind)+'</span></td>'+planCell+'</tr>'; };
+  var flat=[], body="";
+  AR_GROUPS.forEach(function(g){
+    if(AR.f==="long" && g.k==="normal") return;
+    var list=rows.filter(function(r){ return r.g===g.k; }).sort(function(a,b){ return b.age-a.age || b.x.bal-a.x.bal; });
+    var gs={amt:0,paid:0,bal:0}; list.forEach(function(r){ gs.amt+=r.x.amt; gs.paid+=r.x.paid; gs.bal+=r.x.bal; });
+    var open=(AR.wk||AR.f==="od")?true:!!AR.open[g.k];
+    body+='<tr class="ar-grp g-'+g.k+'" data-g="'+g.k+'"><td colspan="'+nc+'"><span class="tw">'+(open?"▾":"▸")+'</span><b>'+esc(g.name)+'</b><span class="rng">'+esc(g.rng)+'</span>'+
+      '<span class="gs">'+list.length+'건 · 잔액 <b>'+fmt(gs.bal)+'</b></span></td></tr>';
+    if(!open) return;
+    if(!list.length){ body+='<tr><td colspan="'+nc+'" class="mini" style="padding:12px 16px">해당 채권 없음</td></tr>'; return; }
+    var lim=AR.lim[g.k]||10;
+    list.slice(0,lim).forEach(function(r){ flat.push(r); body+=rowHtml(r, flat.length-1); });
+    if(list.length>lim) body+='<tr class="ar-more"><td colspan="'+nc+'"><button type="button" class="btn sm" data-am="'+g.k+'">더보기 (+'+Math.min(list.length-lim,50)+'건'+(list.length-lim>50?' / 남은 '+(list.length-lim)+'건':'')+')</button></td></tr>';
+    body+='<tr class="ar-gsum"><td colspan="'+(multi?5:4)+'">'+esc(g.name)+' 계 '+list.length+'건</td><td class="num">'+fmt(gs.amt)+'</td><td class="num">'+fmt(gs.paid)+'</td><td class="num">'+fmt(gs.bal)+'</td><td colspan="4"></td></tr>';
+  });
+  $("#arTbl").innerHTML='<thead><tr>'+(multi?'<th>법인</th>':'')+'<th style="text-align:right">경과일수</th><th>회계일자</th><th>거래처명</th><th>적요</th><th style="text-align:right">전표금액</th><th style="text-align:right">반제금액</th><th style="text-align:right">잔액</th><th class="c">등급</th><th>예상입금일</th><th>계정</th><th>회수계획</th></tr></thead><tbody>'+
+    (rows.length?body:'<tr><td colspan="'+nc+'" class="empty" style="padding:22px">조건에 맞는 채권이 없습니다.</td></tr>')+
+    (rows.length?'<tr class="total"><td colspan="'+(multi?5:4)+'">전체 계 '+rows.length+'건</td><td class="num">'+fmt(sum.amt)+'</td><td class="num">'+fmt(sum.paid)+'</td><td class="num">'+fmt(sum.bal)+'</td><td colspan="4"></td></tr>':'')+'</tbody>';
+  $("#arFoot").textContent="악성 = 경과 90일 초과 · 장기 = 61~90일 · 정상 = 60일 이내 (경과일수 = 파일 조회일 − 회계일자) · 예상입금일 = 매출처별 수금규칙(등급 A·B 규칙 / C 중앙값 / D 평균 / N 60일, 휴일 보정) · +n일 = 예상입금일이 파일 기준일보다 n일 지남 · 회수계획은 공용 저장소에 저장";
+  $$("#arTbl .ar-grp").forEach(function(tr){ tr.onclick=function(){ AR.open[tr.dataset.g]=!AR.open[tr.dataset.g]; renderBondView(); }; });
+  $$("#arTbl [data-am]").forEach(function(b){ b.onclick=function(){ AR.lim[b.dataset.am]=(AR.lim[b.dataset.am]||10)+50; renderBondView(); }; });
+  $$("#arTbl [data-as]").forEach(function(b){ b.onclick=function(){ var r=flat[+b.dataset.as], inp=$('#arTbl [data-ai="'+b.dataset.as+'"]'); arPlanSave(r.c, r.x, inp.value); renderBondView(); }; });
+  $$("#arTbl [data-ai]").forEach(function(inp){ inp.onkeydown=function(e){ if(e.key==="Enter"){ var r=flat[+inp.dataset.ai]; arPlanSave(r.c, r.x, inp.value); renderBondView(); } }; });
+}
+function arPartyTable(rows){
+  var P=arPartyGroups(rows).sort(function(a,b){ return b.od-a.od || b.bal-a.bal; });
+  var multi=scopeCos().length>1, nc=(multi?1:0)+9;
+  var html=P.slice(0,AR.plim).map(function(g){
+    var e=g.e||{}, r=e.r, open=!!AR.popen[g.k];
+    var rule=e.k==="rule"?arRuleText(r):(e.label||"");
+    var h='<tr class="ar-prow'+(open?" open":"")+'" data-pk="'+esc(g.k)+'">'+(multi?'<td>'+coChip(g.c)+'</td>':'')+
+      '<td class="ar-party"><span class="tw">'+(open?"▾":"▸")+'</span>'+esc(g.name)+'<div class="mini">'+esc(g.biz.length===10?g.biz.slice(0,3)+"-"+g.biz.slice(3,5)+"-"+g.biz.slice(5):"")+'</div></td>'+
+      '<td class="c">'+arGradeChip(e.g)+'</td><td class="mini ar-rule" title="'+esc(rule+(r&&r.note?" · "+r.note:""))+'">'+esc(rule)+(r&&r.note?' <span class="chip auto">조건 변경</span>':'')+'</td>'+
+      '<td class="num">'+(r&&r.hit!=null?r.hit+'%':'<span class="mini">-</span>')+'</td>'+
+      '<td class="num">'+g.rows.length+'</td><td class="num"><b>'+fmt(g.bal)+'</b></td>'+
+      '<td class="num'+(g.od?' ar-odv':'')+'">'+(g.od?fmt(g.od)+'<div class="mini">'+g.nOd+'건</div>':'<span class="mini">-</span>')+'</td>'+
+      '<td>'+(g.next?esc(g.next.slice(5))+' <span class="mini">('+esc(dowOf(g.next))+')</span>':'<span class="mini">-</span>')+'</td>'+
+      '<td class="mini">'+esc(g.oldest||"")+'</td></tr>';
+    if(open){ h+=g.rows.slice().sort(function(a,b){ return a.x.date<b.x.date?-1:1; }).map(function(rr){ var x=rr.x;
+      return '<tr class="ar-psub">'+(multi?'<td></td>':'')+'<td class="mini ar-memo" title="'+esc(x.memo)+'">'+esc(x.date)+' · '+esc(x.memo)+'</td><td></td><td class="mini">'+esc(x.kind)+'</td><td></td><td></td>'+
+        '<td class="num">'+fmt(x.bal)+'</td><td colspan="2">'+arExpCell(rr.c,x)+'</td><td class="mini">경과 '+rr.age+'일</td></tr>'; }).join(""); }
+    return h; }).join("");
+  var tb=P.reduce(function(s,g){ return s+g.bal; },0), to=P.reduce(function(s,g){ return s+g.od; },0);
+  $("#arTbl").innerHTML='<thead><tr>'+(multi?'<th>법인</th>':'')+'<th>매출처</th><th class="c">등급</th><th>수금규칙</th><th class="num">적중률</th><th class="num">건수</th><th class="num">잔액</th><th class="num">예상일 경과</th><th>다음 예상입금</th><th>가장 오래된 발행</th></tr></thead><tbody>'+
+    (P.length?html:'<tr><td colspan="'+nc+'" class="empty" style="padding:22px">조건에 맞는 매출처가 없습니다.</td></tr>')+
+    (P.length>AR.plim?'<tr class="ar-more"><td colspan="'+nc+'"><button type="button" class="btn sm" id="arPMore">더보기 (남은 '+(P.length-AR.plim)+'곳)</button></td></tr>':'')+
+    (P.length?'<tr class="total"><td colspan="'+(multi?6:5)+'">매출처 '+P.length+'곳 · '+rows.length+'건</td><td class="num">'+fmt(tb)+'</td><td class="num">'+fmt(to)+'</td><td colspan="2"></td></tr>':'')+'</tbody>';
+  $("#arFoot").textContent="예상일 경과가 큰 매출처부터 · 등급 A(적중 80%↑)·B(60~80%) = 규칙 확인, C = 고정 규칙 없음(중앙값), D = 표본 부족(평균), N = 신규(60일) · 적중률 = 과거 완납건 중 규칙대로 입금된 비율(규칙 문서) · 행을 누르면 건별";
+  $$("#arTbl .ar-prow").forEach(function(tr){ tr.onclick=function(){ var k=tr.dataset.pk; AR.popen[k]=!AR.popen[k]; renderBondView(); }; });
+  var pm=$("#arPMore"); if(pm) pm.onclick=function(){ AR.plim+=60; renderBondView(); };
+}
+/* ---- 미수금 제외(사용자 결정 2026-10-20): 저장된 미수금 채권·메타·회수계획을 지운다 ---- */
+function arPurgeMisu(){
+  var n=0;
+  (D.companies||[]).forEach(function(c){
+    Object.keys(c.ar||{}).forEach(function(d){ var k0=(c.ar[d]||[]).length; c.ar[d]=(c.ar[d]||[]).filter(function(x){ return x.kind!=="미수금"; }); n+=k0-c.ar[d].length; if(!c.ar[d].length) delete c.ar[d]; });
+    if(c.arMeta && c.arMeta["미수금"]){ delete c.arMeta["미수금"]; n++; }
+    Object.keys(c.arPlan||{}).forEach(function(k){ if(k.indexOf("미수금|")===0){ delete c.arPlan[k]; n++; } });
+  });
+  return n;
+}
+/* ---- 대시보드 카드 · 자금일보 참고 ---- */
+function arUpcoming(cos, from, to){
+  var out=[]; AR_EXP={};
+  (cos||[]).forEach(function(c){ if(c.id==="GU") return; Object.keys(c.ar||{}).forEach(function(d){ (c.ar[d]||[]).forEach(function(x){
+    if(x.kind==="미수금" || !(x.bal>0)) return; var e=arExpect(c,x); if(!e.date) return;
+    out.push({c:c, x:x, e:e, od:e.date<arAsOf(c,x)}); }); }); });
+  return {od:out.filter(function(r){ return r.od; }), win:out.filter(function(r){ return !r.od && r.e.date>=from && r.e.date<=to; })};
+}
+function dxArCard(){
+  var host=$("#dxAr"); if(!host) return;
+  var cos=scopeCos(), has=cos.some(function(c){ return c.arRules && Object.keys(c.ar||{}).length; });
+  if(!has){ host.innerHTML=""; host.hidden=true; return; }
+  host.hidden=false;
+  var t=todayISO(), m0=arMonday(t), U1=arUpcoming(cos, m0, isoAdd(m0,6)), U2=arUpcoming(cos, isoAdd(m0,7), isoAdd(m0,13));
+  var sum=function(L){ return L.reduce(function(s,r){ return s+r.x.bal; },0); };
+  var top=function(L){ var by={}; L.forEach(function(r){ var k=r.c.id+"|"+r.x.party; (by[k]=by[k]||{c:r.c,n:r.x.party,v:0,d:r.e.date}).v+=r.x.bal; if(r.e.date<by[k].d) by[k].d=r.e.date; });
+    return Object.keys(by).map(function(k){ return by[k]; }).sort(function(a,b){ return b.v-a.v; }).slice(0,5); };
+  var T1=top(U1.win);
+  host.innerHTML='<header><h2>매출채권 입금 예정</h2><span class="sub">수금규칙 기준 예상 · 단위 억원 · 매출채권 파일 기준일 이후 확인 필요</span><div class="sp"><button class="btn sm" id="dxArGo">매출채권관리</button></div></header>'+
+    '<div class="dx-ar"><div class="dx-ar-k"><div><span class="lbl">이번 주</span><b title="'+esc(fmt(sum(U1.win))+"원")+'">'+eok(sum(U1.win))+'</b><span class="mini">'+U1.win.length+'건 · '+esc(m0.slice(5))+'~'+esc(isoAdd(m0,6).slice(5))+'</span></div>'+
+    '<div><span class="lbl">다음 주</span><b title="'+esc(fmt(sum(U2.win))+"원")+'">'+eok(sum(U2.win))+'</b><span class="mini">'+U2.win.length+'건</span></div>'+
+    '<div class="odk"><span class="lbl">예상일 경과</span><b title="'+esc(fmt(sum(U1.od))+"원")+'">'+eok(sum(U1.od))+'</b><span class="mini">'+U1.od.length+'건 · 미입금</span></div></div>'+
+    '<table class="tbl dx-ar-t"><thead><tr><th>이번 주 주요 매출처</th><th>예상일</th><th class="num">억원</th></tr></thead><tbody>'+
+    (T1.length?T1.map(function(p){ return '<tr><td>'+(curCo==="ALL"?coChip(p.c)+' ':'')+esc(p.n)+'</td><td class="mini">'+esc(p.d.slice(5))+' ('+esc(dowOf(p.d))+')</td><td class="num" title="'+esc(fmt(p.v)+"원")+'">'+eok(p.v)+'</td></tr>'; }).join(""):'<tr><td colspan="3" class="mini">이번 주 예상 입금 없음</td></tr>')+'</tbody></table></div>';
+  var go=$("#dxArGo"); if(go) go.onclick=function(){ AR.wk="w0"; AR.wkCo=""; setView("ar"); };
+}
+function ilboArPanel(){
+  var host=$("#ilboBody"); if(!host || !host.firstChild) return;
+  var c=ilboCo(); if(!c || c.id==="GU" || !c.arRules) return;
+  var iso=ILBO.date; if(!iso) return;
+  var U=arUpcoming([c], iso, iso);
+  var sum=function(L){ return L.reduce(function(s,r){ return s+r.x.bal; },0); };
+  var by={}; U.win.forEach(function(r){ var k=arDigits(r.x.partyCode)||r.x.party; var g=by[k]||(by[k]={n:r.x.party, g:r.e.g, v:0, k:0, d0:r.x.date, d1:r.x.date}); g.v+=r.x.bal; g.k++; if(r.x.date<g.d0) g.d0=r.x.date; if(r.x.date>g.d1) g.d1=r.x.date; });
+  var L=Object.keys(by).map(function(k){ return by[k]; }).sort(function(a,b){ return b.v-a.v; });
+  var h='<div class="panel ilbo-ar"><header><h2>매출채권 예상 입금 (참고)</h2><span class="sub">'+esc(iso)+' · 수금규칙 기준 · 자금일보 양식·검증에는 들어가지 않음</span><div class="sp"><button class="btn sm" id="ilboArGo">매출채권관리</button></div></header>'+
+    '<div class="pad"><div class="mini" style="margin-bottom:8px">예상 '+L.length+'곳 '+U.win.length+'건 <b>'+fmt(sum(U.win))+'원</b> · 예상일 지난 미입금 '+U.od.length+'건 '+fmt(sum(U.od))+'원 (매출채권 파일 기준일 '+esc(arAsOf(c,{kind:"외상매출금"}))+' — 그 뒤 입금은 반영 안 됨)</div>'+
+    (L.length?'<div class="scroll"><table class="tbl"><thead><tr><th>매출처</th><th class="c">등급</th><th class="num">건수</th><th>회계일자</th><th class="num">잔액</th></tr></thead><tbody>'+
+      L.slice(0,12).map(function(g){ return '<tr><td>'+esc(g.n)+'</td><td class="c">'+arGradeChip(g.g)+'</td><td class="num">'+g.k+'</td><td class="mini">'+esc(g.d0===g.d1?g.d0:g.d0+" ~ "+g.d1)+'</td><td class="num">'+fmt(g.v)+'</td></tr>'; }).join("")+
+      (L.length>12?'<tr><td colspan="5" class="mini">외 '+(L.length-12)+'곳</td></tr>':'')+'</tbody></table></div>':'<div class="mini">이 날 예상 입금 채권 없음</div>')+'</div></div>';
+  host.insertAdjacentHTML("beforeend", h);
+  var go=$("#ilboArGo"); if(go) go.onclick=function(){ AR.wk=""; AR.view="item"; AR.q=""; setView("ar"); };
+}
+(function(){
+  var _rd=renderDash; renderDash=function(){ var r=_rd.apply(this, arguments); try{ dxArCard(); }catch(e){ console.warn("dxArCard", e); } return r; };
+  var _ri=renderIlbo; renderIlbo=function(){ var r=_ri.apply(this, arguments); try{ ilboArPanel(); }catch(e){ console.warn("ilboArPanel", e); } return r; };
+})();
+
+/* [v85] 수금규칙 문서는 법인 정보와 따로(co/<법인>/arrule/main) — 법인 정보 문서 크기·팀원 저장 보호와 분리 */
+(function(){
+  var _ci=coInfo; coInfo=function(c){ var o=_ci(c); delete o.arRules; return o; };
+  var _bd=buildDocs; buildDocs=function(){ var m=_bd(); (D.companies||[]).forEach(function(c){ if(c.arRules) m["co/"+c.id+"/arrule/main"]=c.arRules; }); return m; };
+  var _dl=dbLoad; dbLoad=function(){ return _dl().then(function(D2){ if(!D2) return D2;
+    return Promise.all((D2.companies||[]).map(function(c){ return DB.doc("co/"+c.id+"/arrule/main").get().then(function(sn){ if(sn.exists) c.arRules=sn.data(); }, function(){}); })).then(function(){ return D2; }); }); };
+  $("#btnArRules").onclick=function(){ $("#arRuleIn").click(); };
+  $("#arRuleIn").onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(f) arRulesUpload(f); setTimeout(function(){ e.target.value=""; },0); };
+  $$("#arViewSeg button").forEach(function(b){ b.onclick=function(){ AR.view=b.dataset.v; renderAr(); }; });
+  $$("#arSeg button").forEach(function(b){ b.onclick=function(){ AR.f=b.dataset.f; renderAr(); }; });
+})();
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -8729,6 +9135,7 @@ function loadData(){
       if(loaded){ D=loaded; snapInfo0();   // [v84.1] 보정 전 값
         var pre={}; (D.companies||[]).forEach(function(c){ pre[c.id]=infoSig(c); });
         migrate(); restrictCos(); lastDocs={}; buildAll(); watchRemote(); enter();
+        if(arPurgeMisu() && !readOnly) save();   // [v85] 미수금 채권·메타·회수계획 삭제(사용자 요청 2026-10-20)
         if(AUTH.isAdmin && !readOnly){   // [v84.1] 보정으로 바뀐 법인 정보만 저장(관리자만 — 팀원은 DB가 관리자 전용 값을 되돌림)
           var ch=(D.companies||[]).filter(function(c){ return pre[c.id]!==undefined && pre[c.id]!==infoSig(c); });
           if(ch.length){ ch.forEach(function(c){ delete lastDocs["co/"+c.id+"/info/main"]; }); save(); }
@@ -10588,6 +10995,7 @@ function ilboFlowBlock(title, cashIn, cashOut, depIn, depOut, screen, planMode, 
         else if(x.merged && x.merged.length>1){        // [v55] 같은 적요 입금 합침
           desc=esc(x.memo||"")+' <select class="cellsel ilboMergeCat" data-d="'+esc(x.d)+'" data-is="'+x.merged.join(",")+'">'+IN_CATS.map(function(k){ return '<option'+(k===x.cat?' selected':'')+'>'+esc(k)+'</option>'; }).join("")+'</select>'+(x.auto?' <span class="chip auto">추정</span>':'')+
             ' <button type="button" class="ilboExp">▸ '+x.merged.length+'건</button><div class="ilboMem" hidden>'+x.members.map(function(q){ return esc(q.name||"-")+' '+w0(q.amt); }).join("<br>")+'</div>'; }
+        else if(x.feeRow || !txnsOf(m.c,x.d||m.prev)[x.idx]) desc=esc(x.memo||"")+' '+esc(x.cat||"")+(x.feeRow?' <span class="chip nv" title="자금이동 입·출 차액 — 1p 운영경비에 포함">이체 수수료</span>':'');   // [v85]
         else desc=esc(x.memo||"")+' '+catCell(m.c, txnsOf(m.c,x.d||m.prev)[x.idx], x.d||m.prev, x.idx)+(x.slip?' <span class="chip nv" title="전일 전표와 계좌·금액 일치">전표 매칭</span>':'');
       }
       return '<td class="c">'+esc(x.acct)+'</td><td class="desc">'+desc+'</td><td class="num">'+w0(amt)+'</td>';
@@ -11024,7 +11432,7 @@ bindIlbo();
 
 /* ===================== [v26] 매출채권관리 — 건별반제정리현황 파서·집계 ===================== */
 var AR={f:"all", kind:"", q:""};
-var AR_KINDS=["외상매출금","외화외상매출금","미수금"];
+var AR_KINDS=["외상매출금","외화외상매출금"];   // [v85] 미수금 제외
 function arKindOf(fileName, rows){
   var n=String(fileName||"");
   if(/외화외상매출금/.test(n)) return "외화외상매출금";
@@ -11048,12 +11456,13 @@ function parseBondExcel(ab, fileName){
   if(C.acct<0||C.amt<0||C.paid<0||C.bal<0||C.note<0) return null;
   var g=function(row,k){ return C[k]>=0?row[C[k]]:""; };
   var m=String(fileName||"").match(/(\d{4})[-.]?(\d{2})[-.]?(\d{2})\D+(\d{4})[-.]?(\d{2})[-.]?(\d{2})/);   // "2025-01-01~2026-09-22" → 조회일
-  var asOf=m ? m[4]+"-"+m[5]+"-"+m[6] : todayISO();
+  var asOf=m ? m[4]+"-"+m[5]+"-"+m[6] : todayISO(), maxBan="";   // [v85]
   var all=0, rows=[], sumAmt=0, sumBal=0, unit="";
   for(var r=1;r<aoa.length;r++){
     var row=aoa[r]||[], d=toISO(g(row,"acct"));
     if(!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;            // 코드·합계·주소 행 제외
     all++; unit=unit||txt(g(row,"unit"));
+    var bn=toISO(g(row,"ban")); if(bn && /^\d{4}-\d{2}-\d{2}$/.test(bn) && bn>maxBan && bn<=todayISO()) maxBan=bn;   // [v85]
     var amt=toNum(g(row,"amt")), paid=toNum(g(row,"paid")), bal=toNum(g(row,"bal"));
     sumAmt+=amt; sumBal+=bal;
     if(Math.abs(bal)<1) continue;
@@ -11065,6 +11474,7 @@ function parseBondExcel(ab, fileName){
       age:age, isLongTerm:age>60, isSamsung:/삼성|samsung/i.test(party+" "+memo)});
   }
   if(!all) return null;
+  if(!m && maxBan){ asOf=maxBan; rows.forEach(function(x){ x.age=Math.round((new Date(asOf)-new Date(x.date))/86400000); x.isLongTerm=x.age>60; }); }   // [v85] 업로드 날짜 대신 마지막 입금일
   return {unit:unit, kind:arKindOf(fileName,rows), rows:rows, all:all, sumAmt:sumAmt, sumBal:sumBal, asOf:asOf, file:fileName||""};
 }
 var parseArLedger=parseBondExcel;   // v26 호출부 호환
@@ -11305,6 +11715,7 @@ function arFiles(files){
     if(!pk){ msgs.push(f.name+": 건별반제정리현황 형식이 아닙니다"); return; }
     var c=detectCompany(pk.unit)||guessCoFromName(f.name)||(curCo!=="ALL"?co(curCo):null);
     if(!c){ msgs.push(f.name+": 법인 판별 실패"); return; }
+    if(pk.kind==="미수금"){ msgs.push(f.name+": 미수금은 매출채권관리에서 제외 — 저장하지 않음"); return; }   // [v85]
     commitAr(c, pk); n++; msgs.push(c.short+" "+pk.kind+" 미결 "+pk.rows.length+"건 · 잔액 "+fmt(pk.sumBal)+"원");
   }); }); }, Promise.resolve()).then(function(){ invalidate(); return save(); }).then(function(){ toast(msgs.join(" / ")||"반영할 파일이 없습니다"); renderAr(); });
 }
