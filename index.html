@@ -566,7 +566,11 @@ td.ar-expc{white-space:nowrap}
 .ar-week .zero{color:var(--muted)}
 .ar-wbar td{padding-top:6px;padding-bottom:2px;border-bottom:0}
 .ar-vbar{height:46px;display:flex;align-items:flex-end;justify-content:flex-end}
-.ar-vbar i{display:block;width:18px;background:var(--navy);border-radius:4px 4px 0 0;min-height:1px}
+.ar-vbar i{display:block;width:18px;background:var(--navy);border-radius:4px 4px 0 0;min-height:2px}
+.ar-rulemeta.need{background:var(--move-soft);color:var(--ink-2);border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ar-rulemeta.need b{color:var(--warn)}
+.ar-wempty{padding:28px 16px}
+.ar-nodate{color:var(--muted)}
 .ar-wcnt td{border-top:0;color:var(--muted)}
 td.ar-odv{color:var(--out)}
 .ar-prow{cursor:pointer}
@@ -649,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v85 · 2026-10-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v85.1 · 2026-10-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -787,7 +791,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
         <header><h2>매출채권관리</h2><span class="sub" id="arSub">건별반제정리현황(외상매출금·외화외상매출금) 업로드</span>
           <div class="sp"><button class="btn sm" id="btnArUpload">건별반제정리현황 올리기</button><button class="btn sm" id="btnArRules" title="매출처별 수금(입금) 규칙 정리 문서(.md)">수금규칙 올리기</button><button class="btn sm" id="btnArXlsx">엑셀 내보내기</button></div>
         </header>
-        <input type="file" id="arIn" accept=".xls,.xlsx" multiple hidden>
+        <input type="file" id="arIn" accept=".xls,.xlsx,.md,.txt" multiple hidden>
         <input type="file" id="arRuleIn" accept=".md,.txt,text/markdown" hidden>
         <div class="pad"><div class="kpis ar-kpis" id="arKpis"></div></div>
         <div class="pad mini ar-rulemeta" id="arRuleMeta"></div>
@@ -8821,7 +8825,11 @@ function arRulesUpload(file){
   if(readOnly){ toast("보기 전용입니다 — 규칙을 올릴 수 없습니다."); return; }
   var fr=new FileReader();
   fr.onload=function(){
-    var P=arRulesFromMd(String(fr.result||"")), ids=Object.keys(P.cos).filter(function(id){ return id!=="GU" && co(id); });
+    /* [v85.1] UTF-8로 읽고, 표를 못 찾거나 깨진 글자가 많으면 한글 윈도(EUC-KR/CP949)로 다시 읽음 */
+    var buf=fr.result, txt=function(enc){ try{ return new TextDecoder(enc).decode(buf); }catch(e){ return ""; } };
+    var t=txt("utf-8"), P=arRulesFromMd(t);
+    if(!Object.keys(P.cos).length || (t.match(/\uFFFD/g)||[]).length>20){ var t2=txt("euc-kr"), P2=arRulesFromMd(t2); if(Object.keys(P2.cos).length) P=P2; }
+    var ids=Object.keys(P.cos).filter(function(id){ return id!=="GU" && co(id); });
     if(!ids.length){ toast("수금규칙 표를 찾지 못했습니다 — '## 5. 에스넷시스템(주)'처럼 법인 제목 아래 규칙 표가 있는 문서인지 확인하세요"); return; }
     var at=new Date().toISOString(), msg=[];
     ids.forEach(function(id){ var c=co(id);
@@ -8830,7 +8838,8 @@ function arRulesUpload(file){
     audit("ar_rules", {menu:"ar", target:file.name, detail:{cos:P.cnt, asOf:P.asOf, skipped:P.skipped.length}});
     invalidate(); save().then(function(){ toast("수금규칙 저장 · "+msg.join(" · ")+(P.skipped.length?" · 읽지 못한 "+P.skipped.length+"곳":"")); renderAr(); });
   };
-  fr.readAsText(file, "utf-8");
+  fr.onerror=function(){ toast("파일을 읽지 못했습니다: "+file.name); };
+  fr.readAsArrayBuffer(file);
 }
 /* ---- 예상입금일 ---- */
 function arMonthDay(iso, off, day){
@@ -8871,7 +8880,7 @@ function arRuleText(r){
 function arGradeChip(g){ if(!g) return ""; return '<span class="chip ar-g ar-g-'+(g==="REL"?"rel":g.toLowerCase())+'" title="'+esc(AR_GRADE_NAME[g]||g)+'">'+esc(g==="REL"?"관계사":g)+'</span>'; }
 function arExpCell(c, x){
   var e=arExpect(c, x);
-  if(!e.date) return '<span class="mini" title="'+esc(e.label||"")+'">'+esc(e.k==="rel"?"관계사":e.k==="gu"?"—":e.k==="none"?"규칙 없음":"—")+'</span>';
+  if(!e.date) return '<span class="mini ar-nodate" title="'+esc(e.label||"")+'">'+esc(e.k==="rel"?"관계사":e.k==="none"?"규칙 미등록":"—")+'</span>';
   var od=arDaysBetween(e.date, arAsOf(c,x)), tip=(e.r?(e.r.n+" · "+arRuleText(e.r)+(e.r.hit!=null?" · 적중 "+e.r.hit+"%":"")):e.label)||"";
   return '<span class="ar-exp'+(od>0?" od":"")+'" title="'+esc(tip)+'">'+esc(e.date.slice(5))+'</span>'+(od>0?' <span class="chip ar-od" title="예상입금일이 파일 기준일보다 '+od+'일 지남">+'+od+'일</span>':'');
 }
@@ -8898,8 +8907,8 @@ function arWeekHtml(W){
   var td=function(v,k,id){ var on=AR.wk===k && (!AR.wkCo||AR.wkCo===id);
     return '<td class="num'+(Math.abs(v||0)<0.5?" zero":"")+(k==="od"&&v?" ar-odv":"")+(on?" on":"")+'" data-wk="'+k+'"'+(id?' data-wkco="'+id+'"':'')+' title="'+esc(fmt(v||0)+"원")+'">'+mil(v||0)+'</td>'; };
   var head='<tr><th>법인</th>'+W.cols.map(function(cl){ return '<th class="num'+(cl.k==="od"?" ar-odh":"")+'"><div>'+esc(cl.l)+'</div><div class="mini">'+esc(cl.sub)+'</div></th>'; }).join("")+'</tr>';
-  var bars='<tr class="ar-wbar"><td class="mini">합계 막대</td>'+W.cols.map(function(cl){ var v=W.tot[cl.k]||0;
-      if(cl.k==="od"||cl.k==="st") return '<td></td>';
+  var bars='<tr class="ar-wbar"><td class="mini">주별 합계</td>'+W.cols.map(function(cl){ var v=W.tot[cl.k]||0;
+      if(cl.k==="od"||cl.k==="st"||!(v>0)) return '<td></td>';
       return '<td><div class="ar-vbar" title="'+esc(cl.l+" "+fmt(v)+"원 · "+(W.cnt[cl.k]||0)+"건")+'"><i style="height:'+(max?dxClamp(v/max*100):0).toFixed(1)+'%"></i></div></td>'; }).join("")+'</tr>';
   var body=cos.map(function(c){ return '<tr><td class="ar-wco">'+coChip(c)+' '+esc(c.short||c.name)+'</td>'+W.cols.map(function(cl){ return td((W.by[c.id]||{})[cl.k], cl.k, c.id); }).join("")+'</tr>'; }).join("");
   var tot='<tr class="total"><td>합계</td>'+W.cols.map(function(cl){ return td(W.tot[cl.k], cl.k, ""); }).join("")+'</tr>'+
@@ -8937,17 +8946,28 @@ renderBondView=function(){
     card("o ar-warn","악성채권 (90일 초과)",G.bad.bal,G.bad.n+"건 · 비중 "+pct(G.bad.bal).toFixed(1)+"%",'',pct(G.bad.bal))+
     card("ar-mid","장기채권 (61~90일)",G.long.bal,G.long.n+"건 · 비중 "+pct(G.long.bal).toFixed(1)+"%",'',pct(G.long.bal))+
     card("","정상채권 (60일 이내)",G.normal.bal,G.normal.n+"건 · 비중 "+pct(G.normal.bal).toFixed(1)+"%",'',pct(G.normal.bal))+
-    card("ar-odk","예상입금일 경과",OD.bal,OD.n+"건 · 비중 "+pct(OD.bal).toFixed(1)+"% · 기준일 대비",'',pct(OD.bal))+
+    (all.some(function(r){ return !!r.wk; }) ? card("ar-odk","예상입금일 경과",OD.bal,OD.n+"건 · 비중 "+pct(OD.bal).toFixed(1)+"% · 파일 기준일 대비",'',pct(OD.bal))
+      : card("","예상입금일 경과",null,"수금규칙을 올리면 계산",'',null))+
     card("x","삼성 매출처 채권 잔액",K.samsung,K.nSam+"건 · 비중 "+K.samPct.toFixed(1)+"%",' <span class="chip ar-sam">SAMSUNG</span>');
-  /* 규칙 안내 */
-  var rm=scopeCos().filter(function(c){ return c.id!=="GU"; }).map(function(c){ var R=c.arRules; return R ? c.short+" "+R.n+"곳" : c.short+" 규칙 없음"; });
-  var r0=scopeCos().map(function(c){ return c.arRules; }).filter(Boolean)[0];
-  $("#arRuleMeta").innerHTML='<b>수금규칙</b> '+esc(rm.join(" · "))+(r0?' · '+esc(r0.file||"")+(r0.asOf?' (분석일 '+esc(r0.asOf)+')':'')+' · '+esc(String(r0.at||"").slice(0,10))+(r0.by?' '+esc(r0.by):''):' · 규칙 문서(.md)를 올리면 예상입금일이 계산돼요')+
-    (scopeCos().some(function(c){ return c.id==="GU"; })?' · 굿어스는 종료 법인이라 예상입금일 계산 안 함':'');
+  /* 규칙 안내 — 규칙이 없는 법인이 있으면 눈에 띄게(v85.1: 규칙 문서를 아직 안 올린 상태를 알아보기 어려웠음) */
+  var ruleCos=scopeCos().filter(function(c){ return c.id!=="GU"; }), missing=ruleCos.filter(function(c){ return !c.arRules; });
+  var rm=ruleCos.map(function(c){ var R=c.arRules; return R ? c.short+" "+R.n+"곳" : c.short+" 없음"; });
+  var r0=ruleCos.map(function(c){ return c.arRules; }).filter(Boolean)[0];
+  var hasGU=scopeCos().some(function(c){ return c.id==="GU"; });
+  $("#arRuleMeta").className="pad mini ar-rulemeta"+(missing.length?" need":"");
+  $("#arRuleMeta").innerHTML = missing.length
+    ? '<b>수금규칙이 아직 없어요</b> — '+esc(missing.map(function(c){ return c.short; }).join("·"))+' 규칙 문서(「매출처별 수금(입금) 규칙 정리」 .md)를 올리면 예상입금일·주간 입금 예정이 계산돼요. '+
+      '<button type="button" class="btn sm primary" id="arRuleUp2">수금규칙 올리기</button>'+(r0?' <span>· 등록된 규칙: '+esc(rm.join(" · "))+'</span>':'')
+    : '<b>수금규칙</b> '+esc(rm.join(" · "))+' · '+esc(r0.file||"")+(r0.asOf?' (분석일 '+esc(r0.asOf)+')':'')+' · '+esc(String(r0.at||"").slice(0,10))+(r0.by?' '+esc(r0.by):'')+(hasGU?' · 굿어스는 종료 법인이라 예상입금일 계산 안 함':'');
+  var up2=$("#arRuleUp2"); if(up2) up2.onclick=function(){ $("#arRuleIn").click(); };
   /* 주간 입금 예정 */
-  $("#arWeekSub").textContent="예상입금일 기준 · 단위 백만원 · "+W.m0+"(월) 주부터 "+AR_WEEKS+"주"+(W.noneN?" · 예상일 없는 "+W.noneN+"건(관계사·굿어스·규칙 없음) 제외":"");
-  $("#arWeek").innerHTML=(all.length?arWeekHtml(W):'<div class="empty">채권 데이터가 없습니다</div>');
-  $("#arWeekFoot").innerHTML='칸을 누르면 아래 목록이 그 주 채권만 보여요'+(AR.wk?' · <button type="button" class="btn sm" id="arWkClear">주 선택 해제</button>':'')+' · 경과 = 예상입금일이 파일 기준일(조회일)보다 앞인데 아직 잔액이 남은 건';
+  var dated=all.filter(function(r){ return !!r.wk; }).length;
+  $("#arWeekSub").textContent="예상입금일 기준 · 단위 백만원 · "+W.m0+"(월) 주부터 "+AR_WEEKS+"주"+(dated&&W.noneN?" · 예상일 없는 "+W.noneN+"건(관계사·굿어스·규칙 없음) 제외":"");
+  $("#arWeek").innerHTML = !all.length ? '<div class="empty">채권 데이터가 없습니다</div>'
+    : !dated ? '<div class="empty ar-wempty"><b>예상입금일이 계산된 채권이 없어요</b>'+(missing.length?'위 [수금규칙 올리기]로 규칙 문서를 올려 주세요.':'관계사·굿어스·잔액 0 이하 채권만 있어요.')+'</div>'
+    : arWeekHtml(W);
+  $("#arWeekFoot").innerHTML = dated ? '칸을 누르면 아래 목록이 그 주 채권만 보여요'+(AR.wk?' · <button type="button" class="btn sm" id="arWkClear">주 선택 해제</button>':'')+' · 경과 = 예상입금일이 파일 기준일보다 앞인데 아직 잔액이 남은 건' : '';
+  if(!dated){ AR.wk=""; AR.wkCo=""; }
   $$("#arWeek [data-wk]").forEach(function(td){ td.onclick=function(){ var k=td.dataset.wk, id=td.dataset.wkco||"";
     if(AR.wk===k && AR.wkCo===id){ AR.wk=""; AR.wkCo=""; } else { AR.wk=k; AR.wkCo=id; } renderAr(); }; });
   var wc=$("#arWkClear"); if(wc) wc.onclick=function(){ AR.wk=""; AR.wkCo=""; renderAr(); };
@@ -11710,6 +11730,8 @@ function arExport(){
 }
 function arFiles(files){
   var arr=Array.prototype.slice.call(files||[]), n=0, msgs=[];
+  var md=arr.filter(function(f){ return /\.(md|markdown|txt)$/i.test(f.name||""); });   // [v85.1]
+  if(md.length){ arRulesUpload(md[0]); arr=arr.filter(function(f){ return md.indexOf(f)<0; }); if(!arr.length) return; }
   arr.reduce(function(p,f){ return p.then(function(){ return readFile(f).then(function(ab){
     var pk=null; try{ pk=parseArLedger(ab, f.name); }catch(e){ pk=null; }
     if(!pk){ msgs.push(f.name+": 건별반제정리현황 형식이 아닙니다"); return; }
