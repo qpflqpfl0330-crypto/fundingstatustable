@@ -545,7 +545,7 @@ svg.chart{display:block;width:100%;height:auto;overflow:visible}
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v82 · 2026-10-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v83 · 2026-10-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -1801,6 +1801,7 @@ var SEED_GD = [
 ["국민","358815-274453501","국민 453501",17,"원화","하도급 협력대금"],["국민","358815-274454401","국민 454401",18,"원화","하도급 협력대금"],
 ["하나","287-910777-07711","하나 07711",19,"원화","501.정기예금 · 2026-10-08 만기"],["하나","287-910777-08311","하나 08311",20,"원화","502.정기예금 · 2026-10-08 만기"],
 ["신한","207-038-046623","신한 046623",21,"원화","503.정기예금 · 2026-10-31 만기"],["농협","353-8874-8934-34","농협 8934",22,"원화","504.정기예금 · 2027-08-05 만기"],
+["신한","207-040-561593","신한 561593",22.1,"원화","505.[신한]정기예금5"],["신한","207-040-561718","신한 561718",22.2,"원화","506.[신한]정기예금6 · 2026-10-07 가입"],   /* [v83] 10-07 신한 695222 → 30억·20억 정기예금 가입 */
 ["하나","287-910005-87438","하나 87438",23,"외화","401.[하나]외화 USD"],
 ["KB증권","370-982-105","KB 105",24,"원화","증권계좌"],["NH투자증권","202-01-026829","NH 026829",25,"원화","증권계좌"]
 ];
@@ -8057,6 +8058,17 @@ function migrate(){
       if(!ex.formEnd) ex.formEnd="2026-10-19";
       if(ex.slipActual==null) ex.slipActual=true;
       ex.endFixV=82;
+    }
+    /* [v83] 굿어스데이터 2026-10-07 정기예금 가입(신한 695222 → 561593 30억 · 561718 20억, 사용자 확인 2026-10-20).
+       561718이 계좌 목록에 없어 미등록 계좌로 잡히던 것 — 없으면 1회 추가(이미 있으면 그대로) */
+    if(ex.id==="GD" && (+ex.acctFixV||0) < 83){
+      [["신한","207-040-561593","신한 561593","505.[신한]정기예금5"],["신한","207-040-561718","신한 561718","506.[신한]정기예금6 · 2026-10-07 가입"]].forEach(function(r){
+        var d=digitsOnly(r[1]); ex.accounts=ex.accounts||[];
+        if(ex.accounts.some(function(x){ return digitsOnly(x.num)===d; })) return;
+        var mx=ex.accounts.reduce(function(m,x){ return Math.max(m, +x.order||0); },0);
+        ex.accounts.push({bank:r[0], num:r[1], label:r[2], order:mx+1, group:"원화", note:r[3]});
+      });
+      ex.acctFixV=83;
     }
     if(ex.id==="SN" && (+ex.loanFixV||0) < 77){
       (ex.loans||[]).forEach(function(l){
