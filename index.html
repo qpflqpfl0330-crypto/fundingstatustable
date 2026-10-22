@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v88 · 2026-10-22</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v89 · 2026-10-22</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -7758,7 +7758,10 @@ function renderSettings(){
         '<td><input class="cellsel" data-ai="'+idx+'" data-f="note" value="'+esc(a.note||"")+'" style="width:200px"></td>'+
         '<td><button class="btn sm" data-adel="'+idx+'">삭제</button></td></tr>';
     }).join("")+'</tbody>';
-  $$("#acctTbl [data-ai]").forEach(function(el){ el.onchange=function(){ var f=el.dataset.f; target.accounts[+el.dataset.ai][f]= f==="order"?(+el.value||0):el.value; invalidate(); save().then(function(){toast("계좌 저장됨")}); }; });
+  $$("#acctTbl [data-ai]").forEach(function(el){ el.onchange=function(){ var f=el.dataset.f, a=target.accounts[+el.dataset.ai];
+    if(f==="label"){ var old=a.label; if(!acctLabelChange(target, a, el.value)){ el.value=a.label; return; }   // [v89] 표기 바꾸면 저장 자료도 새 표기로
+      invalidate(); save().then(function(){ toast("계좌 표기 저장됨 — "+old+" → "+a.label+" (저장된 거래·잔액 자료도 함께 바꿈)"); render(); }); return; }
+    a[f]= f==="order"?(+el.value||0):el.value; invalidate(); save().then(function(){toast("계좌 저장됨")}); }; });
   $$("#acctTbl [data-adel]").forEach(function(b){ b.onclick=function(){ target.accounts.splice(+b.dataset.adel,1); invalidate(); save().then(function(){renderSettings();toast("계좌 삭제됨")}); }; });
 
   // 기초잔액
@@ -9897,6 +9900,86 @@ ilboModel=(function(f){ return function(c, iso){ var m=f.apply(this, arguments);
   }catch(e){}
   return m; }; })(ilboModel);
 
+/* ===================== [v89] 계좌 표기 변경 시 저장 자료 따라 바꾸기 · 이관 계좌 계획 잔액 · 현금인출 = 당일계획 경비 ===================== */
+/* ---------- 계좌 표기(라벨) 별칭 ----------
+   거래·보고서 마감(repAccts)·시재표·전표 줄은 계좌를 '표기' 글자로 저장한다. 설정에서 표기를 바꾸면 예전 표기로 저장된 자료가
+   '미등록 계좌'로 따로 잡혀 잔액이 두 번 더해졌다(솔루션 10-21: 이관 계좌 [구굿어스] → [굿어스] 변경 후 19.3억 중복).
+   - 표기를 바꾸면: 예전 표기를 a.aliases에 남기고 저장 자료를 새 표기로 바꾼다.
+   - 불러올 때: a.aliases + '[…]' 꼬리만 다른 미등록 표기(같은 바탕 표기의 [..] 계좌가 하나뿐일 때)를 등록 표기로 바꾸고 저장한다. */
+var RELABEL_PENDING={};
+function lblBase(s){ return String(s||"").replace(/\s*\[[^\]]*\]\s*\d*$/,"").trim(); }
+function relabelMapOf(c){
+  var reg={}, map={}; (c.accounts||[]).forEach(function(a){ reg[a.label]=a; });
+  (c.accounts||[]).forEach(function(a){ (a.aliases||[]).forEach(function(o){ if(o && !reg[o] && o!==a.label) map[o]=a.label; }); });
+  var used={}, add=function(l){ if(l && !reg[l] && !map[l] && /\[/.test(l)) used[l]=1; };
+  Object.keys(c.days||{}).forEach(function(d){ var r=dayRec(c,d); if(!r) return;
+    (r.txns||[]).forEach(function(t){ add(t.acct); }); Object.keys(r.repAccts||{}).forEach(add); (r.accts||[]).forEach(function(a){ add(a.label); }); });
+  Object.keys(c.slips||{}).forEach(function(d){ ((c.slips[d]||{}).lines||[]).forEach(function(L){ add(L.acct); }); });
+  Object.keys(used).forEach(function(u){ var b=lblBase(u); if(!b) return;
+    var hit=(c.accounts||[]).filter(function(a){ return /\[/.test(a.label) && lblBase(a.label)===b; });
+    if(hit.length===1) map[u]=hit[0].label; });
+  return map;
+}
+function relabelApply(c, map){
+  var ks=Object.keys(map); if(!ks.length) return [];
+  var touched={}, mark=function(kind, d){ touched["co/"+c.id+"/"+kind+"/"+d.slice(0,7)]=1; }, R=function(l){ return map.hasOwnProperty(l)?map[l]:l; };
+  Object.keys(c.days||{}).forEach(function(d){ var r=c.days[d], hit=false;
+    var tx=Array.isArray(r)?r:(r&&r.txns)||[];
+    tx.forEach(function(t){ if(map.hasOwnProperty(t.acct)){ t.acct=R(t.acct); hit=true; } });
+    if(r && !Array.isArray(r)){
+      if(r.repAccts){ var nr={}; Object.keys(r.repAccts).forEach(function(k){ var nk=R(k); if(nk!==k) hit=true; if(nr.hasOwnProperty(nk) && nk!==k) return; nr[nk]=r.repAccts[k]; }); r.repAccts=nr; }
+      (r.accts||[]).forEach(function(a){ if(map.hasOwnProperty(a.label)){ a.label=R(a.label); hit=true; } });
+    }
+    if(hit) mark("m", d); });
+  Object.keys(c.sheetRef||{}).forEach(function(d){ var hit=false; ((c.sheetRef[d]||{}).txns||[]).forEach(function(t){ if(map.hasOwnProperty(t.acct)){ t.acct=R(t.acct); hit=true; } }); if(hit) mark("ref", d); });
+  Object.keys(c.slips||{}).forEach(function(d){ var hit=false; ((c.slips[d]||{}).lines||[]).forEach(function(L){ if(map.hasOwnProperty(L.acct)){ L.acct=R(L.acct); hit=true; } }); if(hit) mark("slip", d); });
+  if(c.opening){ var no={}, h2=false; Object.keys(c.opening).forEach(function(k){ var nk=R(k); if(nk!==k) h2=true; no[nk]=c.opening[k]; }); if(h2){ c.opening=no; touched["co/"+c.id+"/info/main"]=1; } }
+  if(c.fyOpen && c.fyOpen.accts){ var nf={}, h3=false; Object.keys(c.fyOpen.accts).forEach(function(k){ var nk=R(k); if(nk!==k) h3=true; nf[nk]=c.fyOpen.accts[k]; }); if(h3){ c.fyOpen.accts=nf; touched["co/"+c.id+"/info/main"]=1; } }
+  return Object.keys(touched);
+}
+/* ---------- 현금인출(보통예금 → 현금) = 당일계획 지출 '운영경비' + 현금시재 입금 (사용자 결정 2026-10-22, 전 법인) ----------
+   실적은 CMS 출금(거래구분 현금)이 이미 운영경비 — 계획도 같은 기준. 현금 → 은행 입금(반대)은 종전대로 자금이동. */
+function slipCashWdFix(lines){
+  var n=0, byV={}; (lines||[]).forEach(function(L){ (byV[L.voucher]=byV[L.voucher]||[]).push(L); });
+  Object.keys(byV).forEach(function(v){ var ls=byV[v];
+    var cin=ls.filter(function(L){ return L.kind==="move-in" && L.acct==="현금"; }), bout=ls.filter(function(L){ return L.kind==="move-out" && L.acct!=="현금"; });
+    if(!cin.length || !bout.length) return;
+    if(ls.some(function(L){ return (L.kind==="move-in" && L.acct!=="현금") || (L.kind==="move-out" && L.acct==="현금"); })) return;   // 은행끼리 이동이 섞인 전표는 그대로
+    bout.forEach(function(L){ L.kind="out"; L.cat="운영경비"; L.auto=false; L.cashWd=true; L.catWhy="현금인출(보통예금 → 현금시재) — 실적 CMS와 같이 운영경비"; n++; });
+    cin.forEach(function(L){ L.kind="cash-in"; L.cat="현금입금"; L.auto=false; L.cashWd=true; n++; });
+  });
+  return n;
+}
+slipDaysOf=(function(f){ return function(c, b, fileName){ var out=f.apply(this, arguments); try{ Object.keys(out).forEach(function(d){ slipCashWdFix(out[d].lines); }); }catch(e){} return out; }; })(slipDaysOf);
+/* 불러온 직후: 표기 별칭 · 현금인출 전표 정리 → 바뀐 문서는 다음 저장 때 올린다 */
+migrate=(function(f){ return function(){ var r=f.apply(this, arguments);
+  try{ (D.companies||[]).forEach(function(c){
+    relabelApply(c, relabelMapOf(c)).forEach(function(p){ RELABEL_PENDING[p]=1; });
+    Object.keys(c.slips||{}).forEach(function(d){ if(slipCashWdFix((c.slips[d]||{}).lines)) RELABEL_PENDING["co/"+c.id+"/slip/"+d.slice(0,7)]=1; });
+  }); }catch(e){ console.warn("v89 relabel", e); }
+  return r; }; })(migrate);
+buildAll=(function(f){ return function(){ var r=f.apply(this, arguments);
+  var ps=Object.keys(RELABEL_PENDING); RELABEL_PENDING={};
+  if(ps.length){ Object.keys(lastDocs).forEach(function(k){ if(ps.some(function(p){ return k===p || k.indexOf(p+".p")===0; })) delete lastDocs[k]; });
+    var later=function(){ if(typeof readOnly!=="undefined" && readOnly) return; if(typeof ROLE!=="undefined" && !(ROLE.admin||ROLE.upload)) return;
+      var pv=$("#previewPanel"); if(pv && !pv.hidden){ setTimeout(later, 3000); return; }   // 업로드 검토 중이면 끝난 뒤
+      if(AUTH.user) save(); };
+    setTimeout(later, 1500); }
+  return r; }; })(buildAll);
+/* 설정 › 계좌 표기 변경 */
+function acctLabelChange(c, a, nv){
+  var old=a.label; nv=String(nv||"").trim(); if(!nv || nv===old) return false;
+  if((c.accounts||[]).some(function(x){ return x!==a && x.label===nv; })){ toast("같은 표기의 계좌가 이미 있습니다: "+nv); return false; }
+  a.aliases=(a.aliases||[]).filter(function(x){ return x!==nv; }); if(a.aliases.indexOf(old)<0) a.aliases.push(old);
+  a.label=nv; var m={}; m[old]=nv; relabelApply(c, m);
+  return true;
+}
+/* ---------- 자금일보 계획: 승계일 당일 이관 계좌 시작 잔액 ---------- */
+function xferPlanOpen(c, iso, prevEnd, acct){
+  var X=xferFormOf(c); if(!X || !(prevEnd<X.xdate) || iso<X.xdate) return 0;
+  return +(X.byLabel||{})[acct]||0;
+}
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -11640,14 +11723,14 @@ function ilboModel(c, iso){
     L.forEach(function(x){
       if(x.acct==="현금") return;
       var abx=acctOf(c,x.acct), fxo=null; if(x.fx || (abx && abx.group==="외화") || x.fxTrade || x.fxTradeSyn){ var ab=abx, bk=ab?ab.bank:String(x.acct).split(" ")[0]; fxo=(m.fxRows||[]).filter(function(r){ return r.bank===bk; }).reduce(function(s,r){ return s+(r.cKrw||0); },0); }   // [v58] 외화 계좌 = 랏 원화 잔액
-      var e=exp[x.acct]||(exp[x.acct]={acct:x.acct, open:fxo!=null?fxo:((ch&&ch[x.acct])?ch[x.acct].close:0), in:0, out:0, mvIn:0, mvOut:0});
+      var e=exp[x.acct]||(exp[x.acct]={acct:x.acct, open:fxo!=null?fxo:(((ch&&ch[x.acct])?ch[x.acct].close:0)+xferPlanOpen(c, iso, prevEnd, x.acct)), in:0, out:0, mvIn:0, mvOut:0});   // [v89] 승계일 당일: 이관 계좌는 승계 잔액에서 시작
       if(x.kind==="in") e.in+=x.amount; else if(x.kind==="out") e.out+=x.amount; else if(x.kind==="move-in") e.mvIn+=x.amount; else if(x.kind==="move-out") e.mvOut+=x.amount;
     });
     m.expected=Object.keys(exp).map(function(k){ var e=exp[k]; e.close=e.open+e.in-e.out+e.mvIn-e.mvOut; return e; });
     var neg=m.expected.filter(function(e){ return e.open+e.in-e.out+e.mvIn < -0.5; });   // [v58] 지급 기준(자금이동 출금 = 당일 수금분 스윕은 제외)
     chk(!neg.length, neg.length ? "계획 반영 시 지급 잔액 부족: "+neg.map(function(e){return e.acct+" "+fmt(e.open+e.in-e.out+e.mvIn)}).join(", ") : "계획 반영 후 계좌별 지급 가능 잔액 모두 0 이상");
     var cashExp=m.cash.close+slipTotals(c,iso).cashIn-slipTotals(c,iso).cashOut;
-    chk(cashExp>=0, "현금시재 예상 "+fmt(cashExp)+"원 (전일 "+fmt(m.cash.close)+" − 당일 현금지출 "+fmt(slipTotals(c,iso).cashOut)+")");
+    chk(cashExp>=0, "현금시재 예상 "+fmt(cashExp)+"원 (전일 "+fmt(m.cash.close)+(slipTotals(c,iso).cashIn?" + 당일 현금입금 "+fmt(slipTotals(c,iso).cashIn):"")+" − 당일 현금지출 "+fmt(slipTotals(c,iso).cashOut)+")");   // [v89] 현금인출 전표 = 현금입금
     if(m.planInList.length) chk(true, "사후 수금 전표 "+m.planInList.length+"건 "+fmt(m.planInList.reduce(function(s,x){return s+x.amount},0))+"원 — 회계일자 이후 작성분이라 당일계획 입금에서 제외");
   }
   /* [v55] 전표 매칭 검증 */
