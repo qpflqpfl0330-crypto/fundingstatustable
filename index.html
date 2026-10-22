@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v85.1 · 2026-10-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v87 · 2026-10-21</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -817,13 +817,14 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
     <section class="view" id="v-fep" hidden>
       <div id="autoHub">
         <div class="auto-hero"><div><div class="auto-hero-t">에스넷그룹 자금파트 · 업무 모듈</div><div class="mini">필요한 업무를 선택하세요. 모든 파일은 이 브라우저 안에서만 처리됩니다.</div></div>
-          <div class="auto-pills"><span>운영 모듈 6개</span><span class="acc">엑셀 자동 생성</span><span>법인별 일괄 처리</span></div></div>
+          <div class="auto-pills"><span>운영 모듈 7개</span><span class="acc">엑셀 자동 생성</span><span>법인별 일괄 처리</span></div></div>
         <div class="auto-grid" id="autoGrid"></div>
       </div>
       <div class="auto-back" id="autoBack" hidden><button class="btn sm" id="btnAutoBack">← 자금업무자동화 목록</button><b id="autoToolTitle"></b></div>
       <!-- [v60] 이자수익전표 카드 하위 탭 — mmt = 기존 #mmt-app 그대로 · int = 기타 이자수익전표(#int-app) -->
       <!-- [v66] 사원경비 자동화 카드 하위 탭 — cardpay = 법인카드 계정대체 · expense = 사원경비(구 사원경비 대량이체) · overdue = 연체자 관리 -->
       <div class="seg" id="empTabs" role="group" aria-label="사원경비 자동화 업무" hidden><button type="button" data-t="cardpay" aria-pressed="true">법인카드 계정대체</button><button type="button" data-t="expense" aria-pressed="false">사원경비</button><button type="button" data-t="overdue" aria-pressed="false">연체자 관리</button></div>
+      <div class="seg" id="purTabs" role="group" aria-label="매입대금 별도지불 업무" hidden><button type="button" data-t="orapay" aria-pressed="true">오라클 지급</button><button type="button" data-t="snetpay" aria-pressed="false">에스넷 별도지급</button></div>
       <div class="seg" id="intTabs" role="group" aria-label="이자수익전표 종류" hidden><button type="button" data-t="mmt" aria-pressed="true">MMT 이자수익전표</button><button type="button" data-t="int" aria-pressed="false">기타 이자수익전표</button></div>
 
       <div class="auto-screen" data-tool="plan" hidden>
@@ -1582,6 +1583,85 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
               <textarea id="odMail" aria-label="안내 메일 문구" spellcheck="false"></textarea>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- [v82] 매입대금 별도지불 · 오라클 지급 — 구매팀 오라클 매입리스트 → 60일 지급일정 · 특이케이스(지급변경) · 지출일정 엑셀 -->
+      <div class="auto-screen" data-tool="orapay" hidden>
+<style>
+#purTabs{margin:0 0 12px}
+#orpNeedTbl{border-top:1px solid var(--rule-strong)}
+#orpNeedTbl .seg button{padding:3px 10px;font-size:12px}
+.orp-tbl td{white-space:nowrap}
+.orp-tbl th.num,.orp-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+.orp-tbl td.ctr,.orp-tbl th.ctr{text-align:center}
+.orp-tbl tr.orp-grp td{border-top:1px solid var(--rule-strong)}
+.orp-tbl tr.orp-shift td.orp-pay{color:var(--out);font-weight:600}
+.orp-tbl tr.orp-spec td{background:color-mix(in srgb,#F5C518 14%,transparent)}
+.orp-tbl tr.orp-off td{opacity:.45}
+.orp-tbl .orp-sub{display:block;font-size:10.5px;color:var(--muted);font-weight:400}
+.orp-tbl select{max-width:320px;font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--rule-strong);border-radius:6px;background:var(--surface);color:var(--ink)}
+.orp-checks{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.orp-check{display:flex;align-items:baseline;gap:8px 12px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--surface-2);font-size:12.5px}
+.orp-check b{font-variant-numeric:tabular-nums}
+.orp-check .mini{flex-basis:100%}
+.orp-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:900px){.orp-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.orp-term{width:64px}
+.orp-who{width:130px}
+</style>
+        <div class="panel fer-panel card-head">
+          <header><h2>오라클 지급</h2><span class="sub">구매팀 오라클 매입리스트(종합) → 작성일자 + 60일 지급 · 주말·공휴일이면 전영업일(60일을 넘기지 않음) · 특이케이스 반영 → 매입분 지출일정 엑셀</span>
+            <div class="sp"><button class="btn sm" id="btnOrpNew" type="button">새로 시작</button></div></header>
+          <div class="pad card-headpad">
+            <ol class="fer-steps card-steps" id="orpSteps"><li data-s="1">매입리스트 올리기</li><li data-s="2">합계 검증</li><li data-s="3">특이케이스 확인</li><li data-s="4">지출일정 엑셀</li></ol>
+            <div class="card-ctl">
+              <div class="grp"><span class="lbl">매입월</span><div class="card-val" id="orpMonth"><span class="mini">—</span></div></div>
+              <div class="grp"><span class="lbl">지불조건 <span class="muted">작성일자 +</span></span><div class="card-val"><input type="number" id="orpTerm" class="card-date orp-term" min="1" max="365" value="60" aria-label="지불조건 일수"> 일</div></div>
+              <div class="grp"><span class="lbl">회계단위</span><div class="card-val"><span class="chip co" style="color:var(--c-gd)">GD</span> 굿어스데이터㈜</div></div>
+              <div class="grp"><span class="lbl">전표 작성일자</span><input type="date" id="orpWrite" class="card-date" aria-label="전표 작성일자"></div>
+              <div class="grp"><span class="lbl">작성사원</span><input type="text" id="orpWho" class="card-date orp-who" value="이영인(GD)" aria-label="작성사원"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>1. 파일 올리기</h2><span class="sub">구매팀 매입리스트(.xlsx — 종합 · 세금계산서 발행내역) 필수 · ERP 건별반제(또는 건별반제 시트가 든 지출일정 파일)는 선택 — 여러 개를 한꺼번에</span></header>
+          <div class="pad">
+            <div class="ilbo-drop card-drop" id="orpDrop" tabindex="0" role="button" aria-label="파일 선택"><b>파일을 끌어다 놓거나 눌러서 선택</b><span class="mini">매입리스트: 작성일자·합계·적요·전표번호 머리글 · 건별반제: 회계일자·최종반제일자·전표금액·전표번호 머리글 — 종류는 머리글로 알아서 나눕니다</span></div>
+            <input type="file" id="orpIn" accept=".xls,.xlsx" multiple hidden>
+            <div id="orpFiles" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"></div>
+            <div class="orp-checks" id="orpChecks"></div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>2. 특이케이스 · 확인 필요</h2><span class="sub">마이너스 계산서가 다른 전표와 먼저 반제(상계)된 건 → 상계 대상 전표의 작성일자로 옮겨 그 지급분에서 차감 · 세금계산서 발행내역 ‘마이너스 반제’ 표시나 건별반제의 최종반제일자로 자동으로 짝을 찾습니다 · OR 전표가 아니거나 건별반제에 없는 전표는 근거를 보고 포함/제외를 직접 고릅니다</span></header>
+          <div class="pad" id="orpSpecPad"></div>
+          <div class="scroll"><table class="tbl card-tbl orp-tbl" id="orpSpecTbl"></table></div>
+          <div class="scroll"><table class="tbl card-tbl orp-tbl" id="orpNeedTbl"></table></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>3. 지급일정</h2><span class="sub">작성일자별 합계 → 지급일(Payment Day)별 지출금액 · 붉은 지급일 = 60일째가 주말·공휴일이라 앞당긴 날</span>
+            <div class="sp"><div class="seg" id="orpSeg"><button type="button" data-f="day" aria-pressed="true">작성일자별</button><button type="button" data-f="pay" aria-pressed="false">지급일별</button><button type="button" data-f="item" aria-pressed="false">건별</button></div></div></header>
+          <div class="pad" style="padding-bottom:0"><div class="kpis ar-kpis orp-kpis" id="orpKpis"></div></div>
+          <div class="scroll" style="max-height:64vh"><table class="tbl card-tbl orp-tbl" id="orpTbl"></table></div>
+          <div class="pad mini" id="orpFoot"></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>4. 지출일정 엑셀</h2><span class="sub">시트: 오라클 매입_보고(보고용 일정표 · 대금지급변경) · 전표입력(지급일별 품의) · 건별명세(계산서별 지급일)</span>
+            <div class="sp"><button class="btn primary sm" id="btnOrpXlsx" type="button" disabled>지출일정 엑셀 다운로드</button></div></header>
+          <div class="pad mini" id="orpOutNote">매입리스트를 올리면 만들 수 있습니다. 모든 파일은 이 브라우저 안에서만 처리되고 저장하지 않습니다.</div>
+        </div>
+      </div>
+
+      <!-- [v82] 매입대금 별도지불 · 에스넷 별도지급 (준비 중) -->
+      <div class="auto-screen" data-tool="snetpay" hidden>
+        <div class="panel fer-panel">
+          <header><h2>에스넷 별도지급</h2><span class="sub">준비 중</span></header>
+          <div class="pad"><div class="banner">오라클 지급 화면을 먼저 완성한 뒤 같은 방식으로 이어서 만듭니다. 업무 규칙(지급 조건 · 대상 거래처 · 원본 파일)을 알려 주시면 반영하겠습니다.</div></div>
         </div>
       </div>
 
@@ -4294,6 +4374,7 @@ function coState(c){
   var fy=c.fyOpen||null, base=fy?fy.asOf:null;
   var dates=Object.keys(c.days).filter(function(d){ return d<=_t && (!base || d>=base); }).sort(), accs=effAccounts(c);
   var hasBase=!!(base && dates[0]===base);
+  var XS=xferSeed(c), XD=XS?XS.date:null, xfxDone=false, xtDone=false;   // [v87] 계좌 이관 승계 기초
   var chain={}, totals={}, fxState={}, fxDetail=[], fxSrcIso=null, cashState=null, fxPrev=0, fxAfter={}, fxAnchorSkip=[];   // [v58]
   if(fy){
     Object.keys(fy.fxState||{}).forEach(function(cy){ fxState[cy]={amt:fy.fxState[cy].amt||0, krw:fy.fxState[cy].krw||0}; });
@@ -4329,10 +4410,12 @@ function coState(c){
   /* 계좌별로 앵커에서 전방·후방 전파 — 기초잔액을 넣지 않아도 CMS 잔액에 맞춰집니다 */
   accs.forEach(function(ac){
     var lab=ac.label, seed=+((c.opening||{})[lab])||0, run=null, firstA=-1;
+    var xv=(XS && Object.prototype.hasOwnProperty.call(XS.byLabel, lab)) ? XS.byLabel[lab] : null, xdone=false;   // [v87] 이관 계좌: 이관일 첫 자료일에 원 법인 마감잔액을 기초로
     var fyV = fy ? (+((fy.accts||{})[lab])||0) : null;
     if(fy){ seed=fyV; if(!hasBase) run=fyV; }              // [v25] 기준일 마감 잔액에서 출발
     for(var i=0;i<dates.length;i++){
       var g=grid[dates[i]][lab];
+      if(xv!==null && !xdone && dates[i]>=XD){ xdone=true; run=(run||0)+xv; g.xferIn=xv; }
       if(fy && dates[i]===base){ g.anchor=fyV; if(g.anchorOpen==null) g.anchorOpen=fyV-g.delta; }   // 기준일 마감 = 확정값
       if(g.anchor!=null){
         g.open = (g.anchorOpen!=null) ? g.anchorOpen : (run!==null ? run : g.anchor-g.delta);
@@ -4344,7 +4427,7 @@ function coState(c){
       }
       run = g.close;
     }
-    if(firstA>0 && !fy){                              // 첫 앵커 이전 구간은 거꾸로 되짚어 채움 (개시 앵커가 있으면 생략)
+    if(firstA>0 && !fy && xv===null){                 // 첫 앵커 이전 구간은 거꾸로 되짚어 채움 (개시 앵커가 있으면 생략 · [v87] 이관 계좌는 이관 전 0)
       var back=grid[dates[firstA]][lab].open;
       for(var j=firstA-1;j>=0;j--){
         var gg=grid[dates[j]][lab];
@@ -4377,6 +4460,11 @@ function coState(c){
     } else {
       var nf2={}; Object.keys(fxState).forEach(function(cy){ nf2[cy]={amt:fxState[cy].amt||0, krw:fxState[cy].krw||0}; });
       fxState=nf2; fxDetail=fxDetail.slice();
+    }
+    if(XS && XS.fx && !xfxDone && iso>=XD){           // [v87] 외화 잔액·랏 승계 — 외화금액은 센트 단위로 더해 소수점 2자리 보존
+      xfxDone=true;
+      Object.keys(XS.fxState).forEach(function(cy){ var sl=fxState[cy]||(fxState[cy]={amt:0,krw:0}); sl.amt=(fxCents(sl.amt)+fxCents(XS.fxState[cy].amt))/100; sl.krw=(sl.krw||0)+(XS.fxState[cy].krw||0); });
+      fxDetail=fxDetail.concat(XS.fxDetail); fxPrev+=XS.fxKrw;
     }
     /* CMS로 잡힌 외화 입출금 중 환율을 확인·확정한 건은 그날부터 외화 잔액에 증분 반영 */
     /* [v53] 그날 자금현황보고 마감값(asOf = 그날)이 들어 있으면 그날 거래는 이미 보고서 마감에 포함 — CMS 확정분을 다시 더하거나 빼지 않는다 */
@@ -4441,6 +4529,7 @@ function coState(c){
   var firstAnchor=-1, running=(fy && !hasBase) ? fy.total : null, seenDetail=false;     // [v25] 기준일 이후 첫날은 개시 기초에서 출발
   for(var i=0;i<rows.length;i++){
     var r=rows[i], prevSrc=i>0?rows[i-1].src:null;
+    if(XS && !xtDone && r.iso>=XD){ xtDone=true; r.xferIn=XS.krw+(XS.fx?XS.fxKrw:0); if(running!==null) running+=r.xferIn; }   // [v87] 승계분은 기초에(수지 아님)
     var useAbs = (r.src==="sheet") || (r.src==="cms" && r.absClose!=null) || (r.src==="xlsm" && !seenDetail && (prevSrc===null || prevSrc==="xlsm"));   // [v58]
     if(r.src==="xlsm" && seenDetail) r.delta=r.net||0;   // [v58] 상세 데이터 사이의 일별현황 날(주말)은 수지차만
     if(r.src==="sheet"||r.src==="cms") seenDetail=true;
@@ -4465,7 +4554,7 @@ function coState(c){
   }
   rows.forEach(function(r){
     totals[r.iso]={open:r.open, close:r.close, fx:r.fxKrw, fxState:r.fxState, fxDetail:r.fxDetail, fxSrcIso:r.fxSrcIso, gov:r.gov,
-      unalloc:r.close-r.depClose, cash:r.cashState.close, cashState:r.cashState, net:r.net, src:r.src};
+      unalloc:r.close-r.depClose, cash:r.cashState.close, cashState:r.cashState, net:r.net, src:r.src, xferIn:r.xferIn||0, xferSrc:r.xferIn?XS.src:null};
   });
   var v={dates:dates, accs:accs, chain:chain, totals:totals, anchored:firstAnchor>=0};
   _cache[c.id]={k:k,v:v};
@@ -4480,6 +4569,7 @@ function daySummary(c,iso){
   a.open=t.open; a.close=t.close; a.fx=t.fx; a.gov=t.gov; a.fxState=t.fxState||{}; a.unalloc=t.unalloc||0;
   a.cash=t.cash||0; a.cashState=t.cashState||{open:0,inAmt:0,outAmt:0,close:0}; a.fxDetail=t.fxDetail||[]; a.fxSrcIso=t.fxSrcIso||null;
   a.usable=t.close-t.fx-t.gov-((manualOf(c,iso).trust)||0);
+  a.xferIn=(st.totals[iso]&&st.totals[iso].xferIn)||0; a.xferSrc=(st.totals[iso]&&st.totals[iso].xferSrc)||null;   // [v87]
   return a;
 }
 /* 여러 법인 합산 */
@@ -7996,6 +8086,15 @@ function handleFiles(files){
           if(!sp) return false;
           var c5=detectCompany((sp.lines[0]||{}).unit)||guessCoFromName(f.name)||(curCo!=="ALL"?co(curCo):null);
           if(!c5){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--warn)"><span>'+esc(f.name)+'</span><span class="chip auto">법인 미판별</span><span class="mini">파일명에 SN/굿어스/데이터/솔루션을 포함시켜 주세요</span></div>'); return true; }
+          var xs5=xferSplitLines(c5, sp.lines);   // [v87] 이관일 이후 회계일자 줄은 승계 법인 전표로
+          if(xs5){
+            var bX=buildSlip(xs5.to, xs5.moved), dX=slipDaysOf(xs5.to, bX, f.name);
+            result.slips[xs5.to.id]=result.slips[xs5.to.id]||{};
+            Object.keys(dX).forEach(function(d){ result.slips[xs5.to.id][d]=result.slips[xs5.to.id][d]?slipMergeDay(result.slips[xs5.to.id][d], dX[d]):dX[d]; });
+            log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip mv">계좌 이관</span><span class="mini">'+esc(c5.short)+' 전표 '+xs5.moved.length+'줄('+esc(Object.keys(dX).sort().join(", "))+') → '+esc(xs5.to.name)+' 전표로 저장</span></div>');
+            if(!xs5.rest.length) return true;
+            sp.lines=xs5.rest;
+          }
           var b5=buildSlip(c5, sp.lines), days5=slipDaysOf(c5, b5, f.name), dl5=Object.keys(days5).sort();
           if(!dl5.length){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(f.name)+'</span><span class="mini">전표에서 회계일자를 찾지 못했습니다</span></div>'); return true; }
           result.slips[c5.id]=result.slips[c5.id]||{};
@@ -8012,7 +8111,7 @@ function handleFiles(files){
         if(rows.length){
           var groups={};
           rows.forEach(function(r){
-            var c=detectCompany(r.company)||guessCoFromName(f.name);
+            var c=xferCo(detectCompany(r.company)||guessCoFromName(f.name), r.date);   // [v87]
             if(!c){ result.notes.push(f.name+": 법인을 판별하지 못한 "+1+"건"); return; }
             (groups[c.id]=groups[c.id]||[]).push(r);
           });
@@ -9116,6 +9215,229 @@ function ilboArPanel(){
   $$("#arViewSeg button").forEach(function(b){ b.onclick=function(){ AR.view=b.dataset.v; renderAr(); }; });
   $$("#arSeg button").forEach(function(b){ b.onclick=function(){ AR.f=b.dataset.f; renderAr(); }; });
 })();
+
+/* ===================== [v87] 법인 계좌 이관(합병 승계) =====================
+   굿어스(GU) → 굿어스스마트솔루션(GS) 합병: 이관일부터 굿어스의 살아 있는 계좌는 솔루션 계좌로 본다.
+   - 설정: 이관하는 법인 info에 xfer={to, date, accts:[계좌번호 숫자], fx, at, by} (관리자 전용 값)
+   - 업로드: CMS 기업명·전표 회계단위가 굿어스여도 거래일·회계일자가 이관일 이후면 솔루션으로 들어간다
+   - 잔액: 솔루션의 이관 계좌는 이관 전날(굿어스 마지막 자료일) 굿어스 마감잔액을 '승계 기초'로 시작한다.
+           입금·출금에는 넣지 않으므로 기초 + 입금 − 출금 = 기말은 그대로, 그룹 합계도 중복 없음(굿어스는 종료일 이후 합계 제외)
+   - 외화: xfer.fx면 굿어스 외화 잔액(통화별 외화금액·장부 원화)과 보유 랏을 그대로 승계 (외화 소수점 2자리 보존)
+   - 자금집행결과보고서: 양식 종료일(formEnd) 다음 날부터의 굿어스 CMS·전표는 솔루션 칸에 합산 */
+INFO_ADMIN_KEYS.push("xfer");
+function xferOf(c){ var x=c&&c.xfer; return (x && x.to && x.date && Array.isArray(x.accts) && x.to!==c.id) ? x : null; }
+function xferSrcs(c){ return ((D&&D.companies)||[]).filter(function(s){ var x=xferOf(s); return !!(x && c && x.to===c.id); }); }
+function xferTag(s){ return "[구"+String((s&&s.short)||(s&&s.name)||"").replace(/\s/g,"")+"]"; }
+/* 업로드 법인 판별 뒤 — 이관일 이후 거래면 승계 법인으로 */
+function xferCo(c, date){ var x=xferOf(c); if(!x || !date || date<x.date) return c; return co(x.to)||c; }
+/* 자금집행결과보고서: 양식에서 빠지는 날(formEnd 다음 날)부터 승계 법인 칸 */
+function xferFerFrom(s){ var x=xferOf(s); if(!x) return null; var fe=coFormEnd(s); return fe ? isoAdd(fe,1) : x.date; }
+function xferFerTo(k){ var s=ferCo(k), x=xferOf(s); return x ? x.to : null; }
+/* 승계 법인(c)에 등록된 이관 계좌 목록 */
+function xferAccts(c){
+  var out=[];
+  xferSrcs(c).forEach(function(s){ var x=xferOf(s);
+    (c.accounts||[]).forEach(function(a){ var d=digitsOnly(a.num); if(!d || x.accts.indexOf(d)<0) return;
+      var sa=(s.accounts||[]).filter(function(b){ return digitsOnly(b.num)===d; })[0]||null;
+      out.push({src:s, x:x, acc:a, srcAcc:sa}); }); });
+  return out;
+}
+/* 승계 기초 — 이관 전날까지 원 법인의 마지막 자료일 마감 */
+function xferSeed(c){
+  var srcs=xferSrcs(c); if(!srcs.length) return null;
+  var s=srcs[0], x=xferOf(s), st=coState(s);
+  var pd=st.dates.filter(function(d){ return d<x.date; }).pop();
+  var out={src:s.id, date:x.date, asOf:pd||null, byLabel:{}, krw:0, fxState:{}, fxDetail:[], fxKrw:0, fx:!!x.fx};
+  var ch=(pd&&st.chain[pd])||{}, tot=(pd&&st.totals[pd])||{};
+  xferAccts(c).forEach(function(r){
+    if(r.src!==s || r.acc.group==="외화") return;
+    var v=r.srcAcc ? ch[r.srcAcc.label] : null, amt=v ? (+v.close||0) : 0;
+    out.byLabel[r.acc.label]=amt; out.krw+=amt;
+  });
+  if(x.fx){
+    Object.keys(tot.fxState||{}).forEach(function(cy){ var f=tot.fxState[cy]||{}; if(!fxCents(f.amt) && !(+f.krw)) return;
+      out.fxState[cy]={amt:fxCents(f.amt)/100, krw:+f.krw||0}; out.fxKrw+=(+f.krw||0); });
+    out.fxDetail=(tot.fxDetail||[]).map(function(l){ return Object.assign({}, l, {xfer:s.id}); });
+  }
+  return out;
+}
+/* 기간 안에 승계가 일어났으면(기간 첫날 기초에는 아직 없고 기말에는 있는 경우) 그 금액 — 자금일보 열별 항등식 검증용 */
+function xferInRange(c, rg){
+  if(!rg) return 0; var XS=xferSeed(c); if(!XS || !XS.date) return 0;
+  if(!(XS.date>rg.from && XS.date<=rg.to)) return 0;
+  var st=coState(c), d=st.dates.filter(function(x){ return x>=XS.date && x<=rg.to; })[0];
+  return d && st.totals[d] ? (st.totals[d].xferIn||0) : 0;
+}
+/* 캐시 키 — 승계 법인 잔액은 원 법인 자료에도 따라 달라진다 */
+ckey=(function(f){ return function(c){ var k=f(c); xferSrcs(c).forEach(function(s){ k+="|X:"+JSON.stringify(xferOf(s))+"|"+f(s); }); return k; }; })(ckey);
+
+/* 전표 줄 나누기 — 이관일 이후 회계일자 줄은 승계 법인으로 */
+function xferSplitLines(c, lines){
+  var x=xferOf(c); if(!x) return null;
+  var mv=[], rest=[]; (lines||[]).forEach(function(L){ (L.date && L.date>=x.date ? mv : rest).push(L); });
+  if(!mv.length) return null;
+  return {to:co(x.to), moved:mv, rest:rest};
+}
+
+/* 자금집행결과보고서 — 계산용 상태(원본 FERS는 그대로 두고 복사본에서 합친다) */
+function xferFerState(st){
+  var out={date:st.date, erp:Object.assign({}, st.erp), cms:Object.assign({}, st.cms)}, notes=[];
+  FER_ALL.forEach(function(k){
+    var to=xferFerTo(k); if(!to) return;
+    var from=xferFerFrom(ferCo(k)); if(!from) return;
+    var cm=st.cms[k];
+    if(cm && cm.rows){
+      var mvR=cm.rows.filter(function(t){ return t.date>=from; });
+      if(mvR.length){
+        var keepR=cm.rows.filter(function(t){ return t.date<from; });
+        if(keepR.length) out.cms[k]=Object.assign({}, cm, {rows:keepR}); else delete out.cms[k];
+        var tg=out.cms[to];
+        out.cms[to]= tg ? Object.assign({}, tg, {rows:tg.rows.concat(mvR), name:tg.name+" + "+cm.name}) : {name:cm.name, rows:mvR.slice(), company:cm.company, xferOnly:true};
+        notes.push(ferCo(k).short+" CMS "+mvR.length+"건");
+      }
+    }
+    var ep=st.erp[k];
+    if(ep && ep.parsed){
+      var mvL=ep.parsed.lines.filter(function(L){ return L.date>=from; });
+      if(mvL.length){
+        var keepL=ep.parsed.lines.filter(function(L){ return L.date<from; });
+        var subP=function(p, ls){ var dd={}; ls.forEach(function(L){ dd[L.date]=(dd[L.date]||0)+1; }); return Object.assign({}, p, {lines:ls, dates:dd}); };
+        if(keepL.length) out.erp[k]=Object.assign({}, ep, {parsed:subP(ep.parsed, keepL)}); else delete out.erp[k];
+        var te=out.erp[to];
+        out.erp[to]= te ? Object.assign({}, te, {parsed:subP(te.parsed, te.parsed.lines.concat(mvL)), name:te.name+" + "+ep.name}) : {name:ep.name, parsed:subP(ep.parsed, mvL), unit:ep.unit, xferOnly:true};
+        notes.push(ferCo(k).short+" 전표 "+mvL.length+"줄");
+      }
+    }
+    if(notes.length){ var wm=ferCo(k).name+" "+from+" 이후 자료("+notes.join(" · ")+")는 계좌 이관에 따라 "+ferCo(to).name+" 칸에 합산했습니다", wl=(st.warn||(st.warn=[])); if(wl.indexOf(wm)<0) wl.push(wm); }
+    notes=[];
+  });
+  return out;
+}
+
+/* ---------- 설정 › 법인 계좌 이관 (관리자) ---------- */
+var XF={src:"GU", file:null, sel:null};
+function xferBalFile(ab, name){
+  var wb=XLSX.read(ab,{type:"array"}), ws=wb.Sheets[wb.SheetNames[0]];
+  var rows=XLSX.utils.sheet_to_json(ws,{defval:"",raw:true}), out=[], asOf="";
+  rows.forEach(function(r){ var o={}; Object.keys(r).forEach(function(k){ o[String(k).trim()]=r[k]; });
+    var num=String(o["계좌"]||o["계좌번호"]||"").trim(), d=digitsOnly(num); if(!d || d.length<8) return;
+    if(o["총잔액"]===undefined && o["잔액"]===undefined) return;
+    var ccy=String(o["통화"]||"KRW").trim().toUpperCase(), bal=toNum(o["총잔액"]!==undefined?o["총잔액"]:o["잔액"]);
+    var q=o["최종조회일"]; if(typeof q==="number" && q>40000){ var dt=new Date(Math.round((q-25569)*86400000)); asOf=dt.toISOString().slice(0,10); }
+    out.push({company:String(o["기업명"]||"").trim(), bank:String(o["은행"]||"").trim(), digits:d, tail:d.slice(-5), alias:String(o["계좌별칭"]||"").trim(), ccy:ccy,
+      bal: ccy==="KRW" ? Math.round(bal) : fxCents(bal)/100});
+  });
+  if(!out.length) return null;
+  return {name:name, rows:out, asOf:asOf};
+}
+/* 원 법인 마지막 자료일 마감(계좌별) */
+function xferSrcClose(s, before){
+  var st=coState(s), pd=st.dates.filter(function(d){ return !before || d<before; }).pop();
+  return {asOf:pd||null, ch:(pd&&st.chain[pd])||{}, tot:(pd&&st.totals[pd])||{}};
+}
+/* 승계 법인 특정일 계좌 잔액 */
+function xferTgtClose(t, label, iso){
+  var st=coState(t), d=st.dates.filter(function(x){ return x<=iso; }).pop(); var r=d&&st.chain[d]&&st.chain[d][label];
+  return {v:r ? r.close : null, d:d||null};
+}
+function renderXfer(){
+  var host=$("#xferPanel");
+  if(!host){ var a=$("#coTbl"); if(!a) return; var p=a.closest(".panel"); host=document.createElement("div"); host.className="panel"; host.id="xferPanel"; p.parentNode.insertBefore(host, p.nextSibling); }
+  if(!(typeof ROLE!=="undefined" && ROLE.admin)){ host.hidden=true; return; }
+  host.hidden=false;
+  var srcs=D.companies.filter(function(c){ return !!c.endDate || !!xferOf(c); });
+  if(!srcs.length){ host.innerHTML='<header><h2>법인 계좌 이관 (합병)</h2></header><div class="pad"><p class="hint" style="margin:0">종료일이 있는 법인이 없습니다. 법인 관리 표에서 종료일을 먼저 넣으세요.</p></div>'; return; }
+  if(!srcs.some(function(c){ return c.id===XF.src; })) XF.src=srcs[0].id;
+  var s=co(XF.src), x=xferOf(s), tgtId=(x&&x.to)||(D.companies.filter(function(c){ return c.name===s.successor || c.short===s.successor; })[0]||{}).id||"";
+  var date=(x&&x.date)||(s.endDate?isoAdd(s.endDate,1):"");
+  if(!XF.sel){ XF.sel={}; (s.accounts||[]).forEach(function(a){ var d=digitsOnly(a.num); if(d && x && x.accts.indexOf(d)>=0) XF.sel[d]=1; }); }
+  var sc=xferSrcClose(s, date), t=tgtId?co(tgtId):null;
+  var fileBy={}; ((XF.file&&XF.file.rows)||[]).forEach(function(r){ (fileBy[r.digits]=fileBy[r.digits]||[]).push(r); });
+  var rowsH=(s.accounts||[]).map(function(a){
+    var d=digitsOnly(a.num), on=!!XF.sel[d], v=sc.ch[a.label], fx=a.group==="외화";
+    var fr=fileBy[d]||[], tl=t ? (t.accounts||[]).filter(function(b){ return digitsOnly(b.num)===d; })[0] : null;
+    var fileTxt=fr.length ? fr.map(function(r){ return (r.ccy==="KRW"?fmt(r.bal):r.ccy+" "+fmtFx(r.bal)); }).join("<br>") : '<span class="mini">-</span>';
+    var chk="", cmpTxt='<span class="mini">-</span>';
+    if(fr.length && !fx && XF.file.asOf){
+      var cmp = (x && tl && XF.file.asOf>=x.date) ? xferTgtClose(t, tl.label, XF.file.asOf) : {v:(v?v.close:null), d:sc.asOf};
+      var fv=fr.reduce(function(q,r){ return q+(r.ccy==="KRW"?r.bal:0); },0);
+      if(cmp.v!=null && cmp.d) cmpTxt=fmt(cmp.v)+' <span class="mini">'+esc(cmp.d.slice(5))+(tl && x && cmp.d>=x.date?' · '+esc(t.short):'')+'</span>';
+      /* 대시보드 자료가 파일 조회일보다 앞이면 아직 대조할 수 없다(차이로 보이지 않게) */
+      chk = (cmp.v==null || !cmp.d) ? '<span class="chip nv">자료 없음</span>'
+          : (cmp.d<XF.file.asOf ? '<span class="chip nv" title="대시보드 자료가 '+esc(cmp.d)+'까지라 '+esc(XF.file.asOf)+' 잔액과 대조할 수 없습니다 — 그날 거래내역을 올리면 대조합니다">자료 '+esc(cmp.d.slice(5))+'까지</span>'
+          : (Math.abs(cmp.v-fv)<1 ? '<span class="chip in">일치</span>' : '<span class="chip ar-warnchip">차이 '+fmt(fv-cmp.v)+'</span>'));
+    }
+    return '<tr'+(on?' class="xf-on"':'')+'><td><input type="checkbox" data-xd="'+d+'"'+(on?' checked':'')+'></td>'+
+      '<td>'+esc(a.label)+(tl?' <span class="chip in" title="솔루션 계좌로 등록됨">'+esc(tl.label)+'</span>':'')+'</td><td class="mini" style="white-space:nowrap">'+esc(a.note||"")+'</td><td class="c">'+esc(fx?"외화":"원화")+'</td>'+
+      '<td class="num">'+(fx?'<span class="mini">외화 랏 승계</span>':(v?fmt(v.close):'<span class="mini">-</span>'))+'</td>'+
+      '<td class="num">'+fileTxt+'</td>'+(XF.file?'<td class="num">'+cmpTxt+'</td>':'')+'<td>'+chk+'</td></tr>';
+  }).join("");
+  var fxSt=sc.tot.fxState||{}, fxTxt=Object.keys(fxSt).filter(function(cy){ return fxCents(fxSt[cy].amt); }).map(function(cy){ return cy+" "+fmtFx(fxSt[cy].amt)+" (장부 "+fmt(fxSt[cy].krw||0)+"원)"; }).join(" · ")||"없음";
+  var leftover=x ? Object.keys(s.days||{}).filter(function(d){ return d>=x.date; }).concat(Object.keys(s.slips||{}).filter(function(d){ return d>=x.date; })) : [];
+  leftover=leftover.filter(function(d,i,a){ return a.indexOf(d)===i; }).sort();
+  host.innerHTML='<header><h2>법인 계좌 이관 (합병)</h2><span class="sub">이관일부터 원 법인의 계좌·거래·전표를 승계 법인으로 봅니다 · 이관 전날 마감잔액은 승계 법인의 기초로 넘어갑니다(입·출금 아님)</span></header>'+
+    '<div class="pad" style="display:flex;flex-direction:column;gap:12px">'+
+      '<div class="toolbar" style="flex-wrap:wrap;gap:8px">'+
+        '<label class="field" style="margin:0"><span class="lbl">원 법인</span><select id="xfSrc">'+srcs.map(function(c){ return '<option value="'+c.id+'"'+(c.id===s.id?' selected':'')+'>'+esc(c.name)+'</option>'; }).join("")+'</select></label>'+
+        '<label class="field" style="margin:0"><span class="lbl">승계 법인</span><select id="xfTo"><option value="">선택</option>'+D.companies.filter(function(c){ return c.id!==s.id; }).map(function(c){ return '<option value="'+c.id+'"'+(c.id===tgtId?' selected':'')+'>'+esc(c.name)+'</option>'; }).join("")+'</select></label>'+
+        '<label class="field" style="margin:0"><span class="lbl">이관일 (이날 거래부터 승계 법인)</span><input type="date" id="xfDate" value="'+esc(date)+'"></label>'+
+        '<label style="display:flex;align-items:center;gap:6px;align-self:flex-end;min-height:36px;margin:0;cursor:pointer"><input type="checkbox" id="xfFx"'+((!x||x.fx)?' checked':'')+'><span>외화 잔액·랏도 승계</span></label>'+
+      '</div>'+
+      '<p class="hint" style="margin:0">'+esc(s.name)+' 자금 자료 종료일 <b>'+esc(s.endDate||"-")+'</b> · 계획서·결과보고서 양식 종료일 <b>'+esc(coFormEnd(s)||"-")+'</b> — 자금집행결과보고서는 양식 종료일 다음 날('+esc(xferFerFrom(s)||(coFormEnd(s)?isoAdd(coFormEnd(s),1):"-"))+')부터 승계 법인 칸에 합산합니다. '+
+        '승계 기초 기준: <b>'+esc(sc.asOf||"자료 없음")+'</b> 마감 · 외화 '+esc(fxTxt)+'</p>'+
+      '<div class="toolbar"><button class="btn" id="xfFileBtn">계좌잔액조회 파일로 체크</button><input type="file" id="xfFile" accept=".xls,.xlsx" hidden>'+
+        '<span class="mini">'+(XF.file?esc(XF.file.name)+' · '+XF.file.rows.length+'줄'+(XF.file.asOf?' · 조회일 '+XF.file.asOf:'')+' — 파일은 저장하지 않습니다':'살아 있는 계좌 목록(계좌잔액조회)을 올리면 그 계좌를 체크하고 잔액을 맞춰 봅니다')+'</span></div>'+
+      '<div class="scroll"><table class="tbl" id="xfTbl" style="min-width:860px"><thead><tr><th></th><th>계좌</th><th>메모</th><th class="c">구분</th><th class="num">이관 전 마감 ('+esc(sc.asOf||"-")+')</th><th class="num">잔액조회 파일'+(XF.file&&XF.file.asOf?' ('+esc(XF.file.asOf)+')':'')+'</th>'+(XF.file?'<th class="num">대시보드 같은 날</th>':'')+'<th>대조</th></tr></thead><tbody>'+rowsH+'</tbody></table></div>'+
+      (leftover.length?'<div class="banner warn">'+esc(s.name)+'에 이관일 이후 자료가 남아 있습니다('+esc(leftover.join(", "))+'). 이 날짜의 CMS·전표 파일을 다시 올리면 '+esc((t&&t.name)||"승계 법인")+'으로 들어갑니다. <button class="btn sm" id="xfPurge">'+esc(s.short)+' 쪽 이관일 이후 자료 지우기</button></div>':'')+
+      '<div class="toolbar"><button class="btn primary" id="xfSave">이관 저장</button>'+(x?'<button class="btn" id="xfOff">이관 해제</button>':'')+
+        '<span class="mini" id="xfMsg">'+(x?'현재: '+esc(s.short)+' → '+esc(co(x.to).short)+' · '+esc(x.date)+'부터 · 계좌 '+x.accts.length+'개'+(x.fx?' · 외화 승계':'')+(x.by?' · '+esc(x.by):''):'아직 이관 설정이 없습니다')+'</span></div>'+
+    '</div>';
+  $("#xfSrc").onchange=function(){ XF.src=this.value; XF.sel=null; renderXfer(); };
+  $$("#xfTbl [data-xd]").forEach(function(el){ el.onchange=function(){ if(el.checked) XF.sel[el.dataset.xd]=1; else delete XF.sel[el.dataset.xd]; el.closest("tr").classList.toggle("xf-on", el.checked); }; });
+  $("#xfFileBtn").onclick=function(){ $("#xfFile").click(); };
+  $("#xfFile").onchange=function(e){ var f=e.target.files[0]; if(!f) return; readFile(f).then(function(ab){ var r=xferBalFile(ab, f.name);
+      if(!r){ toast(f.name+": 계좌잔액조회(계좌·통화·총잔액) 형식이 아닙니다"); return; }
+      XF.file=r; XF.sel={}; var known={}; (s.accounts||[]).forEach(function(a){ var d=digitsOnly(a.num); if(d) known[d]=1; });
+      var miss=r.rows.filter(function(q){ return !known[q.digits]; });
+      r.rows.forEach(function(q){ if(known[q.digits]) XF.sel[q.digits]=1; });
+      renderXfer(); toast(f.name+": 계좌 "+Object.keys(XF.sel).length+"개 체크"+(miss.length?" · "+s.short+" 계좌 목록에 없는 "+miss.length+"줄("+miss.map(function(q){ return q.bank+" …"+q.tail; }).join(", ")+")":""));
+    }).catch(function(err){ toast(f.name+": 읽기 실패 — "+err.message); }); setTimeout(function(){ e.target.value=""; },0); };
+  $("#xfSave").onclick=function(){
+    var to=$("#xfTo").value, dt=$("#xfDate").value, acc=Object.keys(XF.sel||{});
+    if(!to){ toast("승계 법인을 고르세요"); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){ toast("이관일을 넣으세요"); return; }
+    if(!acc.length){ toast("이관할 계좌를 하나 이상 체크하세요"); return; }
+    if(s.endDate && dt<=s.endDate){ toast("이관일은 "+s.name+" 자금 자료 종료일("+s.endDate+") 다음 날 이후여야 합니다 — 종료일까지는 "+s.short+" 자료로 남습니다"); return; }
+    xferApply(s, co(to), dt, acc, $("#xfFx").checked);
+  };
+  if($("#xfOff")) $("#xfOff").onclick=function(){ var to=co(x.to); delete s.xfer; XF.sel=null; invalidate();
+    save().then(function(){ audit("xfer_off",{co:s.id, menu:"settings", target:s.id+"→"+to.id, detail:{date:x.date, n:x.accts.length}}); toast("이관 해제 — "+to.short+"에 등록된 이관 계좌는 남겨 두었습니다(설정 › 계좌에서 정리)"); render(); renderXfer(); }); };
+  if($("#xfPurge")) $("#xfPurge").onclick=function(){
+    var n=0; leftover.forEach(function(d){ if(s.days[d]){ delete s.days[d]; n++; } if(s.slips&&s.slips[d]){ delete s.slips[d]; n++; } });
+    invalidate(); save().then(function(){ audit("xfer_purge",{co:s.id, menu:"settings", detail:{dates:leftover}}); toast(s.short+" 이관일 이후 자료 "+leftover.length+"일 삭제 — 해당 파일을 다시 올려 주세요"); render(); renderXfer(); });
+  };
+}
+function xferApply(s, t, dt, acc, fx){
+  var tag=xferTag(s), added=[], mm=[];
+  t.accounts=t.accounts||[];
+  var mx=t.accounts.reduce(function(m,a){ return Math.max(m,+a.order||0); },0);
+  acc.forEach(function(d){
+    var sa=(s.accounts||[]).filter(function(a){ return digitsOnly(a.num)===d; })[0]; if(!sa) return;
+    if(t.accounts.some(function(a){ return digitsOnly(a.num)===d; })) return;
+    var lab=sa.label+" "+tag, k=2; while(t.accounts.some(function(a){ return a.label===lab; })) lab=sa.label+" "+tag+(k++);
+    mx++; t.accounts.push({bank:sa.bank, num:sa.num, label:lab, order:mx, group:sa.group||"원화", note:tag+" "+(sa.note||"")});
+    added.push(lab);
+  });
+  (s.mmt||[]).forEach(function(n){ var d=digitsOnly(n); if(acc.indexOf(d)<0) return; t.mmt=t.mmt||[]; if(!t.mmt.some(function(m){ return digitsOnly(m)===d; })){ t.mmt.push(n); mm.push(n); } });
+  s.xfer={to:t.id, date:dt, accts:acc.slice().sort(), fx:!!fx, at:new Date().toISOString(), by:(AUTH.user&&AUTH.user.email)||""};
+  invalidate();
+  save().then(function(){
+    audit("xfer_set",{co:s.id, menu:"settings", target:s.id+"→"+t.id, detail:{date:dt, n:acc.length, fx:!!fx, accts:acc.map(function(d){ return "…"+d.slice(-4); })}});
+    toast(s.short+" → "+t.short+" 이관 저장 · "+dt+"부터 · 계좌 "+acc.length+"개"+(added.length?" · "+t.short+" 계좌 "+added.length+"개 추가":"")+(mm.length?" · MMT "+mm.length+"개":""));
+    XF.sel=null; render(); renderXfer();
+  });
+}
+renderSettings=(function(f){ return function(){ var r=f.apply(this, arguments); try{ renderXfer(); }catch(e){ var m=$("#xferPanel"); if(m) m.innerHTML='<div class="pad"><div class="banner bad">계좌 이관 칸을 그리지 못했습니다: '+esc(e.message)+'</div></div>'; } return r; }; })(renderSettings);
 
 function enter(){
   AUTH.entered=true;
@@ -10828,7 +11150,8 @@ function ilboModel(c, iso){
     else if(x.partial && x.hasData) chk(false, x.label+": 영업일 "+x.bizDays+"일 중 "+x.dataDays+"일 저장 — 빠진 날짜 확인 필요");
     if(x.hasData && !x.planMissing && x.bizDays!==0){
       var rg=colRange(x), pr=rg?cashPair(rg.from, rg.to).amt:0;
-      var gap=Math.round(x.open+x.net+pr-x.close);
+      var xin=xferInRange(c, rg), gap=Math.round(x.open+x.net+pr+xin-x.close);   // [v87] 계좌 이관 승계 기초
+      if(xin && Math.abs(gap)<1) chk(true, x.label+": 계좌 이관 승계 "+fmt(xin)+"원 포함 — 기초시재+수지차+승계 = 기말시재 (1원 단위 일치)");
       var retro=x.label.indexOf("25년")>=0 || (!!rg && /월간실적/.test(x.label) && rg.y<=RETRO_Y);
       if(Math.abs(gap)>=1){
         if(retro) chk(true, x.label+(rg?"("+rg.y+"년)":"")+": 과거 소급 실적 — 기초+수지차=기말 검증 제외 (참고 차이 "+fmt(gap)+"원)");
@@ -11185,7 +11508,7 @@ function ilboFiles(files){
     var rows=[]; try{ rows=sniffSlip(ab)?[]:parseCMS(ab); }catch(e){ rows=[]; }      // [v45] 전표 머리글이면 CMS 파서 생략
     if(rows.length){
       var groups={};
-      rows.forEach(function(r){ var cc=detectCompany(r.company)||guessCoFromName(f.name); if(cc) (groups[cc.id]=groups[cc.id]||[]).push(r); });
+      rows.forEach(function(r){ var cc=xferCo(detectCompany(r.company)||guessCoFromName(f.name), r.date); if(cc) (groups[cc.id]=groups[cc.id]||[]).push(r); });
       Object.keys(groups).forEach(function(id){ var by=processRows(co(id),groups[id]); res.cms[id]=res.cms[id]||{};
         Object.keys(by).forEach(function(d){ res.cms[id][d]=(res.cms[id][d]||[]).concat(by[d]); if(!lastCms||d>lastCms) lastCms=d; }); });
       hasCms=true;
@@ -11197,6 +11520,14 @@ function ilboFiles(files){
     if(sp){
       var c=detectCompany((sp.lines[0]||{}).unit)||guessCoFromName(f.name)||ilboCo();
       if(!c){ ilboLog('<span>'+esc(f.name)+'</span><span class="mini">법인 판별 실패 — 법인 탭을 선택하고 다시 올려주세요</span>',true); return; }
+      var xsI=xferSplitLines(c, sp.lines);   // [v87] 이관일 이후 회계일자 줄은 승계 법인 전표로
+      if(xsI){
+        var dI=slipDaysOf(xsI.to, buildSlip(xsI.to, xsI.moved), f.name), lI=saveSlipDays(xsI.to, dI);
+        lI.forEach(function(d){ slipDates.push({c:xsI.to, d:d}); });
+        ilboLog('<span>'+esc(f.name)+'</span><span class="chip mv">계좌 이관</span><span class="mini">'+esc(c.short)+' 전표 '+xsI.moved.length+'줄('+esc(lI.join(", "))+') → '+esc(xsI.to.name)+' 전표로 저장</span>');
+        if(!xsI.rest.length){ if(ilboCo()!==xsI.to) curCo=xsI.to.id; ILBO.date=lI[lI.length-1]; return; }
+        sp.lines=xsI.rest;
+      }
       var b=buildSlip(c, sp.lines); if(!b.date){ ilboLog('<span>'+esc(f.name)+'</span><span class="mini">회계일자를 찾지 못했습니다</span>',true); return; }
       /* [v23] 여러 날짜가 든 전표 파일도 날짜별로 나눠 저장 */
       var days=slipDaysOf(c, b, f.name), dlist=saveSlipDays(c, days);
@@ -13405,21 +13736,26 @@ var AUTO_TOOLS=[
   {k:"check",  t:"대량이체 파일점검",   d:"작성 전표(차변) ↔ 은행 대량이체 파일 1:1 대사 검증", tags:["은행·계좌·금액·예금주","정상 건만 결과 생성"], ico:'<path d="M4 7h16M4 12h10M4 17h7"/><path d="M15 16l2 2 4-4"/>'},
   {k:"emp",    t:"사원경비 자동화",     d:"법인카드 계정대체 · 사원경비 대량이체 · 카드 연체자 관리", tags:["법인카드 계정대체","사원경비","연체자 관리"], ico:'<circle cx="9" cy="7.5" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 9.4-3.9"/><circle cx="17" cy="16.5" r="4.5"/>'},
   {k:"card",   t:"법인카드 등록",       d:"삼성카드 발급내역 → ERP 업로드 파일 · CMS 등록 파일", tags:["발급내역 업로드","ERP·CMS 파일"], ico:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6 15h4"/>'},
+  {k:"pur",    t:"매입대금 별도지불",   d:"구매팀 매입리스트 → 60일 지급일정(주말·공휴일 전영업일) · 특이케이스 반영 · 지출일정 엑셀", tags:["오라클 지급","에스넷 별도지급","지출일정 생성"], ico:'<path d="M4 6.5h16v11H4z"/><path d="M4 10h16"/><path d="M8 14h3"/><path d="M15.5 13.2v3.6M13.7 15h3.6"/>'},
   {k:"mmt",    t:"이자수익전표",       d:"MMT·기타 계좌 원천징수영수증 PDF → 이자수익 전표", tags:["MMT · 기타 계좌","PDF 판독","ERP KO 엑셀 다운로드"], ico:'<rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M7 9h4M7 13h6M7 17h3"/><circle cx="16.5" cy="15.5" r="3.2"/><path d="M15 17l3-3"/>'}
 ];
 /* [v60] 'int'(기타 이자수익전표)는 이자수익전표 카드(k:"mmt")의 하위 탭 — 카드 정의는 하나, 화면은 둘 */
 var INT_TABS={mmt:"MMT", int:"기타"};
 /* [v66] 사원경비 자동화 카드(k:"emp") 하위 탭 — 화면(data-tool)은 cardpay · expense · overdue 셋, 카드 정의는 하나. 카드를 누르면 첫 탭(법인카드 계정대체) */
 var EMP_TABS={cardpay:"법인카드 계정대체", expense:"사원경비", overdue:"연체자 관리"};
-function autoToolOf(t){ var k=t==="int"?"mmt":EMP_TABS[t]?"emp":t; return AUTO_TOOLS.filter(function(x){ return x.k===k; })[0]; }
+/* 매입대금 별도지불 카드(k:"pur") 하위 탭 — 화면은 orapay · snetpay. 카드를 누르면 첫 탭(오라클 지급) */
+var PUR_TABS={orapay:"오라클 지급", snetpay:"에스넷 별도지급"};
+function autoToolOf(t){ var k=t==="int"?"mmt":EMP_TABS[t]?"emp":PUR_TABS[t]?"pur":t; return AUTO_TOOLS.filter(function(x){ return x.k===k; })[0]; }
 function renderAutoHub(){
   var t=AUTO.tool;
   if(t==="emp") t=AUTO.tool="cardpay";
+  if(t==="pur") t=AUTO.tool="orapay";
   $("#autoHub").hidden=!!t; $("#autoBack").hidden=!t;
   $("#intTabs").hidden=!INT_TABS[t]; $$("#intTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });
   $("#empTabs").hidden=!EMP_TABS[t]; $$("#empTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });   // [v66]
+  $("#purTabs").hidden=!PUR_TABS[t]; $$("#purTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });
   $$("#v-fep .auto-screen").forEach(function(s){ s.hidden=s.dataset.tool!==t; });
-  $("#viewTitle").textContent = t ? "자금업무 자동화 · "+autoToolOf(t).t+(INT_TABS[t]?" · "+INT_TABS[t]:EMP_TABS[t]?" · "+EMP_TABS[t]:"") : TITLES.fep;
+  $("#viewTitle").textContent = t ? "자금업무 자동화 · "+autoToolOf(t).t+(INT_TABS[t]?" · "+INT_TABS[t]:EMP_TABS[t]?" · "+EMP_TABS[t]:PUR_TABS[t]?" · "+PUR_TABS[t]:"") : TITLES.fep;
   if(!t){
     $("#autoGrid").innerHTML=AUTO_TOOLS.map(function(x){
       return '<button class="auto-card" data-k="'+x.k+'"><span class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+x.ico+'</svg></span>'+
@@ -13433,11 +13769,452 @@ function renderAutoHub(){
   else if(t==="cardpay"){ renderCardpay(); cpMasterLoad(CPS.co).then(function(){ renderCardpay(); cpLoadSaved(); }); }   // [v46]
   else if(t==="mmt"){ /* [v31] #mmt-app · window.MMTSlipApp이 자체 초기화·렌더링을 전담 — 대시보드 쪽 추가 호출 불필요 */ }
   else if(t==="overdue"){ renderOverdue(); }   // [v66] 연체자 관리
+  else if(t==="orapay"){ renderOrp(); }   // 매입대금 별도지불 · 오라클 지급
   else if(t==="int"){ if(window.IntSlipApp) window.IntSlipApp.show(); }   // [v60] 기타 이자수익전표 — 계좌 목록(D) 로드 후 매핑 상태를 다시 읽는다
 }
 $("#btnAutoBack").onclick=function(){ AUTO.tool=null; renderAutoHub(); };
 $$("#intTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });   // [v60]
 $$("#empTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });   // [v66]
+$$("#purTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });
+/* ===================== [v80] 매입대금 별도지불 · 오라클 지급 — 엔진 (window.ORP) =====================
+   입력: 구매팀 오라클 매입리스트(.xlsx — '종합' 시트 + 선택 '세금계산서 발행내역' 시트) · 선택 ERP 건별반제
+   규칙: 지급일 = 계산서 작성일자 + 60일 · 그날이 주말·공휴일이면 전영업일(60일을 넘기지 않음)
+         마이너스 계산서가 다른 전표와 먼저 반제(상계)된 건 = 특이케이스(지급변경) → 상계 대상 전표의 작성일자로 옮겨 그 지급분에서 차감
+         세금계산서 발행내역 L열 '별도 상신 … 제외' 행은 검증 합계에서 뺀다 (종합에는 이미 빠져 있음)
+   화면·엑셀은 이 엔진의 결과(build)만 쓴다. */
+(function(root){
+  var DAY=86400000;
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function isoOf(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function toISO(v){
+    if(v==null||v==="") return "";
+    if(v instanceof Date) return isNaN(v)?"":isoOf(v);
+    if(typeof v==="number"){ if(v<20000||v>80000) return ""; var d=new Date(Math.round((v-25569)*DAY)); return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate()); }
+    var m=String(v).trim().match(/^(\d{4})[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})/);
+    return m?m[1]+"-"+pad(m[2])+"-"+pad(m[3]):"";
+  }
+  function addDays(iso,n){ var d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n); return isoOf(d); }
+  function dow(iso){ return new Date(iso+"T00:00:00").getDay(); }
+  function diffDays(a,b){ return Math.round((new Date(a+"T00:00:00")-new Date(b+"T00:00:00"))/DAY); }
+  function num(v){ if(typeof v==="number") return v; var s=String(v==null?"":v).replace(/[,\s원]/g,""); if(s===""||s==="-") return 0; var n=+s; return isNaN(n)?0:n; }
+  function txt(v){ return String(v==null?"":v).trim(); }
+  var DOW=["일","월","화","수","목","금","토"];
+
+  /* 영업일 판정 — holidayName(iso)를 주입(대시보드 공용 법정공휴일 + 내장 2025·2027) */
+  function payDayOf(due, holi){ var p=due, n=0; while((dow(p)===0||dow(p)===6||holi(p)) && n<15){ p=addDays(p,-1); n++; } return p; }
+
+  /* 머리글 행 찾기 */
+  function findHeader(aoa, must){
+    for(var i=0;i<Math.min(aoa.length,15);i++){ var r=(aoa[i]||[]).map(function(x){ return txt(x).replace(/\s/g,""); });
+      if(must.every(function(k){ return r.indexOf(k)>=0; })) return {row:i, idx:function(k){ return r.indexOf(k); }}; }
+    return null;
+  }
+
+  /* 매입리스트 워크북 → {rows, listTotal, tax} */
+  function parseList(wb, XLSX){
+    var names=wb.SheetNames, aoaOf=function(n){ return XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}); };
+    var mainName=null, H=null, A=null;
+    var order=names.slice().sort(function(a,b){ return (b.replace(/\s/g,"")==="종합")-(a.replace(/\s/g,"")==="종합"); });
+    for(var i=0;i<order.length;i++){ var a=aoaOf(order[i]), h=findHeader(a,["작성일자","합계","전표번호"]); if(h&&findHeader(a,["적요"])){ mainName=order[i]; H=h; A=a; break; } }
+    if(!mainName) throw new Error("'작성일자 · 합계 · 전표번호' 머리글이 있는 시트(종합)를 찾지 못했습니다.");
+    var c={date:H.idx("작성일자"),amt:H.idx("금액"),vat:H.idx("부가세"),tot:H.idx("합계"),b1:H.idx("비고1"),cust:H.idx("비고2"),mg:H.idx("관리번호"),oks:H.idx("OKS번호"),
+      pj:H.idx("프로젝트번호"),pjn:H.idx("프로젝트명"),kind:H.idx("유형"),sales:H.idx("영업담당"),memo:H.idx("적요"),alt:H.idx("대체코드"),alta:H.idx("대체금액"),slip:H.idx("전표번호")};
+    var g=function(r,k){ return c[k]>=0?r[c[k]]:""; };
+    var rows=[], listTotal=null;
+    for(var r=H.row+1;r<A.length;r++){ var x=A[r]||[]; var d=toISO(g(x,"date")), t=g(x,"tot");
+      if(!d){ if(listTotal==null && t!=="" && !isNaN(num(t)) && rows.length) listTotal=num(t); continue; }
+      rows.push({id:"r"+(r+1), xrow:r+1, date:d, amt:num(g(x,"amt")), vat:num(g(x,"vat")), total:num(t), note1:txt(g(x,"b1")), cust:txt(g(x,"cust")), mg:txt(g(x,"mg")), oks:txt(g(x,"oks")),
+        pj:txt(g(x,"pj")), pjName:txt(g(x,"pjn")), kind:txt(g(x,"kind")), sales:txt(g(x,"sales")), memo:txt(g(x,"memo")), alt:txt(g(x,"alt")), altAmt:txt(g(x,"alta")), slip:txt(g(x,"slip"))}); }
+    /* 세금계산서 발행내역 (선택) */
+    var tax=null, tn=names.filter(function(n){ return /세금계산서/.test(n); })[0];
+    if(tn){ var ta=aoaOf(tn), th=findHeader(ta,["관리번호","작성일자","합계"]);
+      if(th){ var ti={mg:th.idx("관리번호"),date:th.idx("작성일자"),tot:th.idx("합계"),cust:th.idx("비고2")}, maxc=0;
+        var trs=[]; for(var k=th.row+1;k<ta.length;k++){ var y=ta[k]||[]; if(!toISO(y[ti.date])) continue;
+          /* 비고 열(L·M) — 머리글이 비어 있어 위치로 읽는다: 합계 열 뒤 OKS·비고2·비고3 다음 두 칸 */
+          var L=txt(y[11]), M=txt(y[12]);
+          trs.push({xrow:k+1, mg:txt(y[ti.mg]), date:toISO(y[ti.date]), total:num(y[ti.tot]), cust:txt(y[ti.cust]), note:L, ref:M, excl:/제외/.test(L)}); }
+        var inc=trs.filter(function(t){ return !t.excl; });
+        tax={sheet:tn, rows:trs, total:inc.reduce(function(s,t){ return s+t.total; },0), count:inc.length,
+          excluded:trs.filter(function(t){ return t.excl; }), minusMarks:trs.filter(function(t){ return /마이너스/.test(t.note); })}; } }
+    return {sheet:mainName, rows:rows, listTotal:listTotal, tax:tax};
+  }
+
+  /* ERP 건별반제 (선택) → 반제 행
+     ERP 원본(.xls): 2행 = 합계행(회계일자·적요 없음) → 건너뜀 · 항목k/내역명k 쌍 중 '자금예정일자' = 60일째(휴일 조정 전) · 최종반제일자 = 실제 반제(지급)일
+     작업 시트(지출일정 파일의 '건별반제'): 분할 반제 행(회계일자 없음 + 적요 있음)은 윗 행과 같은 전표 */
+  function parseBanje(aoa){
+    var H=findHeader(aoa,["회계일자","최종반제일자","전표금액","전표번호"]); if(!H) return null;
+    var c={d:H.idx("회계일자"),f:H.idx("최종반제일자"),memo:H.idx("적요"),amt:H.idx("전표금액"),ban:H.idx("반제금액"),slip:H.idx("전표번호"),bal:H.idx("잔액")};
+    var kv=[]; for(var k=1;k<=12;k++){ var a=H.idx("항목"+k), b=H.idx("내역명"+k); if(a>=0&&b>=0) kv.push([a,b]); }
+    var rows=[], last=null, raw=kv.length>0;
+    for(var r=H.row+1;r<aoa.length;r++){ var x=aoa[r]||[]; var amt=num(x[c.amt]), memo=txt(x[c.memo]), d0=toISO(x[c.d]);
+      if(!memo && !d0) continue;                       /* 합계행 · 빈 행 */
+      var d=d0, slip=txt(x[c.slip]);
+      if(!d && last){ d=last.date; slip=slip||last.slip; }
+      var due=""; kv.forEach(function(p){ if(txt(x[p[0]])==="자금예정일자") due=toISO(txt(x[p[1]]).replace(/^(\d{4})(\d{2})(\d{2})$/,"$1-$2-$3")); });
+      var o={xrow:r+1, date:d, fin:toISO(x[c.f]), due:due, memo:memo, amt:amt, slip:slip, bal:c.bal>=0?num(x[c.bal]):0, cont:!d0}; rows.push(o); if(!o.cont) last=o; }
+    return {rows:rows, raw:raw, total:rows.reduce(function(s,o){ return s+o.amt; },0)};
+  }
+
+  /* 특이케이스(마이너스 계산서 상계) 후보 — 자동 짝짓기 */
+  function autoPairs(list, banje){
+    var rows=list.rows, bySlip={}, byMg={}; rows.forEach(function(r){ if(r.slip) bySlip[r.slip]=r; if(r.mg) byMg[r.mg]=r; });
+    var out={};
+    rows.filter(function(r){ return r.total<0; }).forEach(function(m){
+      var tgt=null, src="";
+      /* ① 세금계산서 발행내역 L열 '마이너스 반제' + M열 같은 반제전표 */
+      if(list.tax){ var mk=list.tax.rows.filter(function(t){ return t.mg===m.mg && /마이너스/.test(t.note); })[0];
+        if(mk){ var pair=list.tax.rows.filter(function(t){ return t!==mk && /마이너스/.test(t.note) && t.ref===mk.ref && t.total>0; })[0];
+          if(pair && byMg[pair.mg]){ tgt=byMg[pair.mg]; src="세금계산서 발행내역 '마이너스 반제'"; } } }
+      /* ② 건별반제: 마이너스 작성일자에 반제된, 금액이 같은 다른 전표 */
+      if(!tgt && banje){ var b=banje.rows.filter(function(o){ return o.fin===m.date && Math.round(o.amt)===Math.round(-m.total) && o.slip && o.slip!==m.slip && bySlip[o.slip]; })[0];
+        if(b){ tgt=bySlip[b.slip]; src="건별반제 최종반제일자 "+b.fin; } }
+      out[m.id]= tgt?{target:tgt.id, src:src}:{target:"", src:""};
+    });
+    return out;
+  }
+
+  /* 일정 계산 — opt: {term:60, holi, pairs:{minusId:{target}}, excluded:{id:true}} */
+  function build(list, opt){
+    var term=opt.term||60, holi=opt.holi||function(){ return null; }, pairs=opt.pairs||{}, exc=opt.excluded||{};
+    var byId={}; list.rows.forEach(function(r){ byId[r.id]=r; });
+    var items=[], specials=[], excluded=[];
+    list.rows.forEach(function(r){
+      if(exc[r.id]){ excluded.push(r); return; }
+      var eff=r.date, p=pairs[r.id], tgt=p&&p.target&&byId[p.target]&&!exc[p.target]?byId[p.target]:null;
+      if(r.total<0 && tgt){ eff=tgt.date; specials.push({minus:r, target:tgt, src:p.src||"직접 지정"}); }
+      items.push({r:r, eff:eff}); });
+    /* 작성일자별 */
+    var dmap={}; items.forEach(function(it){ (dmap[it.eff]=dmap[it.eff]||{date:it.eff, amt:0, n:0, items:[]}); dmap[it.eff].amt+=it.r.total; dmap[it.eff].n++; dmap[it.eff].items.push(it); });
+    var days=Object.keys(dmap).sort().map(function(k){ var d=dmap[k]; d.due=addDays(k,term); d.pay=payDayOf(d.due,holi); d.elapsed=diffDays(d.pay,k);
+      d.shift=d.pay!==d.due; d.reason=d.shift?shiftReasons(d.due,d.pay,holi).join(", "):""; return d; });
+    var prev=null; days.forEach(function(d){ d.start=prev?addDays(prev,1):d.date.slice(0,8)+"01"; if(d.start>d.date) d.start=d.date; prev=d.date; });
+    /* 지급일별 */
+    var pmap={}, pays=[]; days.forEach(function(d){ if(!pmap[d.pay]){ pmap[d.pay]={pay:d.pay, amt:0, n:0, days:[]}; pays.push(pmap[d.pay]); } pmap[d.pay].amt+=d.amt; pmap[d.pay].n+=d.n; pmap[d.pay].days.push(d); });
+    pays.sort(function(a,b){ return a.pay<b.pay?-1:1; });
+    days.forEach(function(d){ d.first=pmap[d.pay].days[0]===d; d.payAmt=pmap[d.pay].amt; });
+    var total=days.reduce(function(s,d){ return s+d.amt; },0);
+    /* 특이케이스의 원래 집행일(마이너스 자기 작성일자 기준) */
+    specials.forEach(function(s){ var od=s.minus.date, due=addDays(od,term); s.origPay=payDayOf(due,holi); s.newPay=payDayOf(addDays(s.target.date,term),holi); });
+    var months=pays.map(function(p){ return p.pay.slice(0,7); });
+    var holidays=collectHolidays(days, holi);
+    return {term:term, items:items, days:days, pays:pays, total:total, specials:specials, excluded:excluded, holidays:holidays,
+      month:list.rows.length?mode(list.rows.map(function(r){ return r.date.slice(0,7); })):"", payMonths:months.filter(function(m,i){ return months.indexOf(m)===i; })};
+  }
+  function shiftReasons(due,pay,holi){ var out=[]; for(var p=addDays(pay,1);p<=due;p=addDays(p,1)){ var h=holi(p); out.push(p.slice(5).replace("-","/")+" "+(h||DOW[dow(p)]+"요일")); } return out; }
+  function collectHolidays(days,holi){ if(!days.length) return []; var a=days[0].pay, b=days[days.length-1].due, out=[];
+    for(var p=a;p<=b;p=addDays(p,1)){ var h=holi(p); if(h) out.push({date:p,name:h}); } return out; }
+  function mode(arr){ var c={},best="",n=0; arr.forEach(function(v){ c[v]=(c[v]||0)+1; if(c[v]>n){ n=c[v]; best=v; } }); return best; }
+
+  /* 검증 */
+  function checks(list, R, banje){
+    var out=[];
+    var listSum=list.rows.reduce(function(s,r){ return s+r.total; },0);
+    out.push({k:"sum", label:"종합 시트 합계 = 지급일정 합계", a:listSum-R.excluded.reduce(function(s,r){ return s+r.total; },0), b:R.total});
+    if(list.listTotal!=null) out.push({k:"row", label:"종합 시트 합계행", a:list.listTotal, b:listSum});
+    if(list.tax) out.push({k:"tax", label:"세금계산서 발행내역 합계(제외 "+list.tax.excluded.length+"행 빼고 "+list.tax.count+"행)", a:list.tax.total, b:listSum, note:list.tax.excluded.map(function(t){ return t.xrow+"행 "+t.cust+" "+t.total.toLocaleString("ko-KR")+" ("+t.note+")"; }).join(" · ")});
+    if(banje){
+      var inB={}; banje.rows.forEach(function(o){ inB[o.slip]=(inB[o.slip]||0)+o.amt; });
+      /* 이미 반제돼 건별반제에 없는 마이너스(특이케이스)만 차감 — 건별반제에 남아 있으면 그 안에서 이미 상계됨 */
+      var spec=R.specials.reduce(function(s,x){ return inB[x.minus.slip]!=null?s:s-x.minus.total; },0);
+      out.push({k:"banje", label:"건별반제 합계 − 지급변경(특이케이스)", a:banje.total-spec, b:R.total, note:"건별반제 "+banje.total.toLocaleString("ko-KR")+" − 지급변경 "+spec.toLocaleString("ko-KR")});
+      /* 전표별 대사: 종합 ↔ 건별반제 */
+      var inL={}; list.rows.forEach(function(r){ inL[r.slip]=(inL[r.slip]||0)+r.total; });
+      var specSlip={}; R.specials.forEach(function(x){ specSlip[x.minus.slip]=1; });
+      var onlyL=Object.keys(inL).filter(function(k){ return inB[k]==null && !specSlip[k]; }), onlyB=Object.keys(inB).filter(function(k){ return inL[k]==null; }),
+          diff=Object.keys(inL).filter(function(k){ return inB[k]!=null && Math.round(inB[k])!==Math.round(inL[k]); });
+      var nb=Object.keys(inB).length, msg=[];
+      if(onlyL.length) msg.push("건별반제에 없음 "+onlyL.length+"건: "+onlyL.slice(0,6).join(", ")+(onlyL.length>6?" …":""));
+      if(onlyB.length) msg.push("매입리스트에 없음 "+onlyB.length+"건: "+onlyB.slice(0,6).join(", ")+(onlyB.length>6?" …":""));
+      if(diff.length) msg.push("금액 다름 "+diff.length+"건: "+diff.slice(0,6).join(", "));
+      var sp=R.specials.filter(function(x){ return inB[x.minus.slip]==null; }).map(function(x){ return x.minus.slip; });
+      if(sp.length) msg.push("특이케이스 "+sp.join(", ")+"는 이미 반제돼 건별반제에 없음(정상)");
+      out.push({k:"slip", label:"전표별 대사 — 매입리스트 ↔ 건별반제 ("+nb+"전표)", a:onlyL.length+onlyB.length+diff.length, b:0, fmtCount:true, note:msg.join(" · ")||"전표번호·금액 모두 같음"});
+      /* 최종반제일자(실제 지급일) ↔ 계산한 지급일 — 반제된 행만 */
+      var payOf={}; R.days.forEach(function(d){ payOf[d.date]=d.pay; });
+      var effOf={}; R.items.forEach(function(it){ effOf[it.r.slip]=payOf[it.eff]; });
+      var specAmt={}; R.specials.forEach(function(x){ specAmt[x.target.slip]=-x.minus.total; });
+      var done=banje.rows.filter(function(o){ return o.fin && effOf[o.slip]; });
+      var bad=done.filter(function(o){ return o.fin!==effOf[o.slip] && !(specAmt[o.slip]!=null && Math.round(o.amt)===Math.round(specAmt[o.slip])); });
+      if(done.length) out.push({k:"fin", label:"최종반제일자(실제 지급일) = 계산한 지급일 ("+done.length+"행 반제됨)", a:bad.length, b:0, fmtCount:true,
+        note:bad.length?bad.slice(0,6).map(function(o){ return o.slip+" 반제 "+o.fin+" / 계산 "+effOf[o.slip]; }).join(" · "):"반제된 행 모두 계산한 지급일과 같음"+(Object.keys(specAmt).length?" (특이케이스 상계분 제외)":"")});
+    }
+    out.forEach(function(c){ c.ok=Math.round(c.a)===Math.round(c.b); });
+    return out;
+  }
+
+  root.ORP={toISO:toISO, addDays:addDays, dow:dow, DOW:DOW, payDayOf:payDayOf, parseList:parseList, parseBanje:parseBanje, autoPairs:autoPairs, build:build, checks:checks};
+})(typeof window!=="undefined"?window:globalThis);
+
+/* [v82] 오라클 지급 — 지출일정 엑셀(ExcelJS). 원본 '2026년 n월 매입분 지출일정.xlsx'의 시트 구성을 따른다 */
+function orpWorkbook(EX, R, L, o){
+  var ORP=(typeof window!=="undefined"?window:globalThis).ORP;
+  var wb=new EX.Workbook();
+  var thin={style:"thin",color:{argb:"FF9AA0AA"}}, B={top:thin,left:thin,bottom:thin,right:thin};
+  var HEAD={type:"pattern",pattern:"solid",fgColor:{argb:"FFE8EDF5"}}, SUM={type:"pattern",pattern:"solid",fgColor:{argb:"FFF2F4F7"}}, YEL={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFF2CC"}};
+  var D=function(iso){ if(!iso) return null; var p=iso.split("-"); return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])); };
+  var NUM="#,##0;[Red]-#,##0", DT="yyyy-mm-dd";
+  var hdr=function(ws,r,c1,vals){ vals.forEach(function(v,i){ var c=ws.getCell(r,c1+i); c.value=v; c.font={bold:true}; c.fill=HEAD; c.border=B; c.alignment={horizontal:"center",vertical:"middle",wrapText:true}; }); };
+  var cell=function(ws,r,c,v,fmt,extra){ var x=ws.getCell(r,c); x.value=v; if(fmt) x.numFmt=fmt; x.border=B; if(extra) Object.keys(extra).forEach(function(k){ x[k]=extra[k]; }); return x; };
+  var memo=function(pay){ return "(GD)"+pay.slice(2).replace(/-/g,".")+" 오라클내자재비 지급"; };
+
+  /* ── 1. 오라클 매입_보고 ── */
+  var ws=wb.addWorksheet("오라클 매입_보고",{views:[{showGridLines:false}], pageSetup:{paperSize:9,orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  ws.columns=[{width:2},{width:9},{width:12},{width:12},{width:6},{width:16},{width:12},{width:6},{width:16},{width:9},{width:2},{width:34},{width:12},{width:12},{width:3},{width:16},{width:16},{width:24},{width:18},{width:15}];
+  var m=R.month.split("-");
+  ws.getCell("B2").value=+m[0]+"년 "+(+m[1])+"월 오라클 매입분 지출일정"; ws.getCell("B2").font={bold:true,size:14};
+  ws.getCell("B3").value=D(R.month+"-01"); ws.getCell("B3").numFmt="yyyy-mm";
+  ws.getCell("J3").value="주말·공휴일인 경우 전영업일"; ws.getCell("J4").value="(단위:원)"; ws.getCell("M4").value="매입전표"; ws.getCell("M4").font={bold:true};
+  hdr(ws,5,2,["지불조건","Invoice Date","Due Date","요일","일별금액","Payment Day","요일","지출금액","경과일수"]); hdr(ws,5,12,["품의내역","시작일","종료일"]);
+  var r0=6, r=r0;
+  R.days.forEach(function(d){
+    var n=d.first?d.payAmt&&R.days.filter(function(x){ return x.pay===d.pay; }).length:0;
+    cell(ws,r,2,{formula:"D"+r+"-C"+r, result:R.term},"0",{alignment:{horizontal:"center"}});
+    cell(ws,r,3,D(d.date),DT,{alignment:{horizontal:"center"}});
+    cell(ws,r,4,{formula:"C"+r+"+"+R.term, result:D(d.due)},DT,{alignment:{horizontal:"center"}});
+    cell(ws,r,5,ORP.DOW[ORP.dow(d.due)],null,{alignment:{horizontal:"center"}});
+    cell(ws,r,6,d.amt,NUM);
+    cell(ws,r,7,D(d.pay),DT,{alignment:{horizontal:"center"}, font:d.shift?{color:{argb:"FFC00000"},bold:true}:undefined});
+    cell(ws,r,8,ORP.DOW[ORP.dow(d.pay)],null,{alignment:{horizontal:"center"}});
+    cell(ws,r,9,d.first?{formula:n>1?"SUM(F"+r+":F"+(r+n-1)+")":"F"+r, result:d.payAmt}:null,NUM,{font:{bold:true}});
+    cell(ws,r,10,{formula:"G"+r+"-C"+r, result:d.elapsed},"0",{alignment:{horizontal:"center"}});
+    var l=ws.getCell(r,12); l.value=d.first?memo(d.pay):null; l.border=B;
+    cell(ws,r,13,D(d.start),DT); cell(ws,r,14,D(d.date),DT);
+    if(d.shift){ var nt=ws.getCell(r,7); nt.note="60일째 "+d.due+" → "+d.reason; }
+    r++; });
+  var rs=r;
+  cell(ws,rs,2,"합 계",null,{font:{bold:true},fill:SUM,alignment:{horizontal:"center"}}); for(var c=3;c<=10;c++) cell(ws,rs,c,null,null,{fill:SUM});
+  ws.mergeCells(rs,2,rs,5);
+  cell(ws,rs,6,{formula:"SUM(F"+r0+":F"+(rs-1)+")",result:R.total},NUM,{font:{bold:true},fill:SUM});
+  cell(ws,rs,9,{formula:"SUM(I"+r0+":I"+(rs-1)+")",result:R.total},NUM,{font:{bold:true},fill:SUM});
+  cell(ws,rs,10,{formula:"F"+rs+"=I"+rs,result:true},null,{fill:SUM,alignment:{horizontal:"center"}});
+  var hl=R.holidays.filter(function(h){ return R.days.some(function(d){ return d.shift && d.pay<h.date && h.date<=d.due; }); });
+  if(hl.length){ var hc=ws.getCell(rs+1,2); hc.value="* "+hl.map(function(h){ return h.date.slice(5).replace("-","/")+" "+h.name; }).join("\n   "); hc.alignment={wrapText:true,vertical:"top"}; ws.mergeCells(rs+1,2,rs+1+Math.max(0,hl.length-1),6); }
+  /* 오른쪽: 대사 · 대금지급변경 */
+  var spec=R.specials.reduce(function(s,x){ return s+x.minus.total; },0), base=o.banjeTotal!=null?o.banjeTotal:R.total-spec;
+  ws.getCell("P5").value=D(R.month+"-01"); ws.getCell("P5").numFmt="yyyy-mm";
+  cell(ws,5,17,base,NUM); ws.getCell("Q4").value=o.banjeTotal!=null?"건별반제 합계":"매입리스트 합계(지급변경 전)";
+  hdr(ws,5,18,["지급변경"]);
+  cell(ws,6,16,"차이"); cell(ws,6,17,{formula:"I"+rs+"-Q5",result:R.total-base},NUM); cell(ws,6,18,spec,NUM);
+  cell(ws,7,17,{formula:"I"+rs+"=Q5",result:R.total===base}); cell(ws,7,18,{formula:"ABS(Q6)=ABS(R6)",result:true});
+  ws.getCell("P10").value="[대금지급변경]"; ws.getCell("P10").font={bold:true};
+  hdr(ws,12,16,["전표번호","계산서 회계일자","기존집행일자","변경요청일자","금액"]);
+  var rr=13;
+  if(R.specials.length) R.specials.forEach(function(s){
+    cell(ws,rr,16,s.minus.slip); cell(ws,rr,17,D(s.minus.date),DT); cell(ws,rr,18,D(s.origPay),DT);
+    cell(ws,rr,19,"마이너스계산서 상계 반영 → "+s.newPay+" ("+s.target.slip+" · "+s.target.date.slice(5)+"분)",null,{alignment:{wrapText:true}}); cell(ws,rr,20,s.minus.total,NUM);
+    for(var c2=16;c2<=20;c2++) ws.getCell(rr,c2).fill=YEL; rr++; });
+  else { cell(ws,rr,16,"해당 없음"); for(var c3=17;c3<=20;c3++) cell(ws,rr,c3,null); }
+  ws.getCell("T2").value="거래처코드"; ws.getCell("T3").value=1168127389;
+
+  /* ── 2. 전표입력 ── */
+  var w2=wb.addWorksheet("전표입력",{views:[{state:"frozen",ySplit:1}]});
+  w2.columns=[8,8,8,16,12,12,12,12,36,16,18,10,8,10,3,16,12].map(function(w){ return {width:w}; });
+  hdr(w2,1,1,["선택","유형","구분","회계단위","회계일자","작성부서","작성일자","작성사원","품의내역","금액","전표번호","회계번호","상태","결재상태"]);
+  var wr=(o.writeDate||"").replace(/-/g,"/");
+  R.pays.forEach(function(p,i){ var y=i+2;
+    [ "N","일반","대체","굿어스데이터㈜",p.pay.replace(/-/g,"/"),"경영관리팀",wr,o.who||"",memo(p.pay),p.amt,"",0,"미결","" ].forEach(function(v,j){ cell(w2,y,j+1,v,j===9?NUM:null); }); });
+  var ye=R.pays.length+1;
+  w2.getCell("P1").value="전표입력 합계"; w2.getCell("P1").font={bold:true};
+  w2.getCell("P2").value={formula:"SUM(J2:J"+ye+")",result:R.total}; w2.getCell("P2").numFmt=NUM;
+  w2.getCell("Q2").value={formula:"P2='오라클 매입_보고'!I"+rs,result:true};
+
+  /* ── 3. 건별명세 ── */
+  var w3=wb.addWorksheet("건별명세",{views:[{state:"frozen",ySplit:1}]});
+  w3.columns=[12,12,12,18,28,14,40,50,14,12,14,30].map(function(w){ return {width:w}; });
+  hdr(w3,1,1,["작성일자","반영 작성일자","지급일","전표번호","거래처(비고2)","프로젝트번호","프로젝트명","적요","공급가액","부가세","합계","비고"]);
+  var specBy={}; R.specials.forEach(function(s){ specBy[s.minus.id]=s; });
+  var rows=R.items.slice().sort(function(a,b){ return a.eff<b.eff?-1:a.eff>b.eff?1:(a.r.slip<b.r.slip?-1:a.r.slip>b.r.slip?1:0); }), y3=2;
+  var payOf={}; R.days.forEach(function(d){ payOf[d.date]=d.pay; });
+  rows.forEach(function(it){ var x=it.r, s=specBy[x.id];
+    var v=[D(x.date),D(it.eff),D(payOf[it.eff]),x.slip,x.cust,x.pj,x.pjName,x.memo,x.amt,x.vat,x.total,s?"지급변경: "+s.target.slip+"와 상계 ("+s.src+")":((o.notes&&o.notes[x.id])||"")];
+    v.forEach(function(val,j){ cell(w3,y3,j+1,val,j<3?DT:j>=8&&j<=10?NUM:null, s?{fill:YEL}:undefined); }); y3++; });
+  R.excluded.forEach(function(x){ var v=[D(x.date),null,null,x.slip,x.cust,x.pj,x.pjName,x.memo,x.amt,x.vat,x.total,(o.notes&&o.notes[x.id])||"제외(지급일정에 넣지 않음)"];
+    v.forEach(function(val,j){ cell(w3,y3,j+1,val,j<3?DT:j>=8&&j<=10?NUM:null,{font:{color:{argb:"FF8A8F98"}}}); }); y3++; });
+  cell(w3,y3,1,"합계",null,{font:{bold:true},fill:SUM}); for(var c4=2;c4<=12;c4++) cell(w3,y3,c4,null,null,{fill:SUM});
+  w3.getCell(y3,11).value={formula:"SUMIFS(K2:K"+(y3-1)+",C2:C"+(y3-1)+",\"<>\")",result:R.total}; w3.getCell(y3,11).numFmt=NUM; w3.getCell(y3,11).font={bold:true};
+  w3.autoFilter={from:{row:1,column:1},to:{row:1,column:12}};
+  return wb;
+}
+
+/* ===================== [v82] 매입대금 별도지불 · 오라클 지급 — 화면 =====================
+   상태 ORPS: list(매입리스트 파싱) · banje(건별반제, 선택) · pairs(마이너스→상계 대상) · excluded(제외 행) · R(일정 결과)
+   저장하지 않음 — 이 브라우저 안에서만 계산 */
+var ORPS={files:[], list:null, listName:"", banje:null, banjeName:"", pairs:{}, excluded:{}, decide:{}, R:null, f:"day", term:60, who:"이영인(GD)", write:"", done:false};
+function orpReset(){ ORPS.files=[]; ORPS.list=null; ORPS.listName=""; ORPS.banje=null; ORPS.banjeName=""; ORPS.pairs={}; ORPS.excluded={}; ORPS.decide={}; ORPS.R=null; ORPS.done=false; }
+function orpHoli(iso){ return holidayName(iso); }
+function orpRecalc(){
+  if(!ORPS.list){ ORPS.R=null; return; }
+  ORPS.R=ORP.build(ORPS.list,{term:ORPS.term, holi:orpHoli, pairs:ORPS.pairs, excluded:ORPS.excluded});
+}
+function orpAddFiles(files){
+  var arr=Array.prototype.slice.call(files||[]); if(!arr.length) return;
+  arr.reduce(function(p,f){ return p.then(function(){ return orpReadOne(f); }); }, Promise.resolve()).then(function(){
+    if(ORPS.list){ /* 자동 짝짓기는 사용자가 고르지 않은 마이너스 건에만 채운다 */
+      var auto=ORP.autoPairs(ORPS.list, ORPS.banje);
+      Object.keys(auto).forEach(function(k){ if(!ORPS.pairs[k]||!ORPS.pairs[k].manual) ORPS.pairs[k]=auto[k]; });
+      /* OR 전표가 아닌 행은 처음 올릴 때 '확인 필요'로만 표시 — 기본은 포함 */
+    }
+    ORPS.done=false; orpRecalc(); renderOrp(); });
+}
+function orpReadOne(f){
+  var ent={name:f.name, kind:"reading", info:"읽는 중…", bad:false}; ORPS.files=ORPS.files.filter(function(x){ return x.name!==f.name; }); ORPS.files.push(ent); renderOrp();
+  var done=function(k,i,b){ ent.kind=k; ent.info=i; ent.bad=!!b; };
+  return readFile(f).then(function(ab){
+    var wb=XLSX.read(ab,{type:"array",cellDates:false}), got=[];
+    /* 매입리스트 */
+    try{ var L=ORP.parseList(wb, XLSX);
+      if(L.rows.length){ ORPS.list=L; ORPS.listName=f.name; ORPS.pairs={}; ORPS.excluded={}; ORPS.decide={};
+        got.push("매입리스트 · "+L.sheet+" "+L.rows.length+"건 · 합계 "+fmt(L.rows.reduce(function(s,r){ return s+r.total; },0))+(L.tax?" · 세금계산서 발행내역 "+L.tax.rows.length+"행":"")); } }catch(e){}
+    /* 건별반제 — 시트 이름에 '건별반제'가 있으면 그 시트, 없으면 첫 시트 */
+    var bn=wb.SheetNames.filter(function(n){ return /건별반제/.test(n); })[0]||(got.length?null:wb.SheetNames[0]);
+    if(bn){ var B=ORP.parseBanje(XLSX.utils.sheet_to_json(wb.Sheets[bn],{header:1,raw:true,defval:""}));
+      if(B&&B.rows.length){ ORPS.banje=B; ORPS.banjeName=f.name+(wb.SheetNames.length>1?" › "+bn:""); got.push("건별반제"+(B.raw?"(ERP 원본)":"(작업 시트)")+" · "+B.rows.length+"행 · 전표금액 합계 "+fmt(B.total)+" · 반제됨 "+B.rows.filter(function(o){ return o.fin; }).length+"행"); } }
+    if(got.length) done(got.length>1?"both":/^매입/.test(got[0])?"list":"banje", got.join(" / "));
+    else done("unknown","알 수 없는 파일 — 매입리스트(작성일자·합계·적요·전표번호) 또는 건별반제(회계일자·최종반제일자·전표금액·전표번호) 머리글이 없습니다",true);
+  }).catch(function(e){ done("unknown","읽기 실패: "+(e&&e.message||e),true); });
+}
+/* 확인 필요 행: OR 전표가 아닌 행 · (건별반제를 올렸으면) 건별반제에 없는 전표 — 상계로 이미 반제된 마이너스는 제외 */
+function orpNeedRows(){
+  var L=ORPS.list; if(!L) return [];
+  var B=ORPS.banje, bySlip={}; if(B) B.rows.forEach(function(o){ (bySlip[o.slip]=bySlip[o.slip]||[]).push(o); });
+  var paired={}; Object.keys(ORPS.pairs).forEach(function(k){ if(ORPS.pairs[k]&&ORPS.pairs[k].target) paired[k]=1; });
+  var taxBy={}; if(L.tax) L.tax.rows.forEach(function(t){ taxBy[t.mg]=t; });
+  return L.rows.map(function(r){
+    var why=[]; if(!/^OR/i.test(r.slip)) why.push("OR 전표 아님");
+    var bs=bySlip[r.slip]; if(B && !bs && !paired[r.id]) why.push("건별반제에 없음");
+    if(!why.length) return null;
+    var erp=!B?'<span class="mini">건별반제 미첨부 — 올려서 비교</span>':
+      bs?(function(){ var amt=bs.reduce(function(s,o){ return s+o.amt; },0), fin=bs.map(function(o){ return o.fin; }).filter(Boolean), due=bs.map(function(o){ return o.due; }).filter(Boolean);
+        return '<span class="chip '+(Math.round(amt)===Math.round(r.total)?"in":"out")+'">있음 '+fmt(amt)+'</span>'+(Math.round(amt)!==Math.round(r.total)?'<span class="orp-sub">금액 차이 '+fmt(amt-r.total)+'</span>':'')+
+          (due.length?'<span class="orp-sub">자금예정 '+esc(due[0])+'</span>':'')+(fin.length?'<span class="orp-sub">최종반제 '+esc(fin.join(", "))+'</span>':''); })()
+      :'<span class="chip out">없음</span><span class="orp-sub">오라클 미지급 잔액에 없는 전표</span>';
+    var t=taxBy[r.mg];
+    var tax=!L.tax?'<span class="mini">세금계산서 발행내역 시트 없음</span>':t?(t.note?'<span class="chip auto">'+esc(t.note)+'</span>':'<span class="chip in">발행내역 '+esc(String(t.xrow))+'행 · 비고 없음</span>')+(t.ref?'<span class="orp-sub">'+esc(t.ref)+'</span>':''):'<span class="chip out">발행내역에 없음</span>';
+    return {r:r, why:why, erp:erp, tax:tax};
+  }).filter(Boolean);
+}
+function orpD(iso){ return iso?iso.slice(2).replace(/-/g,"."):""; }
+function orpDow(iso){ return ORP.DOW[ORP.dow(iso)]; }
+function renderOrp(){
+  if(!$("#orpDrop")) return;
+  if(!ORPS.write) ORPS.write=todayISO();
+  if(document.activeElement!==$("#orpWrite")) $("#orpWrite").value=ORPS.write;
+  if(document.activeElement!==$("#orpTerm")) $("#orpTerm").value=ORPS.term;
+  if(document.activeElement!==$("#orpWho")) $("#orpWho").value=ORPS.who;
+  var L=ORPS.list, R=ORPS.R, ck=L&&R?ORP.checks(L,R,ORPS.banje):[];
+  var minus=L?L.rows.filter(function(r){ return r.total<0; }):[], nonOR=L?L.rows.filter(function(r){ return !/^OR/i.test(r.slip); }):[];
+  var unpaired=minus.filter(function(m){ return !(ORPS.pairs[m.id]&&ORPS.pairs[m.id].target) && !ORPS.excluded[m.id]; });
+  var need=orpNeedRows(), undecided=need.filter(function(x){ return !ORPS.decide[x.r.id]; });
+  var allOk=ck.length&&ck.every(function(c){ return c.ok; });
+  var on={1:!!L, 2:!!L&&allOk, 3:!!L&&!unpaired.length&&!undecided.length, 4:ORPS.done}, cur=[1,2,3,4].filter(function(n){ return !on[n]; })[0]||5;
+  $$("#orpSteps li").forEach(function(li){ var n=+li.dataset.s; li.className=on[n]?"on":n===cur?"cur":""; });
+  $("#orpMonth").innerHTML=R&&R.month?'<b>'+esc(R.month.replace("-","년 "))+'월</b> <span class="mini">→ 지급 '+esc(R.payMonths.map(function(m){ return +m.slice(5)+"월"; }).join("·"))+'</span>':'<span class="mini">—</span>';
+  /* 1. 파일 · 검증 */
+  $("#orpFiles").innerHTML=ORPS.files.map(function(f){ var lab={list:"매입리스트",banje:"건별반제",both:"매입리스트+건별반제",unknown:"알 수 없음",reading:"읽는 중"}[f.kind]||f.kind;
+    return '<div class="filerow"'+(f.bad?' style="border-color:var(--out);color:var(--out)"':'')+'><span>'+esc(f.name)+'</span><span class="chip '+(f.bad?"out":f.kind==="reading"?"nv":"in")+'">'+esc(lab)+'</span><span class="mini">'+esc(f.info)+'</span></div>'; }).join("");
+  $("#orpChecks").innerHTML=ck.map(function(c){ return '<div class="orp-check"><span class="chip '+(c.ok?"in":"out")+'">'+(c.fmtCount?(c.ok?"✓ 이상 없음":"✗ "+fmt(c.a)+"건"):c.ok?"✓ 일치":"✗ 차이 "+fmt(c.a-c.b))+'</span><span>'+esc(c.label)+'</span>'+(c.fmtCount?'':'<b>'+fmt(c.a)+'</b>'+(c.ok?'':'<span class="mini">비교값 '+fmt(c.b)+'</span>'))+(c.note?'<span class="mini">'+esc(c.note)+'</span>':'')+'</div>'; }).join("")+
+    (L&&!L.tax?'<div class="orp-check"><span class="chip nv">—</span><span>세금계산서 발행내역 시트가 없어 발행내역 합계 대사는 건너뜁니다.</span></div>':'')+
+    (L&&!ORPS.banje?'<div class="orp-check"><span class="chip nv">선택</span><span>ERP 건별반제를 올리면 ‘건별반제 합계 − 지급변경 = 지급일정 합계’까지 대사합니다.</span></div>':'');
+  /* 2. 특이케이스 */
+  var pad=[];
+  if(!L) pad.push('<div class="mini">매입리스트를 올리면 마이너스 계산서와 상계 대상을 찾습니다.</div>');
+  else {
+    if(!minus.length) pad.push('<div class="banner good">마이너스 계산서가 없습니다 — 특이케이스(지급변경) 없음.</div>');
+    else if(unpaired.length) pad.push('<div class="banner warn">상계 대상을 찾지 못한 마이너스 계산서 '+unpaired.length+'건 — 아래에서 상계된 전표를 고르세요. ‘상계 없음’이면 자기 작성일자 지급분에서 차감합니다.</div>');
+    else pad.push('<div class="banner good">마이너스 계산서 '+minus.length+'건 모두 상계 대상이 정해졌습니다. 상계 대상 전표의 작성일자 지급분에서 차감합니다.</div>');
+    if(need.length) pad.push('<div class="banner '+(undecided.length?"warn":"good")+'" style="margin-top:8px">확인 필요 '+need.length+'건 (OR 전표가 아닌 행 · 건별반제에 없는 전표) — 건별반제와 구매팀 작업파일을 비교한 뒤 행마다 ‘포함’ 또는 ‘제외’를 고르세요.'+(undecided.length?' <b>아직 '+undecided.length+'건을 고르지 않아 엑셀을 만들 수 없습니다.</b>':' 모두 확인했습니다.')+'</div>');
+  }
+  $("#orpSpecPad").innerHTML=pad.join("");
+  var rowsS=minus;
+  var cand=L?L.rows.filter(function(r){ return r.total>0 && !ORPS.excluded[r.id]; }).sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:(a.slip<b.slip?-1:1); }):[];
+  $("#orpSpecTbl").innerHTML=!rowsS.length?'':
+    '<thead><tr><th>구분</th><th>전표번호</th><th>작성일자</th><th>거래처(비고2)</th><th class="num">합계</th><th>상계 대상 전표</th><th>기존 집행일 → 변경</th><th>근거</th></tr></thead><tbody>'+
+    rowsS.map(function(r){ var isM=r.total<0, p=ORPS.pairs[r.id]||{}, s=R&&R.specials.filter(function(x){ return x.minus.id===r.id; })[0];
+      var sel=isM?'<select data-id="'+r.id+'" aria-label="상계 대상 전표"><option value="">상계 없음 — 자기 작성일자 지급분에서 차감</option>'+
+        cand.map(function(c){ return '<option value="'+c.id+'"'+(p.target===c.id?" selected":"")+'>'+esc(c.slip+" · "+c.date.slice(5)+" · "+c.cust+" · "+fmt(c.total))+'</option>'; }).join("")+'</select>':'<span class="mini">—</span>';
+      var orig=ORP.payDayOf(ORP.addDays(r.date,ORPS.term),orpHoli);
+      return '<tr class="'+(ORPS.excluded[r.id]?"orp-off":s?"orp-spec":"")+'"><td>'+(isM?'<span class="chip auto">마이너스</span>':'<span class="chip nv">OR 아님</span>')+'</td><td class="card-mono">'+esc(r.slip)+'</td><td>'+esc(r.date)+'</td><td>'+esc(r.cust)+'<span class="orp-sub">'+esc(r.pjName||r.memo)+'</span></td>'+
+        '<td class="num">'+fmt(r.total)+'</td><td>'+sel+'</td><td>'+(s?esc(orpD(s.origPay))+' → <b>'+esc(orpD(s.newPay))+'</b>':esc(orpD(orig)))+'</td><td class="mini">'+esc(s?s.src||(p.manual?"직접 지정":""):p.manual?"직접 지정":"")+'</td></tr>'; }).join("")+'</tbody>';
+  /* 2-2. 확인 필요 — 건별반제 · 구매팀 작업파일(세금계산서 발행내역) 근거를 나란히 보고 포함/제외를 직접 고른다 (기본값 없음) */
+  $("#orpNeedTbl").innerHTML=!need.length?'':
+    '<thead><tr><th>사유</th><th>전표번호</th><th>작성일자</th><th>거래처(비고2)</th><th class="num">매입리스트 합계</th><th>건별반제(ERP)</th><th>구매팀 작업파일</th><th>계산 지급일</th><th class="ctr">판단</th></tr></thead><tbody>'+
+    need.map(function(x){ var r=x.r, d=ORPS.decide[r.id];
+      return '<tr class="'+(d==="out"?"orp-off":!d?"orp-spec":"")+'"><td>'+x.why.map(function(w){ return '<span class="chip auto">'+esc(w)+'</span>'; }).join(" ")+'</td><td class="card-mono">'+esc(r.slip)+'</td><td>'+esc(r.date)+'</td>'+
+        '<td>'+esc(r.cust)+'<span class="orp-sub">'+esc([r.kind,r.pj,r.pjName].filter(Boolean).join(" · "))+'</span></td><td class="num">'+fmt(r.total)+'</td>'+
+        '<td>'+x.erp+'</td><td>'+x.tax+'</td><td>'+esc(orpD(ORP.payDayOf(ORP.addDays(r.date,ORPS.term),orpHoli)))+'</td>'+
+        '<td class="ctr"><div class="seg" role="group" aria-label="판단"><button type="button" data-d="in" data-id="'+r.id+'" aria-pressed="'+(d==="in")+'">포함</button><button type="button" data-d="out" data-id="'+r.id+'" aria-pressed="'+(d==="out")+'">제외</button></div></td></tr>'; }).join("")+'</tbody>';
+  $$("#orpNeedTbl button[data-d]").forEach(function(b){ b.onclick=function(){ var id=b.dataset.id, v=b.dataset.d;
+    if(ORPS.decide[id]===v) delete ORPS.decide[id]; else ORPS.decide[id]=v;
+    if(ORPS.decide[id]==="out") ORPS.excluded[id]=true; else delete ORPS.excluded[id];
+    ORPS.done=false; orpRecalc(); renderOrp(); }; });
+  $$("#orpSpecTbl select").forEach(function(s){ s.onchange=function(){ ORPS.pairs[s.dataset.id]={target:s.value, src:s.value?"직접 지정":"", manual:true}; ORPS.done=false; orpRecalc(); renderOrp(); }; });
+  /* 3. 일정 */
+  $$("#orpSeg button").forEach(function(b){ b.setAttribute("aria-pressed",String(b.dataset.f===ORPS.f)); });
+  if(!R){ $("#orpKpis").innerHTML=""; $("#orpTbl").innerHTML='<tbody><tr><td class="empty" style="padding:22px">구매팀 오라클 매입리스트를 올리면 작성일자별 지급일을 계산합니다.</td></tr></tbody>'; $("#orpFoot").textContent=""; }
+  else {
+    var shifted=R.days.filter(function(d){ return d.shift; }).length;
+    $("#orpKpis").innerHTML=tileK("lead","지급 총액",fmt(R.total),"계산서 "+fmt(R.items.length)+"건"+(R.excluded.length?" · 제외 "+R.excluded.length+"건":"")+(undecided.length?" · 확인 필요 "+undecided.length+"건 미정(포함한 채 계산)":""))+
+      tileK("i","지급 횟수",fmt(R.pays.length)+"회",R.pays.length?orpD(R.pays[0].pay)+" ~ "+orpD(R.pays[R.pays.length-1].pay):"")+
+      tileK(shifted?"o":"i","앞당긴 지급",fmt(shifted)+"일자","60일째가 주말·공휴일")+
+      tileK(R.specials.length?"o ar-warn":"i","특이케이스",fmt(R.specials.length)+"건",R.specials.length?"지급변경 "+fmt(R.specials.reduce(function(s,x){ return s+x.minus.total; },0)):"지급변경 없음");
+    var html="";
+    if(ORPS.f==="day"){
+      html='<thead><tr><th class="ctr">Invoice Date</th><th class="ctr">Due Date</th><th class="ctr">요일</th><th class="num">일별금액</th><th class="ctr">Payment Day</th><th class="ctr">요일</th><th class="num">지출금액</th><th class="num">경과일수</th><th class="num">건수</th><th>품의내역</th><th>앞당긴 이유</th></tr></thead><tbody>'+
+        R.days.map(function(d){ var sp=d.items.some(function(it){ return it.eff!==it.r.date; });
+          return '<tr class="'+(d.first?"orp-grp ":"")+(d.shift?"orp-shift ":"")+(sp?"orp-spec":"")+'"><td class="ctr">'+esc(d.date)+'</td><td class="ctr">'+esc(d.due)+'</td><td class="ctr">'+orpDow(d.due)+'</td><td class="num">'+fmt(d.amt)+'</td>'+
+            '<td class="ctr orp-pay">'+esc(d.pay)+'</td><td class="ctr">'+orpDow(d.pay)+'</td><td class="num"><b>'+(d.first?fmt(d.payAmt):"")+'</b></td><td class="num">'+d.elapsed+'</td><td class="num">'+d.n+'</td>'+
+            '<td>'+(d.first?esc("(GD)"+orpD(d.pay)+" 오라클내자재비 지급"):"")+'</td><td class="mini">'+esc([d.reason,sp?'마이너스 상계 반영':''].filter(Boolean).join(' · '))+'</td></tr>'; }).join("")+
+        '<tr class="total"><td colspan="3">합 계</td><td class="num">'+fmt(R.total)+'</td><td></td><td></td><td class="num">'+fmt(R.pays.reduce(function(s,p){ return s+p.amt; },0))+'</td><td colspan="4"></td></tr></tbody>';
+    } else if(ORPS.f==="pay"){
+      html='<thead><tr><th class="ctr">회계일자(지급일)</th><th class="ctr">요일</th><th>품의내역</th><th class="num">금액</th><th class="num">건수</th><th>작성일자 범위</th></tr></thead><tbody>'+
+        R.pays.map(function(p){ return '<tr><td class="ctr">'+esc(p.pay)+'</td><td class="ctr">'+orpDow(p.pay)+'</td><td>'+esc("(GD)"+orpD(p.pay)+" 오라클내자재비 지급")+'</td><td class="num"><b>'+fmt(p.amt)+'</b></td><td class="num">'+p.n+'</td><td class="mini">'+esc(p.days.map(function(d){ return d.date.slice(5); }).join(", "))+'</td></tr>'; }).join("")+
+        '<tr class="total"><td colspan="3">합 계</td><td class="num">'+fmt(R.total)+'</td><td class="num">'+R.items.length+'</td><td></td></tr></tbody>';
+    } else {
+      var payOf={}; R.days.forEach(function(d){ payOf[d.date]=d.pay; });
+      var its=R.items.slice().sort(function(a,b){ return a.eff<b.eff?-1:a.eff>b.eff?1:(a.r.slip<b.r.slip?-1:1); });
+      html='<thead><tr><th>작성일자</th><th>지급일</th><th>전표번호</th><th>거래처(비고2)</th><th>프로젝트</th><th class="num">공급가액</th><th class="num">부가세</th><th class="num">합계</th><th>비고</th></tr></thead><tbody>'+
+        its.map(function(it){ var x=it.r, mv=it.eff!==x.date;
+          return '<tr class="'+(mv?"orp-spec":"")+'"><td>'+esc(x.date)+(mv?'<span class="orp-sub">→ '+esc(it.eff)+' 분으로 반영</span>':'')+'</td><td>'+esc(payOf[it.eff])+'</td><td class="card-mono">'+esc(x.slip)+'</td><td>'+esc(x.cust)+'</td><td>'+esc(x.pj)+'<span class="orp-sub">'+esc(x.pjName)+'</span></td>'+
+            '<td class="num">'+fmt(x.amt)+'</td><td class="num">'+fmt(x.vat)+'</td><td class="num">'+fmt(x.total)+'</td><td class="mini">'+(mv?"지급변경(마이너스 상계)":"")+'</td></tr>'; }).join("")+
+        '<tr class="total"><td colspan="7">합 계 ('+R.items.length+'건)</td><td class="num">'+fmt(R.total)+'</td><td></td></tr></tbody>';
+    }
+    $("#orpTbl").innerHTML=html;
+    var hl=R.holidays.map(function(h){ return h.date.slice(5).replace("-","/")+" "+h.name; });
+    $("#orpFoot").textContent=(hl.length?"지급 기간 공휴일: "+hl.join(" · ")+" — ":"")+"공휴일은 설정 › 법정공휴일 목록(+내장 2025·2027년)을 씁니다.";
+  }
+  /* 4. 엑셀 */
+  $("#btnOrpXlsx").disabled=!R||!R.days.length||undecided.length>0;
+  $("#orpOutNote").innerHTML=!R?'매입리스트를 올리면 만들 수 있습니다. 모든 파일은 이 브라우저 안에서만 처리되고 저장하지 않습니다.':
+    (undecided.length?'<span class="card-warn">확인 필요 '+undecided.length+'건의 포함/제외를 2번에서 먼저 고르세요.</span> ':'')+
+    (unpaired.length?'<span class="card-warn">상계 대상을 고르지 않은 마이너스 계산서 '+unpaired.length+'건은 자기 작성일자 지급분에서 차감한 채로 만듭니다.</span> ':'')+
+    (allOk?'':'<span class="card-warn">합계 대사에 차이가 있습니다 — 1번 검증을 확인하세요.</span> ')+
+    '파일 이름: '+esc(orpFileName(R));
+}
+function orpFileName(R){ var m=R.month.split("-"); return m[0]+"년 "+(+m[1])+"월 매입분 지출일정.xlsx"; }
+(function(){
+  if(!$("#orpDrop")) return;
+  var drop=$("#orpDrop"), inp=$("#orpIn");
+  drop.onclick=function(){ inp.click(); };
+  drop.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); inp.click(); } };
+  drop.ondragover=function(e){ e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave=function(){ drop.classList.remove("over"); };
+  drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove("over"); orpAddFiles(e.dataTransfer.files); };
+  inp.onchange=function(){ orpAddFiles(inp.files); setTimeout(function(){ inp.value=""; },0); };
+  $("#btnOrpNew").onclick=function(){ orpReset(); renderOrp(); };
+  $("#orpTerm").onchange=function(){ var v=Math.max(1,Math.min(365,Math.round(+this.value||60))); ORPS.term=v; ORPS.done=false; orpRecalc(); renderOrp(); };
+  $("#orpWrite").onchange=function(){ ORPS.write=this.value||todayISO(); };
+  $("#orpWho").oninput=function(){ ORPS.who=this.value; };
+  $$("#orpSeg button").forEach(function(b){ b.onclick=function(){ ORPS.f=b.dataset.f; renderOrp(); }; });
+  $("#btnOrpXlsx").onclick=function(){ var R=ORPS.R; if(!R) return; var btn=this; btn.disabled=true;
+    loadExcelJS().then(function(EX){
+      var notes={}; orpNeedRows().forEach(function(x){ var d=ORPS.decide[x.r.id]; if(d) notes[x.r.id]=(d==="in"?"확인 후 포함":"확인 후 제외")+" ("+x.why.join(", ")+")"; });
+      var wb=orpWorkbook(EX, R, ORPS.list, {notes:notes, banjeTotal:ORPS.banje?ORPS.banje.total:null, writeDate:ORPS.write, who:ORPS.who});
+      return wb.xlsx.writeBuffer().then(function(buf){ return offerDownload(orpFileName(R), new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); });
+    }).then(function(){ ORPS.done=true; renderOrp(); }).catch(function(e){ toast("엑셀을 만들지 못했습니다: "+(e&&e.message||e)); renderOrp(); });
+  };
+})();
+
 
 /* 공용: 드롭존 바인딩 */
 function bindDrop(item, onFile){
@@ -13813,7 +14590,10 @@ var FER=(function(){
     if(!other && s.length>=5 && names.some(function(n){ return n.indexOf(s)===0; })) return {kind:"trunc", rest:s, raw:raw};
     return {kind:"", rest:s, raw:raw};
   }
-  function ownHit(t, co){ var a=normOwnName(t.summary,co), b=normOwnName(t.client,co); return a.kind?a:b.kind?b:null; }
+  function ownHit(t, co){ var a=normOwnName(t.summary,co), b=normOwnName(t.client,co), r=a.kind?a:b.kind?b:null;
+    if(!r && typeof xferSrcs==="function" && D){ var cc=(D.companies||[]).filter(function(x){ return x.id===co; })[0];   // [v87]
+      if(cc) xferSrcs(cc).some(function(s){ var a2=normOwnName(t.summary,s.id), b2=normOwnName(t.client,s.id); r=a2.kind?a2:b2.kind?b2:null; return !!r; }); }
+    return r; }
   /* 자사명이 '들어 있기는' 하지만 앞뒤 글자 때문에 자사명이 아닌 경우(근거 표시용) */
   function ownInside(t, co){ var s=(S(t.summary)+"|"+S(t.client)).replace(/\s+/g,""); return (OWN_NAMES[co]||[]).some(function(n){ return s.indexOf(n)>=0; }); }
   function cmpArr(a,b){ for(var i=0;i<a.length;i++){ if(a[i]<b[i]) return -1; if(a[i]>b[i]) return 1; } return 0; }
@@ -14120,8 +14900,8 @@ function ferSaveFepPlan(P){
 function ferRecalc(){
   var dd=ferDates(); FERS.date=dd.date; FERS.warn=dd.warn||[];
   ferSyncCos();   // [v80] 종료된 법인(굿어스 2026-10-19까지)은 집행일이 그 뒤면 표·보고서에서 뺀다
-  FER_ALL.forEach(function(k){ if(FER_COS.indexOf(k)<0 && (FERS.erp[k]||FERS.cms[k])){ var c=ferCo(k); FERS.warn.push((c.name||k)+"("+k+")는 "+coFormEnd(c)+"까지라 집행일 "+FERS.date+" 계산·보고서에서 뺐습니다"); } });
-  FERS.model=(Object.keys(FERS.erp).length||Object.keys(FERS.cms).length)?FER.compute(FERS):null;
+  FER_ALL.forEach(function(k){ if(FER_COS.indexOf(k)<0 && (FERS.erp[k]||FERS.cms[k]) && !xferFerTo(k)){ var c=ferCo(k); FERS.warn.push((c.name||k)+"("+k+")는 "+coFormEnd(c)+"까지라 집행일 "+FERS.date+" 계산·보고서에서 뺐습니다"); } });
+  FERS.model=(Object.keys(FERS.erp).length||Object.keys(FERS.cms).length)?FER.compute(xferFerState(FERS)):null;   // [v87] 계좌 이관 합산(원본 FERS는 그대로)
   if(FERS.model){ FERS.ran=true; ferAutoNotes(); }
 }
 /* 비고 자동 채움: 차이≠0이고 사용자가 아직 손대지 않은 칸만 */
@@ -14220,7 +15000,9 @@ function ferRenderUpload(){
     };
     var cell=function(kind){ var on=kind==="erp"?!!e:!!c;
       return '<div class="ilbo-drop fer-drop'+(on?' done':'')+'" tabindex="0" data-co="'+k+'" data-k="'+kind+'">'+info(kind)+'</div>'; };
-    return '<div class="fer-uprow"><div class="fer-upco">'+ferChip(k)+'<span class="mini">'+esc(ferCo(k).name)+'</span>'+(gone?'<span class="chip nv">소멸 법인</span>':'')+'</div>'+cell("erp")+cell("cms")+'</div>';
+    var xin=FER_ALL.filter(function(s){ return xferFerTo(s)===k && (FERS.cms[s]||FERS.erp[s]); }).map(function(s){ var fr=xferFerFrom(ferCo(s)), nC=((FERS.cms[s]&&FERS.cms[s].rows)||[]).filter(function(t){ return t.date>=fr; }).length, nE=((FERS.erp[s]&&FERS.erp[s].parsed&&FERS.erp[s].parsed.lines)||[]).filter(function(L){ return L.date>=fr; }).length;
+      return (nC||nE) ? '<span class="chip mv" title="계좌 이관 — '+esc(fr)+' 이후 자료는 이 칸에 합산">+ '+esc(ferCo(s).short)+' 이관분'+(nE?' 전표 '+nE+'줄':'')+(nC?' CMS '+nC+'건':'')+'</span>' : ''; }).join("");   // [v87]
+    return '<div class="fer-uprow"><div class="fer-upco">'+ferChip(k)+'<span class="mini">'+esc(ferCo(k).name)+'</span>'+(gone?'<span class="chip nv">소멸 법인</span>':'')+xin+'</div>'+cell("erp")+cell("cms")+'</div>';
   }).join("");
 }
 function ferRowsTable(side){
@@ -14334,7 +15116,7 @@ function ferRenderCfg(){
 function renderExecResult(){
   if(!$("#ferSteps")) return;
   ferSyncCos();   // [v80]
-  if(FERS.model) FERS.model=FER.compute(FERS);                            // 설정·계획 변경 반영
+  if(FERS.model) FERS.model=FER.compute(xferFerState(FERS));              // 설정·계획 변경 반영 · [v87] 계좌 이관 합산
   $("#ferDate").textContent=FERS.date||"—";
   var w=FERS.warn||[];
   $("#ferWarn").innerHTML=(FERS.busy?'<div class="banner" style="margin-top:10px">파일을 읽는 중…</div>':'')+(w.length?'<div class="banner warn" style="margin-top:10px">'+w.map(esc).join("<br>")+'</div>':'');
