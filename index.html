@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v90 · 2026-10-22</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v91 · 2026-10-23</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -9286,8 +9286,10 @@ ckey=(function(f){ return function(c){ var k=f(c); xferSrcs(c).forEach(function(
 /* 전표 줄 나누기 — 이관일 이후 회계일자 줄은 승계 법인으로 */
 function xferSplitLines(c, lines){
   var x=xferOf(c); if(!x) return null;
-  var mv=[], rest=[]; (lines||[]).forEach(function(L){ (L.date && L.date>=x.date ? mv : rest).push(L); });
+  var mv=[], rest=[], pf=String(c.id||"")+"·"; (lines||[]).forEach(function(L){ (L.date && L.date>=x.date ? mv : rest).push(L); });
   if(!mv.length) return null;
+  /* [v91] 회사마다 전표번호를 따로 매긴다(굿어스·솔루션 모두 FI2026102600001) — 원 법인 표시를 붙여 합칠 때·짝 찾을 때 섞이지 않게 */
+  mv=mv.map(function(L){ var v=String(L.voucher||""); return Object.assign({}, L, {voucher:v.indexOf("·")>=0?v:pf+v, xferFrom:c.id}); });
   return {to:co(x.to), moved:mv, rest:rest};
 }
 
@@ -10016,6 +10018,35 @@ function xferCheckHtml(m){
     '<table class="ilbo-tbl"><thead><tr><th>계좌</th><th>구분</th><th>원 법인 마감</th><th>승계액(입금 기타)</th><th>'+esc(m.prevEnd.slice(5))+' 잔액</th><th>CMS 마지막 거래후잔액</th><th>대조</th></tr></thead><tbody>'+rows+
     '<tr class="total"><td colspan="2" class="c">승계 합계</td><td class="num">'+w0(X.total)+'</td><td class="num">'+w0(X.total)+'</td><td colspan="3"></td></tr></tbody></table></div>';
 }
+
+/* ===================== [v91] 합병 이관 법인 자료를 승계 법인 탭에 함께 올리기(10-26 부가세 납부: 굿어스 ERP·CMS → 솔루션) ===================== */
+/* 결과보고서 계획: 승계 법인 계획 = 자기 계획 + 원 법인 계획(계획서 PDF·계획서 도구에 원 법인 칸이 따로 있을 때만). 수기로 고친 계획은 그대로 */
+ferPlan=(function(f){ return function(co){ var p=f.apply(this, arguments);
+  try{ if(p && !p.edited){ var d=FERS.date;
+    FER_ALL.forEach(function(k){ if(k===co || xferFerTo(k)!==co) return; var fr=xferFerFrom(ferCo(k)); if(!fr || !d || d<fr) return;
+      var b=null; try{ b=f(k); }catch(e){ b=null; } if(!b || !(+b.krw || +b.fx)) return;
+      p={krw:(+p.krw||0)+(+b.krw||0), n:(+p.n||0)+(+b.n||0), fx:Math.round(((+p.fx||0)+(+b.fx||0))*100)/100, src:p.src+" + "+ferCo(k).short+"("+b.src+")", xferAdd:{co:k, krw:+b.krw||0, n:+b.n||0, fx:+b.fx||0}}; });
+  } }catch(e){}
+  return p; }; })(ferPlan);
+/* CMS 구분: 합병 이관 뒤 승계 법인 계좌의 '원 법인 자사명' 이체(예: 솔루션 탭의 굿어스 MMT → 하나 81304, 적요 '굿어스(주)')는 자금이동.
+   이관일 이후 거래만(날짜가 없으면 이관 계좌 거래만) · 원 법인 이름 판정은 그 법인 설정(keywords·others)을 그대로 쓴다(굿어스데이터는 굿어스 아님) */
+function xferOwnSrcs(c, row){
+  var srcs=xferSrcs(c); if(!srcs.length || !row) return [];
+  var d=String(row.date||"");
+  return srcs.filter(function(s){ var x=xferOf(s); if(!x) return false;
+    if(d) return d>=x.date;
+    var a=acctOf(c,row.acct); return !!(a && x.accts.indexOf(digitsOnly(a.num))>=0); });
+}
+classifyKind=(function(f){ return function(c, row, internal){ var k=f.apply(this, arguments);
+  if(k!=="수입" && k!=="지출") return k;
+  try{ var sm=row.summary||"", cl=row.client||"";
+    if(!isLoanInterest(row) && !(row.deposit>0 && isInterest(row)) && !containsAny(sm,EXCL_SUMMARY) && !containsAny(sm,EXCL_TRANSFER) && !containsAny(cl,EXCL_TRANSFER) &&
+       xferOwnSrcs(c,row).some(function(s){ return isTransferText(s,cl) || (!clientIsOther(s,cl) && isTransferText(s,sm)); }))
+      return row.deposit>0 ? "자금이동(입금)" : "자금이동(출금)";
+  }catch(e){}
+  return k; }; })(classifyKind);
+cmsOwnish=(function(f){ return function(c, t){ if(f.apply(this, arguments)) return true;
+  try{ return xferOwnSrcs(c,t).some(function(s){ return f(s,t); }); }catch(e){ return false; } }; })(cmsOwnish);
 
 function enter(){
   AUTH.entered=true;
@@ -12118,7 +12149,7 @@ function ilboFiles(files){
         var dI=slipDaysOf(xsI.to, buildSlip(xsI.to, xsI.moved), f.name), lI=saveSlipDays(xsI.to, dI);
         lI.forEach(function(d){ slipDates.push({c:xsI.to, d:d}); });
         ilboLog('<span>'+esc(f.name)+'</span><span class="chip mv">계좌 이관</span><span class="mini">'+esc(c.short)+' 전표 '+xsI.moved.length+'줄('+esc(lI.join(", "))+') → '+esc(xsI.to.name)+' 전표로 저장</span>');
-        if(!xsI.rest.length){ if(ilboCo()!==xsI.to) curCo=xsI.to.id; ILBO.date=lI[lI.length-1]; return; }
+        if(!xsI.rest.length){ if(ilboCo()!==xsI.to) curCo=xsI.to.id; ILBO.date=lI[lI.length-1]; ILBO.userSet=true; return; }
         sp.lines=xsI.rest;
       }
       var b=buildSlip(c, sp.lines); if(!b.date){ ilboLog('<span>'+esc(f.name)+'</span><span class="mini">회계일자를 찾지 못했습니다</span>',true); return; }
@@ -15482,7 +15513,7 @@ function ferPlan(co){
 function ferSaveFepPlan(P){
   try{
     if(!P) return; var cfg=ferCfg(), saved=false;
-    Object.keys(P).forEach(function(k){ var p=P[k]; if(FER_COS.indexOf(k)<0||!p) return;
+    Object.keys(P).forEach(function(k){ var p=P[k]; if((FER_COS.indexOf(k)<0 && !xferFerTo(k))||!p) return;   // [v91] 이관 원 법인 칸도 저장
       var ds={}; p.rows.concat(p.fx).forEach(function(r){ var d=toISO(r["회계일자"]); if(d) ds[d]=(ds[d]||0)+1; });
       var d=Object.keys(ds).sort(function(a,b){ return ds[b]-ds[a]; })[0]; if(!d) return;
       var krw=p.rows.reduce(function(s,r){ return s+(+r["금액"]||0); },0), usd=p.fx.reduce(function(s,r){ return s+(+r.USD||0); },0);
@@ -15525,7 +15556,9 @@ function ferAddFile(f, slot){
     if(!kind) throw new Error("ERP 전표자료조회(계정코드·대변금액·회계일자) 또는 CMS 거래내역(거래일자·출금액) 형식이 아닙니다");
     var c=coName?detectCompany(coName):null, co=c?c.id:(slot&&slot.co)||null;
     if(!co) throw new Error("법인을 판별하지 못했습니다("+(coName||"회계단위/기업명 없음")+")");
-    if(slot && (slot.co!==co || slot.k!==kind)) toast(name+" → "+co+" "+(kind==="erp"?"ERP 전표":"CMS 거래내역")+" 칸으로 옮겼습니다(파일 내용 기준)");
+    var xTo=xferFerTo(co);   // [v91] 굿어스 파일을 솔루션 칸에 올림 → 계좌 이관에 따라 솔루션에 합산
+    if(slot && xTo && slot.co===xTo) toast(name+" → "+ferCo(co).short+" "+(kind==="erp"?"ERP 전표":"CMS 거래내역")+"로 읽었습니다 · "+xferFerFrom(ferCo(co))+" 이후 자료는 계좌 이관에 따라 "+ferCo(xTo).short+"에 합산합니다");
+    else if(slot && (slot.co!==co || slot.k!==kind)) toast(name+" → "+co+" "+(kind==="erp"?"ERP 전표":"CMS 거래내역")+" 칸으로 옮겼습니다(파일 내용 기준)");
     if(kind==="erp") FERS.erp[co]={name:name, parsed:erp, unit:coName};
     else FERS.cms[co]={name:name, rows:rows, company:coName};
   });
