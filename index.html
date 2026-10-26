@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v95 · 2026-10-26</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v96 · 2026-10-26</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -9291,7 +9291,8 @@ function xferSplitLines(c, lines){
   var mv=[], rest=[], pf=String(c.id||"")+"·"; (lines||[]).forEach(function(L){ (L.date && L.date>=x.date ? mv : rest).push(L); });
   if(!mv.length) return null;
   /* [v91] 회사마다 전표번호를 따로 매긴다(굿어스·솔루션 모두 FI2026102600001) — 원 법인 표시를 붙여 합칠 때·짝 찾을 때 섞이지 않게 */
-  mv=mv.map(function(L){ var v=String(L.voucher||""); return Object.assign({}, L, {voucher:v.indexOf("·")>=0?v:pf+v, xferFrom:c.id}); });
+  mv=mv.map(function(L){ var v=String(L.voucher||""), uc=L.unit?detectCompany(L.unit):null; if(uc && uc!==c) return Object.assign({}, L);   // [v96] 줄 회계단위가 다른 법인이면 표시 없음
+    return Object.assign({}, L, {voucher:v.indexOf("·")>=0?v:pf+v, xferFrom:c.id}); });
   return {to:co(x.to), moved:mv, rest:rest};
 }
 
@@ -9308,6 +9309,8 @@ function xferFerState(st){
         var keepR=cm.rows.filter(function(t){ return t.date<from; });
         if(keepR.length) out.cms[k]=Object.assign({}, cm, {rows:keepR}); else delete out.cms[k];
         var tg=out.cms[to];
+        if(tg && tg.rows){ var cg={}; tg.rows.forEach(function(t){ cg[cmsDupSig(t)]=1; }); var dR=mvR.filter(function(t){ return cg[cmsDupSig(t)]; }).length;   // [v96]
+          if(dR){ mvR=mvR.filter(function(t){ return !cg[cmsDupSig(t)]; }); notes.push("같은 CMS 행 "+dR+"건 중복 제외"); } }
         out.cms[to]= tg ? Object.assign({}, tg, {rows:tg.rows.concat(mvR), name:tg.name+" + "+cm.name}) : {name:cm.name, rows:mvR.slice(), company:cm.company, xferOnly:true};
         notes.push(ferCo(k).short+" CMS "+mvR.length+"건");
       }
@@ -9320,6 +9323,8 @@ function xferFerState(st){
         var subP=function(p, ls){ var dd={}; ls.forEach(function(L){ dd[L.date]=(dd[L.date]||0)+1; }); return Object.assign({}, p, {lines:ls, dates:dd}); };
         if(keepL.length) out.erp[k]=Object.assign({}, ep, {parsed:subP(ep.parsed, keepL)}); else delete out.erp[k];
         var te=out.erp[to];
+        if(te && te.parsed){ var eg={}; te.parsed.lines.forEach(function(L){ eg[ferErpSig(L)]=1; }); var dL=mvL.filter(function(L){ return eg[ferErpSig(L)]; }).length;   // [v96]
+          if(dL){ mvL=mvL.filter(function(L){ return !eg[ferErpSig(L)]; }); notes.push("같은 전표 줄 "+dL+"줄 중복 제외"); } }
         out.erp[to]= te ? Object.assign({}, te, {parsed:subP(te.parsed, te.parsed.lines.concat(mvL)), name:te.name+" + "+ep.name}) : {name:ep.name, parsed:subP(ep.parsed, mvL), unit:ep.unit, xferOnly:true};
         notes.push(ferCo(k).short+" 전표 "+mvL.length+"줄");
       }
@@ -10342,6 +10347,44 @@ function exportDailyStatusXlsx(ids, from, to){
   });
 }
 
+/* ===================== [v96] 합병 이관: 같은 전표가 두 파일(솔루션·굿어스)에 함께 있을 때 한 번만 반영 ===================== */
+/* 원인(운영 2026-10-26 솔루션): 솔루션 전표자료조회(GS-전자.xls)에 굿어스 국고 전표 FI2026102300001(하나 81304 372,679,570)이
+   같이 들어 있었고, 굿어스 전표자료조회(Gu-전자.xls)에도 같은 전표가 있었다. 굿어스 파일 줄은 'GU·FI2026102300001'로,
+   솔루션 파일 줄은 'FI2026102300001'로 저장돼 서로 다른 전표로 보고 둘 다 남았다 → 당일 출금·시재표 81304 두 배(745,359,140).
+   ① 줄 단위 회계단위: 파일 안의 줄 회계단위가 이관 원 법인(굿어스)이고 이관일 이후면 그 줄만 원 법인 표시(GU·)를 붙인다(파일 첫 줄 법인과 무관).
+   ② 겹친 줄 정리: 전표번호(표시 뗀 것)·라인·구분·계좌·금액·회계일자가 같은 줄이 'GU·' 줄과 표시 없는 줄로 함께 있으면 표시 없는 줄을 뺀다.
+   ③ 결과보고서: 원 법인 ERP·CMS를 승계 법인 칸에 합칠 때 같은 전표 줄·같은 CMS 행은 한 번만.
+   ④ CMS: 승계 법인 날짜에 원 법인 파일 행을 유지할 때 새 파일과 같은 거래(계좌·일시·금액·거래후잔액)는 뺀다. */
+function xferNormLines(lines){
+  var n=0;
+  (lines||[]).forEach(function(L){ var uc=L && L.unit ? detectCompany(L.unit) : null, x=uc ? xferOf(uc) : null;
+    if(!x || !L.date || L.date<x.date) return; var v=String(L.voucher||""); if(!v || v.indexOf("·")>=0) return;
+    L.voucher=uc.id+"·"+v; L.xferFrom=uc.id; n++; });
+  return n;
+}
+parseSlip=(function(f){ return function(){ var sp=f.apply(this, arguments); try{ if(sp && sp.lines) xferNormLines(sp.lines); }catch(e){} return sp; }; })(parseSlip);
+function slipBaseV(v){ v=String(v||""); var i=v.indexOf("·"); return i>=0 ? v.slice(i+1) : v; }
+function slipDupSig(L){ return [slipBaseV(L.voucher), L.line, L.kind, L.acct, Math.round(+L.amount||0), L.date||""].join("#"); }
+function slipDedupe(sl){
+  if(!sl || !(sl.lines||[]).length) return 0;
+  var pref={}; sl.lines.forEach(function(L){ if(String(L.voucher||"").indexOf("·")>=0) pref[slipDupSig(L)]=1; });
+  var before=sl.lines.length;
+  sl.lines=sl.lines.filter(function(L){ return String(L.voucher||"").indexOf("·")>=0 || !pref[slipDupSig(L)]; });
+  var n=before-sl.lines.length;
+  if(n){ var files=[]; sl.lines.forEach(function(L){ var f=String(L.srcFile||""); if(f && files.indexOf(f)<0) files.push(f); }); if(files.length){ sl.files=files; sl.file=files.join(" + "); } }
+  return n;
+}
+saveSlipDays=(function(f){ return function(c, days){ var r=f.apply(this, arguments);
+  try{ Object.keys(days||{}).forEach(function(d){ var n=slipDedupe((c.slips||{})[d]); if(n && typeof ilboLog==="function" && view==="ilbo") ilboLog('<span>'+esc(c.short)+' '+esc(d)+'</span><span class="chip mv">중복 정리</span><span class="mini">두 파일에 같이 있던 이관 원 법인 전표 '+n+'줄을 한 번만 반영</span>'); }); }catch(e){}
+  return r; }; })(saveSlipDays);
+/* 불러올 때 이미 저장된 겹친 줄도 정리 → 다음 저장 때 반영(v89 RELABEL_PENDING) */
+migrate=(function(f){ return function(){ var r=f.apply(this, arguments);
+  try{ (D.companies||[]).forEach(function(c){ if(!xferSrcs(c).length) return;
+    Object.keys(c.slips||{}).forEach(function(d){ if(slipDedupe(c.slips[d])) RELABEL_PENDING["co/"+c.id+"/slip/"+d.slice(0,7)]=1; }); }); }catch(e){ console.warn("v96 dedupe", e); }
+  return r; }; })(migrate);
+function ferErpSig(L){ return [L.voucher, L.line, L.code, Math.round(+L.cr||0), Math.round(+L.dr||0), L.date||"", digitsOnly(L.acctNum)].join("#"); }
+function cmsDupSig(t){ return [digitsOnly(t.acctNum), t.date||"", String(t.at||""), Math.round(+t.deposit||0), Math.round(+t.withdraw||0), t.after==null?"":Math.round(+t.after)].join("#"); }
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -10684,8 +10727,8 @@ function commitImport(res){
       var nrec = {source:"cms", txns:cms[d]};
       if(prevRec && prevRec.txns) nrec.txns=cms[d].concat(prevRec.txns.filter(function(t){ return t.fromSheet && SEC_ACCT_RE.test(String(t.acct||"")) && !cms[d].some(function(u){ return u.acct===t.acct; }); }));   // [v58] 보고서 증권 계좌 행 유지
       if(xferSrcs(c).length){ var ex0=dayRec(c,d), nco={};   // [v88] 계좌 이관: 기업명(원 파일)이 다른 행은 그 파일을 다시 올릴 때만 바뀐다
-        cms[d].forEach(function(t){ nco[t.company||""]=1; });
-        if(ex0 && ex0.source==="cms") nrec.txns=nrec.txns.concat((ex0.txns||[]).filter(function(t){ return !t.fromSlip && !t.rcSyn && !t.fromSheet && !nco[t.company||""]; })); }
+        var nsg={}; cms[d].forEach(function(t){ nco[t.company||""]=1; nsg[cmsDupSig(t)]=1; });   // [v96] 같은 거래는 새 파일 것만
+        if(ex0 && ex0.source==="cms") nrec.txns=nrec.txns.concat((ex0.txns||[]).filter(function(t){ return !t.fromSlip && !t.rcSyn && !t.fromSheet && !nco[t.company||""] && !nsg[cmsDupSig(t)]; })); }
       if(prevRec){
         if(prevRec.fxState && Object.keys(prevRec.fxState).length) nrec.fxState=prevRec.fxState;
         if(prevRec.fxDetail && prevRec.fxDetail.length) nrec.fxDetail=prevRec.fxDetail;
