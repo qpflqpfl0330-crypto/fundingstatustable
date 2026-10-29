@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v96 · 2026-10-26</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v97 · 2026-10-29</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -8102,7 +8102,9 @@ function handleFiles(files){
             if(!xs5.rest.length) return true;
             sp.lines=xs5.rest;
           }
+          noSlipHint(c5, sp, f.name).forEach(function(h){ log.insertAdjacentHTML("beforeend",'<div class="filerow">'+h+'</div>'); });   // [v97]
           var b5=buildSlip(c5, sp.lines), days5=slipDaysOf(c5, b5, f.name), dl5=Object.keys(days5).sort();
+          if(!dl5.length && Object.keys(sp.emptyDays||{}).length) return true;   // [v97] 위 안내 줄로 대신
           if(!dl5.length){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(f.name)+'</span><span class="mini">전표에서 회계일자를 찾지 못했습니다</span></div>'); return true; }
           result.slips[c5.id]=result.slips[c5.id]||{};
           Object.keys(days5).forEach(function(d){ result.slips[c5.id][d]=result.slips[c5.id][d]?slipMergeDay(result.slips[c5.id][d], days5[d]):days5[d]; });   // [v56] 같이 올린 다른 파일과 합침
@@ -10385,6 +10387,68 @@ migrate=(function(f){ return function(){ var r=f.apply(this, arguments);
 function ferErpSig(L){ return [L.voucher, L.line, L.code, Math.round(+L.cr||0), Math.round(+L.dr||0), L.date||"", digitsOnly(L.acctNum)].join("#"); }
 function cmsDupSig(t){ return [digitsOnly(t.acctNum), t.date||"", String(t.at||""), Math.round(+t.deposit||0), Math.round(+t.withdraw||0), t.after==null?"":Math.round(+t.after)].join("#"); }
 
+/* ===================== [v97] 전표자료조회에 그날 지급·입금 전표가 없을 때 — 확인 받고 '전표 없음'으로 반영 ===================== */
+/* CMS 거래 없는 날(v88 c.noTxn)과 같은 방식.
+   - 수동: c.slipNone[d]={by, at, file, n} — 업로드 가능 사용자가 자금일보 검증 줄의 [전표 없음 확인]을 체크(또는 업로드 기록의 [전표 없음으로 반영]).
+   - 근거 안내: 올린 전표자료조회에 그날 전표는 있는데 예금·현금 계정이 하나도 없으면(예: GD 10-28 매출 대체·선급비용 전표 2건) 업로드 기록·검증 줄에 알려 준다. 자동으로 확정하지는 않는다.
+   - 해제: 그날 예금·현금 전표가 든 파일이 올라오면 자동 해제 + 알림. */
+var SLIP_EMPTY={};   // c.id|날짜 → {file, n} (이번 화면에서 올린 파일 근거 — 저장하지 않음)
+parseSlip=(function(f){ return function(){ var sp=f.apply(this, arguments);
+  try{ if(sp && sp.lines){ var byD={};
+    sp.lines.forEach(function(L){ if(!L.date) return; var o=byD[L.date]||(byD[L.date]={v:{}, money:false}); o.v[L.voucher]=1; if(slipIsCash(L.code)||slipIsDeposit(L.code)) o.money=true; });
+    sp.emptyDays={}; Object.keys(byD).forEach(function(d){ if(!byD[d].money) sp.emptyDays[d]=Object.keys(byD[d].v).length; }); } }catch(e){}
+  return sp; }; })(parseSlip);
+function slipNoneOf(c, d){ return ((c&&c.slipNone)||{})[d]||null; }
+function slipHasLines(c, d){ return !!(((c.slips||{})[d]||{}).lines||[]).length; }
+/* 업로드 기록 줄: 그날 전표는 있으나 예금·현금 계정 없음 */
+function noSlipHint(c0, sp, fname){
+  var rows=[]; if(!sp || !sp.emptyDays) return rows;
+  Object.keys(sp.emptyDays).sort().forEach(function(d){ var c=xferCo(c0, d)||c0; if(!c || slipHasLines(c, d)) return;
+    SLIP_EMPTY[c.id+"|"+d]={file:fname, n:sp.emptyDays[d]};
+    var done=!!slipNoneOf(c, d);
+    rows.push('<span>'+esc(fname)+'</span><span class="chip auto">'+esc(c.short)+' '+esc(d)+'</span><span class="mini">전표 '+sp.emptyDays[d]+'건 — 예금·현금 계정 없음(그날 지급·입금 전표 없음)'+(done?' · 이미 \'전표 없음\'으로 확인됨':' · 맞으면 확인해 주세요')+'</span>'+
+      (done||!canNoTxn()?'':'<button class="btn sm" data-noslipgo="'+esc(c.id+"|"+d)+'">전표 없음으로 반영</button>'));
+  });
+  return rows;
+}
+function slipNoneSet(c, d, on){
+  if(!canNoTxn()){ toast("보기 전용 계정은 확인할 수 없습니다"); return Promise.resolve(); }
+  if(on && slipHasLines(c, d)){ toast(c.short+" "+d+"에는 이미 지급·입금 전표가 있습니다"); render(); return Promise.resolve(); }
+  c.slipNone=c.slipNone||{};
+  var h=SLIP_EMPTY[c.id+"|"+d];
+  if(on) c.slipNone[d]={by:(AUTH.profile&&AUTH.profile.name)||(AUTH.user&&AUTH.user.email)||"", at:new Date().toISOString(), file:h?h.file:"", n:h?h.n:0};
+  else delete c.slipNone[d];
+  invalidate();
+  return save().then(function(){ audit(on?"noslip_confirm":"noslip_unconfirm", {co:c.id, menu:"ilbo", target:d}); toast(c.short+" "+d+" "+(on?"전표 없음(지급·입금 계획 없음)으로 확인":"전표 없음 확인 해제")); render(); });
+}
+function slipNoneText(c, d, ns){
+  var t=ns.at ? new Date(ns.at) : null, tt=t && !isNaN(t) ? (t.getMonth()+1)+"/"+t.getDate()+" "+String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0") : "";
+  return d+" 전표 지급·입금 없음 — 사용자 확인("+[ns.by, tt].filter(Boolean).join(" · ")+")"+(ns.file?" · "+ns.file+(ns.n?" 전표 "+ns.n+"건 예금·현금 계정 없음":""):"");
+}
+document.addEventListener("change", function(e){ var el=e.target; if(!el || !el.matches || !el.matches("input[data-noslip]")) return;
+  var c=co(el.dataset.co); if(c) slipNoneSet(c, el.dataset.noslip, el.checked); });
+document.addEventListener("click", function(e){ var b=e.target && e.target.closest ? e.target.closest("[data-noslipgo]") : null; if(!b) return;
+  var p=b.dataset.noslipgo.split("|"), c=co(p[0]); if(!c) return; b.disabled=true; b.textContent="반영함"; slipNoneSet(c, p[1], true); });
+/* 자금일보 검증 줄 */
+ilboModel=(function(f){ return function(c, iso){ var m=f.apply(this, arguments);
+  try{ var k=m.checks.filter(function(x){ return !x.ok && String(x.msg).indexOf(m.iso+" 전표 미반영")===0; })[0];
+    if(k){ var ns=slipNoneOf(c, m.iso), h=SLIP_EMPTY[c.id+"|"+m.iso];
+      if(ns){ k.ok=true; k.msg=slipNoneText(c, m.iso, ns); }
+      else if(h) k.msg=m.iso+" 전표 미반영 — 올린 "+h.file+"에 이 날 전표 "+h.n+"건 있으나 예금·현금 계정 없음. 지급·입금이 없는 날이면 [전표 없음 확인]";
+      else k.msg+=" · 그날 지급·입금 전표가 없으면 [전표 없음 확인]";
+      k.act="noslip"; k.d=m.iso; k.on=!!ns; m.slipNone=ns; } }catch(e){}
+  return m; }; })(ilboModel);
+ilboDropState=(function(f){ return function(c, m){ var r=f.apply(this, arguments);
+  try{ if(c && m && !m.slip && m.slipNone){ $("#ilboSlipState").innerHTML='✓ '+esc(m.iso)+' 전표 없음 · 사용자 확인'; $("#ilboDropSlip").classList.add("done"); } }catch(e){}
+  return r; }; })(ilboDropState);
+/* 그날 예금·현금 전표가 올라오면 '전표 없음' 확인 해제 */
+saveSlipDays=(function(f){ return function(c, days){ var r=f.apply(this, arguments);
+  try{ var fixed=Object.keys(days||{}).filter(function(d){ return slipNoneOf(c, d) && slipHasLines(c, d); });
+    if(fixed.length){ fixed.forEach(function(d){ delete c.slipNone[d]; });
+      var msg=c.short+" "+fixed.join(", ")+" — 전표 없음으로 확인했던 날에 지급·입금 전표가 올라와 확인을 해제했습니다";
+      setTimeout(function(){ ["#importLog","#ilboLog"].forEach(function(sel){ var el=$(sel); if(el) el.insertAdjacentHTML("beforeend", '<div class="filerow" style="border-color:var(--warn)"><span>전표 없음 확인 해제</span><span class="chip auto">알림</span><span class="mini">'+esc(msg)+'</span></div>'); }); toast(msg); }, 1200); } }catch(e){}
+  return r; }; })(saveSlipDays);
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -12397,7 +12461,8 @@ function renderIlbo(){
   $("#ilboSub").textContent=c.name+" · 전일 실적 "+ilboRangeText(m,"iso")+" · 당일 집행 "+iso+"("+dowOf(iso)+")";
   ilboDropState(c, m);
   var checks='<div class="ilbo-checks">'+m.checks.map(function(k){ return '<div class="'+(k.ok?"ok":"ng")+'">'+(k.ok?"✓":"⚠")+' '+esc(k.msg)+
-    (k.act==="notxn"?' <label class="ilbo-notxn" title="그날 CMS 거래가 실제로 없었으면 체크 — 업로드 가능 사용자만. 나중에 그날 거래가 든 CMS가 올라오면 자동 해제"><input type="checkbox" data-notxn="'+esc(k.d)+'" data-co="'+esc(m.c.id)+'"'+(k.on?' checked':'')+(canNoTxn()?'':' disabled')+'> 거래 없음 확인</label>':'')+'</div>'; }).join("")+'</div>';   // [v88]
+    (k.act==="notxn"?' <label class="ilbo-notxn" title="그날 CMS 거래가 실제로 없었으면 체크 — 업로드 가능 사용자만. 나중에 그날 거래가 든 CMS가 올라오면 자동 해제"><input type="checkbox" data-notxn="'+esc(k.d)+'" data-co="'+esc(m.c.id)+'"'+(k.on?' checked':'')+(canNoTxn()?'':' disabled')+'> 거래 없음 확인</label>':'')+
+    (k.act==="noslip"?' <label class="ilbo-notxn" title="그날 지급·입금 전표가 실제로 없으면 체크 — 업로드 가능 사용자만. 나중에 그날 예금·현금 전표가 올라오면 자동 해제"><input type="checkbox" data-noslip="'+esc(k.d)+'" data-co="'+esc(m.c.id)+'"'+(k.on?' checked':'')+(canNoTxn()?'':' disabled')+'> 전표 없음 확인</label>':'')+'</div>'; }).join("")+'</div>';   // [v88]
   var moves=m.slip&&m.plan.moves.length ? '<table class="ilbo-tbl"><thead><tr><th>전표번호</th><th>계좌</th><th>구분</th><th>적요</th><th>금액</th></tr></thead><tbody>'+
     m.plan.moves.map(function(x){ return '<tr><td class="mono mini">'+esc(x.voucher)+'</td><td class="c">'+esc(x.acct)+'</td><td class="c">'+(x.kind==="move-in"?'<span class="chip mv">이동 입금</span>':'<span class="chip mv">이동 출금</span>')+'</td><td>'+esc(x.rawMemo)+'</td><td class="num">'+w0(x.amount)+'</td></tr>'; }).join("")+'</tbody></table>' : '<div class="empty" style="padding:14px">자금이동 전표 없음</div>';
   var exp=(m.expected||[]).length ? '<table class="ilbo-tbl"><thead><tr><th>계좌</th><th>전일 금일시재</th><th>계획 입금</th><th>계획 출금</th><th>이동 입금</th><th>이동 출금</th><th>예상 잔액</th></tr></thead><tbody>'+
@@ -12489,7 +12554,10 @@ function ilboFiles(files){
         if(!xsI.rest.length){ if(ilboCo()!==xsI.to) curCo=xsI.to.id; ILBO.date=lI[lI.length-1]; ILBO.userSet=true; return; }
         sp.lines=xsI.rest;
       }
-      var b=buildSlip(c, sp.lines); if(!b.date){ ilboLog('<span>'+esc(f.name)+'</span><span class="mini">회계일자를 찾지 못했습니다</span>',true); return; }
+      noSlipHint(c, sp, f.name).forEach(function(h){ ilboLog(h); });   // [v97]
+      var b=buildSlip(c, sp.lines); if(!b.date){ var ed=Object.keys(sp.emptyDays||{}).sort();
+        if(ed.length){ if(ilboCo()!==c) curCo=c.id; ILBO.date=ed[0]; ILBO.userSet=true; return; }   // [v97] 그날 전표는 있으나 예금·현금 계정 없음 → 그 날 검증 줄에서 확인
+        ilboLog('<span>'+esc(f.name)+'</span><span class="mini">회계일자를 찾지 못했습니다</span>',true); return; }
       /* [v23] 여러 날짜가 든 전표 파일도 날짜별로 나눠 저장 */
       var days=slipDaysOf(c, b, f.name), dlist=saveSlipDays(c, days);
       slipDates.push({c:c, d:b.date});
