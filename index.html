@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v99 · 2026-10-29</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v100 · 2026-10-29</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4037,6 +4037,21 @@ function rcApply(c){
       for(var q=di; q>=0 && q>=di-3; q--){ var rq=c.days[dates[q]]; if(!rq || rq.source!=="cms") continue;
         var o=(rq.txns||[]).filter(function(t){ return t!==u && !t.rcSyn && !t.rcDup && !t.fromSlip && t.kind==="지출" && t.acct===u.acct && String(t.client||"").trim()===nm && Math.abs((+t.withdraw||0)-A)<1; })[0];
         if(o){ o.rcDup=true; o.rcWhy="타행이체불능으로 "+d+" 반환 — 실제 지급 아님(반환 입금과 상계)"; u.rcDup=true; u.rcWhy="타행이체불능 반환 — "+dates[q]+" 같은 금액 지출과 상계"; st.r9=(st.r9||0)+1; break; } }
+    });
+    /* R9b 묶음 이체(압축기장) 반환 — 받는 분이 없는 '타행이체불능' 입금은 그날 같은 계좌의 앞선 묶음 지출에서 뺀다:
+       묶음 지출 원 행은 rcDup, 같은 시각·구분으로 (묶음 − 반환) 자동 행. 예: 솔루션 2026-08-14 ■ 지급 리스트 128,020,362 − 반환 2,502,429(정찬성 재송금 2건은 그대로 지급) */
+    (r.txns||[]).forEach(function(u){
+      if(u.rcSyn || u.rcDup || u.fromSlip || (u.ccy&&u.ccy!=="KRW") || u.kind!=="수입") return;
+      if(!/이체\s*불능|타행\s*불능/.test(String(u.summary||"")+" "+String(u.client||""))) return;
+      if(String(u.client||"").trim() && !/압축/.test(String(u.txType||""))) return;
+      var A=+u.deposit||0; if(A<1) return;
+      var o=(r.txns||[]).filter(function(t){ return t!==u && !t.rcSyn && !t.rcDup && !t.fromSlip && t.kind==="지출" && t.acct===u.acct && (+t.withdraw||0)>A && (/압축/.test(String(t.txType||"")) || !String(t.client||"").trim()) && String(t.at||"")<=String(u.at||""); })
+        .sort(function(x,y){ return String(y.at||"").localeCompare(String(x.at||"")); })[0];
+      if(!o) return;
+      o.rcDup=true; o.rcWhy="묶음 이체 중 "+fmt(A)+" 타행이체불능 반환 — 반환분을 뺀 금액으로 자동 행";
+      u.rcDup=true; u.rcWhy="타행이체불능 반환 — 같은 날 묶음 지출("+fmt(+o.withdraw||0)+")에서 차감";
+      syn(r,{date:d, at:o.at||"", acct:o.acct, kind:"지출", cat:o.cat, withdraw:(+o.withdraw||0)-A, summary:(o.summary||o.client||o.txType||o.cat), rcWhy:"묶음 지출 "+fmt(+o.withdraw||0)+" − 이체불능 반환 "+fmt(A), slip:o.slip||undefined, slipVoucher:o.slipVoucher||undefined, catSrc:o.catSrc});
+      st.r9=(st.r9||0)+1;
     });
   });
   dates.forEach(function(d){
@@ -10864,6 +10879,49 @@ function finDeposits(host){
 }
 renderFin=(function(f){ return function(){ if(finTab==="dep"){ $$("#segFin button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.f===finTab?"true":"false"); }); finDeposits($("#finBody")); if(typeof lockFinUi==="function") lockFinUi(); return; } return f.apply(this, arguments); }; })(renderFin);
 
+/* ===================== [v100] 입금 고정 구분 · 사용자 확인 개별 구분 (정답지 대사 회신 2026-10-29) ===================== */
+/* ① 정부지원·환급 입금(고용노동부 · 근로자휴가지원 · 세무과/세무서 · 국세·지방세 환급) → 미수금(자금일보 입금 '기타')
+   ② 삼성선물 계좌 '예탁금 … 조정' 입금 → 기타
+   ③ 사용자가 거래별로 확인한 구분(KNOWN_CATS) — 날짜·법인·거래처·금액이 정확히 같은 행만
+   사용자가 직접 바꾼 구분(catManual)은 건드리지 않는다. */
+var FIXED_IN_CATS=[{re:/고용노동부|고용부|근로자\s*휴가\s*지원|세무과|세무서|국세\s*환급|지방세\s*환급|환급금/, cat:"미수금", why:"정부지원·환급"},
+  {re:/DELL\s*GLOBA/i, cat:"기타", why:"델 리베이트(사용자 확인)"}];
+/* 지출 고정: 주식매수청구권 행사·자기주식 취득(전표 적요 포함) → 지출 기타 (솔루션 26.10 자금현황보고 10-08 414,317,526) */
+var FIXED_OUT_CATS2=[{re:/주식매수청구권|자기주식\s*취득/, cat:"기타", why:"주식매수청구권·자기주식"}];
+var KNOWN_CATS=[
+  {co:"GS", d:"2026-10-12", kind:"수입", client:"이상명", amt:317400, cat:"미수금", why:"사용자 확인 — 미수금"},
+  {co:"GD", d:"2026-09-11", kind:"지출", client:"(주)소프트먼트", amt:220000, cat:"기타", why:"사용자 확인 — 지출 기타"},
+  {co:"GS", d:"2026-09-28", kind:"수입", re:/신윤철/, amt:670000, cat:"기타", why:"자금현황보고 26.09 — 입금 기타"},
+  {co:"GD", d:"2026-08-04", kind:"수입", re:/AMAZON\s*WEB/i, amt:2757488, cat:"미수금", why:"자금현황보고 26.08 — 미수금"},
+  {co:"SN", d:"2026-10-21", kind:"외화(입금)", re:/NVIDIA/i, amt:16200, cat:"미수금", why:"자금현황보고 SNET 26.10 — 미수금(USD 16,200 · 21,513,600)"}
+];
+function fixedInCat(c, t){
+  if(!(+t.deposit>0) || t.kind!=="수입") return null;
+  var h=String(t.client||"")+" "+String(t.summary||"");
+  if(/삼성선물/.test(String(t.acct||"")) && /예탁금/.test(h) && /조정/.test(h)) return "기타";
+  for(var i=0;i<FIXED_IN_CATS.length;i++) if(FIXED_IN_CATS[i].re.test(h)) return FIXED_IN_CATS[i].cat;
+  return null;
+}
+function v100FixCats(c){ var n=0;
+  Object.keys(c.days||{}).forEach(function(d){ var r=c.days[d]; if(!r || !Array.isArray(r.txns)) return;
+    r.txns.forEach(function(t){ if(t.catManual || t.rcSyn) return;
+      var isFxRow=!!(t.ccy && t.ccy!=="KRW"), k=null, why="";
+      var hh=String(t.client||"")+" "+String(t.summary||"");
+      KNOWN_CATS.forEach(function(x){ if(!k && x.co===c.id && x.d===d && x.kind===t.kind && (x.re ? x.re.test(hh) : String(t.client||t.summary||"").trim()===x.client) && Math.abs(((t.kind==="수입"||t.kind==="외화(입금)")?+t.deposit:+t.withdraw)-x.amt)<1){ k=x.cat; why=x.why;
+          if(x.splits && !isFxRow && !(t.splits && t.splits.length===x.splits.length)){ t.splits=x.splits.map(function(z){ return {cat:z.cat, amt:z.amt, text:z.text||""}; }); n++; } } });
+      /* 전표 1건(CMS 1행)이 구분이 다른 전표 줄 여러 개(1:N합계)와 맞으면 줄별로 나눈다 — 예: 솔루션 09-15 SNET SYSTEMS 외화송금 11,053,189 = 외화미지급금(운영경비) 6,814,167 + 외화외상매입금(하도급) 4,239,022 */
+      if(!k && isFxRow){ return; }
+      if(t.kind==="지출" && t.slip && t.slip.type==="1:N합계" && (t.slip.lines||[]).length>1 && !(t.splits && t.splits.length)){
+        var SL0=t.slip.lines, cs=SL0.map(function(l){ return l.cat; }).filter(function(v,i0,a0){ return v && a0.indexOf(v)===i0; });
+        if(cs.length>1 && Math.abs(SL0.reduce(function(a0,l){ return a0+(+l.amt||0); },0)-(+t.withdraw||0))<1){ t.splits=SL0.map(function(l){ return {cat:l.cat, amt:+l.amt||0, text:l.text||""}; }); t.splitsSlip=true; n++; } }
+      if(!k){ k=fixedInCat(c, t); why="입금 고정 구분"; }
+      if(!k && t.kind==="지출"){ var hs=hh+" "+String((t.slip&&(t.slip.memo||t.slip.text))||"")+" "+String(t.slipMemo||""); FIXED_OUT_CATS2.forEach(function(x){ if(!k && x.re.test(hs)){ k=x.cat; why=x.why; } }); }
+      if(k && t.cat!==k){ if(!t.cat0v100) t.cat0v100=t.cat; t.cat=k; t.auto=false; t.catWhy=why; n++; } }); });
+  return n; }
+applyFixedCats=(function(f){ return function(c){ var n=f.apply(this, arguments); try{ n+=v100FixCats(c); }catch(e){} return n; }; })(applyFixedCats);
+/* 전표 매칭(전표 구분 우선) 뒤에 한 번 더 — 사용자 확인 구분·정부지원 환급은 전표보다 우선 */
+fxPostAll=(function(f){ return function(){ var r=f.apply(this, arguments); try{ (D.companies||[]).forEach(function(c){ v100FixCats(c); }); invalidate(); }catch(e){} return r; }; })(fxPostAll);
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -12415,6 +12473,8 @@ function ilboModel(c, iso){
         if(!g){ g=SG[gk]={d:d, s:t.slip, rows:[]}; (isIn?aIn:aOut).push({__g:g}); }
         g.rows.push(row); return;
       }
+      if(!isIn && !fx && t.kind==="지출" && t.splits && t.splits.length>1 && Math.abs(t.splits.reduce(function(a,z){ return a+(+z.amt||0); },0)-(+t.withdraw||0))<1){   // [v100]
+        t.splits.forEach(function(z){ aOut.push(Object.assign({}, row, {memo:z.text?ilboMemoFix(z.text):row.memo, cat:z.cat, amt:+z.amt||0})); }); return; }
       (isIn?aIn:aOut).push(row);
     });
   });
@@ -12424,6 +12484,11 @@ function ilboModel(c, iso){
       var s=g.s, r0=g.rows[0], sum=g.rows.reduce(function(a,r){ return a+r.amt; },0);
       var mem=g.rows.map(function(r){ return {name:r.name, amt:r.amt}; });
       var base={d:g.d, acct:r0.acct, cat:r0.cat, auto:g.rows.some(function(r){ return r.auto; }), idx:r0.idx, fx:r0.fx};
+      if(s.type==="1:N합계" && (s.lines||[]).length>1 && (s.lines||[]).map(function(l){ return l.cat; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; }).length>1 && Math.abs((s.lines||[]).reduce(function(a,l){ return a+l.amt; },0)-sum)<1){   // [v100] 구분이 다른 전표 줄 → 줄별
+        (s.lines||[]).forEach(function(l,j){ var LL=slipLineOf(c, g.d, l.key);
+          out.push(Object.assign({}, base, {memo:(LL&&LL.textManual)||l.text, cat:l.cat||base.cat, amt:l.amt, auto:j===0?base.auto:false, slipRow:{key:l.key, d:g.d, slipNo:l.slipNo, type:"1:N합계", n:g.rows.length, members:j===0?mem:null, grpN:(s.lines||[]).length}})); });
+        return;
+      }
       if(s.type==="묶음"){
         var lsum=(s.lines||[]).reduce(function(a,l){ return a+l.amt; },0);
         if(Math.abs(lsum-sum)>=1) m.slipWarn.push(g.d+" "+r0.acct+" 묶음: 전표 "+fmt(lsum)+" ≠ CMS "+fmt(sum));
