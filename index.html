@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v98 · 2026-10-29</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v99 · 2026-10-29</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -1747,6 +1747,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
         <button data-f="loan" aria-pressed="true">차입현황</button>
         <button data-f="lend" aria-pressed="false">대여현황</button>
         <button data-f="guar" aria-pressed="false">보증현황</button>
+        <button data-f="dep" aria-pressed="false">금융상품 가입현황</button>
         <button data-f="int" aria-pressed="false">이자비용</button>
         <button data-f="rate" aria-pressed="false">금리 변동</button>
         <button data-f="bank" aria-pressed="false">금융권 연락처</button>
@@ -3832,7 +3833,7 @@ function fxFifo(det, bank, ccy, usd){
 /* [v58] 보고서 외화 앵커가 그날까지의 CMS 외화 거래후잔액(은행별 합)과 맞는가 — CMS 잔액이 없는 은행은 비교하지 않음 */
 function fxAnchorOk(c, rec, iso, fxAfter, log){
   var rb={}, cb={};
-  (rec.fxDetail||[]).forEach(function(x){ if((x.ccy||"USD")!=="USD") return; rb[x.bank]=(rb[x.bank]||0)+fxCents(x.amt); });
+  (rec.fxDetail||[]).forEach(function(x){ if((x.ccy||"USD")!=="USD") return; var bk=fxLotNorm(x).bank; rb[bk]=(rb[bk]||0)+fxCents(x.amt); });   // [v99] '하나 88138' → 하나
   Object.keys(fxAfter).forEach(function(a){ var f=fxAfter[a]; var ac=acctOf(c,a); if(ac && ac.group==="외화" && /JPY|EUR|CNY/.test(String(ac.note||"")+String(ac.label||""))) return; cb[f.bank]=(cb[f.bank]||0)+fxCents(f.amt); });
   var bad=Object.keys(cb).filter(function(b){ return Math.abs((rb[b]||0)-cb[b])>1; });
   if(bad.length && log) log.push(iso+" "+bad.map(function(b){ return b+" 보고서 "+fxSym("USD",(rb[b]||0)/100)+" ≠ CMS "+fxSym("USD",cb[b]/100); }).join(", "));
@@ -4025,6 +4026,19 @@ function rcApply(c){
         break; }
     });
   });
+  /* [v99] R9 타행이체불능 반환 — 같은 계좌·같은 받는 분·같은 금액의 지출(그날 또는 3일 안 앞)과 상계: 둘 다 자금수지에서 뺀다(rcDup, 잔액 앵커는 그대로).
+     예: 솔루션 2026-09-23 급여 4명 이체 → '타행이체불능' 반환 2회씩 = 판매대 입금·급여 지출 각 34,702,000(정답지 9월 실적은 뺀 금액) */
+  dates.forEach(function(d, di){
+    var r=c.days[d]; if(!r || r.source!=="cms") return;
+    (r.txns||[]).forEach(function(u){
+      if(u.rcSyn || u.rcDup || u.fromSlip || (u.ccy&&u.ccy!=="KRW") || u.kind!=="수입") return;
+      if(!/이체\s*불능|타행\s*불능|이체불능반환/.test(String(u.summary||"")+" "+String(u.client||"")+" "+String(u.txType||""))) return;
+      var A=+u.deposit||0, nm=String(u.client||"").trim(); if(A<1 || !nm) return;
+      for(var q=di; q>=0 && q>=di-3; q--){ var rq=c.days[dates[q]]; if(!rq || rq.source!=="cms") continue;
+        var o=(rq.txns||[]).filter(function(t){ return t!==u && !t.rcSyn && !t.rcDup && !t.fromSlip && t.kind==="지출" && t.acct===u.acct && String(t.client||"").trim()===nm && Math.abs((+t.withdraw||0)-A)<1; })[0];
+        if(o){ o.rcDup=true; o.rcWhy="타행이체불능으로 "+d+" 반환 — 실제 지급 아님(반환 입금과 상계)"; u.rcDup=true; u.rcWhy="타행이체불능 반환 — "+dates[q]+" 같은 금액 지출과 상계"; st.r9=(st.r9||0)+1; break; } }
+    });
+  });
   dates.forEach(function(d){
     var r=c.days[d]; if(!r||!r.txns||r.source==="sheet"||r.source==="xlsm"){ if(r) endDay(r,d); return; }
     var T=r.txns.filter(function(t){ return !t.rcSyn && (!t.ccy||t.ccy==="KRW"); });
@@ -4050,6 +4064,16 @@ function rcApply(c){
     T.forEach(function(t){ if(t.kind!=="자금이동(출금)") return; var lab=rcLinkAcct(c, String(t.summary||"")+" "+String(t.client||""), digs, t.acct); if(!lab) return;
       var u=T.filter(function(x){ return x.acct===lab && x.kind==="수입" && Math.abs((+x.deposit||0)-(+t.withdraw||0))<1 && !x.rc0; })[0];
       if(u){ rcSet(u,"자금이동(입금)","자금이동","자사 "+t.acct+" 출금과 짝(계좌번호 적요)"); u.rcPair=1; st.r4++; } });
+    /* [v99] R4c 정기예금(계좌 비고 '정기예금' 또는 금융상품 가입현황 등록) 계좌의 '수입'과 같은 날 다른 자사 계좌의 같은 금액 '지출'(적요 없음·자사명·예금 문구) → 둘 다 자금이동
+       (예: 2026-08-05 농협 5965 → 농협 8934 1억이 지출 운영경비 + 수입 이자수익으로 잡혀 8월 입금·지출이 1억씩 컸던 것). 만기 때 반대 방향(예금 계좌 지출 = 다른 계좌 수입)도 같은 금액이면 같다. */
+    var depLab=function(lab){ var a=acctBy[lab]; if(a && a.group!=="외화" && /정기예금|금융상품/.test(String(a.note||""))) return true; return typeof depLinks==="function" && depLinks(c).some(function(L){ return L.label===lab; }); };
+    var mvLike=function(x){ var h=String(x.summary||"").trim()+String(x.client||"").trim(); return !h || own(x) || /정기예금|정기적금|금융상품|예금/.test(h); };
+    T.forEach(function(u){ if(u.kind!=="수입" || u.rc0 || u.rcDup || !depLab(u.acct)) return; var A=+u.deposit||0; if(A<1) return;
+      var o=T.filter(function(x){ return x.kind==="지출" && !x.rc0 && !x.rcDup && x.acct!==u.acct && !depLab(x.acct) && Math.abs((+x.withdraw||0)-A)<1 && mvLike(x); })[0]; if(!o) return;
+      rcSet(u,"자금이동(입금)","자금이동","정기예금 "+u.acct+" 예치 — "+o.acct+" 같은 금액 지출과 짝"); rcSet(o,"자금이동(출금)","자금이동","정기예금 "+u.acct+" 예치와 짝"); st.r4+=2; });
+    T.forEach(function(o){ if(o.kind!=="지출" || o.rc0 || o.rcDup || !depLab(o.acct)) return; var A=+o.withdraw||0; if(A<1) return;
+      var u=T.filter(function(x){ return x.kind==="수입" && !x.rc0 && !x.rcDup && x.acct!==o.acct && !depLab(x.acct) && Math.abs((+x.deposit||0)-A)<1 && mvLike(x); })[0]; if(!u) return;
+      rcSet(o,"자금이동(출금)","자금이동","정기예금 "+o.acct+" 해지 — "+u.acct+" 같은 금액 수입과 짝"); rcSet(u,"자금이동(입금)","자금이동","정기예금 "+o.acct+" 해지와 짝"); st.r4+=2; });
     /* 짝 찾기 — 같은 금액(차이 3,000원 이내) 입·출금 1:1 */
     var ins=T.filter(function(t){ return t.kind==="자금이동(입금)"; }), outs=T.filter(function(t){ return t.kind==="자금이동(출금)"; }), used=new Set();
     var pairedOut=new Set();
@@ -4079,6 +4103,24 @@ function rcApply(c){
     unOut.slice().forEach(function(o){ var lab=rcLinkAcct(c, String(o.summary||"")+" "+String(o.client||""), digs, o.acct); if(!lab || hasRow[lab]) return;
       syn(r,{date:d, acct:lab, kind:"자금이동(입금)", cat:"자금이동", deposit:Math.round(+o.withdraw||0), summary:"[자동] 예치 ("+o.acct+" 출금 짝)", rcWhy:"적요 계좌번호 "+lab}); st.r5++; hasRow[lab]=1;
       unOut=unOut.filter(function(x){ return x!==o; }); });
+    /* [v99] R5-d 금융상품 가입현황(등록 정기예금) — 가입일(3일 안) 같은 금액 자사 출금 ↔ 예금 계좌 예치 · 만기일(5일 안) 원리금 입금 ↔ 예금 계좌 해지(차액 이자수익) */
+    (typeof depLinks==="function"?depLinks(c):[]).forEach(function(L){ var lab=L.label, dp=L.dep; if(!lab || hasRow[lab]) return;
+      var amt=Math.round(+dp.amount||0), FINRE=/정기예금|정기적금|금융상품|예금가입|신규/; if(amt<1) return;
+      if(dp.start && d>=dp.start && d<=isoAdd(dp.start,3) && rcBalBefore(c,lab)<amt-1){
+        var o=unOut.filter(function(x){ return x.acct!==lab && Math.abs((+x.withdraw||0)-amt)<1; })[0];
+        if(o) unOut=unOut.filter(function(x){ return x!==o; });
+        else { o=T.filter(function(x){ return x.kind==="지출" && x.acct!==lab && !x.rc0 && Math.abs((+x.withdraw||0)-amt)<1 && (FINRE.test(String(x.summary||"")+" "+String(x.client||""))||own(x)); })[0];
+          if(o){ rcSet(o,"자금이동(출금)","자금이동","금융상품 가입현황 "+lab+" 예치와 짝"); st.r4++; } }
+        if(o){ syn(r,{date:d, acct:lab, kind:"자금이동(입금)", cat:"자금이동", deposit:amt, summary:"[자동] 정기예금 가입 ("+o.acct+" 출금 짝)", rcWhy:"금융상품 가입현황 "+dp.start+" 가입 "+fmt(amt)}); st.r5++; hasRow[lab]=1; }
+        return; }
+      if(dp.end && d>=dp.end && d<=isoAdd(dp.end,5) && rcBalBefore(c,lab)>=1){
+        var P=Math.round(rcBalBefore(c,lab)), okv=function(x){ var v=+x.deposit||0; return x.acct!==lab && v>=P-1 && v<=P*(1+RC_INT_MAX)+1; };
+        var u=unIn.filter(okv)[0], conv=false;
+        if(!u){ u=T.filter(function(x){ return x.kind==="수입" && !x.rc0 && okv(x) && (FINRE.test(String(x.summary||"")+" "+String(x.client||""))||own(x)); })[0]; conv=!!u; }
+        if(u && mkMature(lab, +u.deposit||0, "금융상품 가입현황 "+dp.end+" 만기")){
+          if(conv){ rcSet(u,"자금이동(입금)","자금이동","금융상품 가입현황 "+lab+" 만기 원리금"); st.r4++; } else unIn=unIn.filter(function(x){ return x!==u; });
+          hasRow[lab]=1; }
+      } });
     /* R5-c 전표에는 자금이동 짝이 있는데 상대 계좌 CMS가 없는 경우(예: 기업 078 → 하나 MMT) */
     unIn.slice().forEach(function(u){ var L=SL.filter(function(l){ return l.kind==="move-out" && l.acct && l.acct!==u.acct && !hasRow[l.acct] && Math.abs((+l.amount||0)-(+u.deposit||0))<1 && rcBalBefore(c,l.acct)>=(+u.deposit||0)-1; })[0]; if(!L) return;   // 잔액이 없는 계좌에서는 만들지 않음
       syn(r,{date:d, acct:L.acct, kind:"자금이동(출금)", cat:"자금이동", withdraw:Math.round(+u.deposit||0), summary:"[자동] 전표 자금이동("+(L.voucher||"")+") — 이 계좌 CMS 없음", rcWhy:"전표 "+(L.voucher||"")}); st.r5++;
@@ -4379,7 +4421,7 @@ function coState0(c){
   var chain={}, totals={}, fxState={}, fxDetail=[], fxSrcIso=null, cashState=null, fxPrev=0, fxAfter={}, fxAnchorSkip=[];   // [v58]
   if(fy){
     Object.keys(fy.fxState||{}).forEach(function(cy){ fxState[cy]={amt:fy.fxState[cy].amt||0, krw:fy.fxState[cy].krw||0}; });
-    fxDetail=(fy.fxDetail||[]).slice(); fxSrcIso=base; fxPrev=fy.fx||0;
+    fxDetail=fxLotsNorm(fy.fxDetail, c); fxSrcIso=base; fxPrev=fy.fx||0;
     /* 기준일 당일의 "전일시재"는 결산 재평가 전 외화(보고서 시재표 외화 전일 원화환산) 기준 */
     var br=hasBase?dayRec(c,base):null, bo=((br&&br.accts)||[]).filter(function(a){ return a.isFx && a.krwOpen!=null; });
     if(bo.length) fxPrev=bo.reduce(function(t,a){ return t+(+a.krwOpen||0); },0);
@@ -4452,12 +4494,12 @@ function coState0(c){
     txnsOf(c,iso).forEach(function(t){ if((fxIsInKind(t.kind)||fxIsOutKind(t.kind)) && t.hasAfter && t.after!=null) fxAfter[t.acct]={bank:t.bank||String(t.acct||"").split(" ")[0], amt:+t.after}; });   // [v58]
     if(fy && iso===base){                                  // [v25] 기준일 외화 = 결산환율 재평가 확정값
       var nb={}; Object.keys(fy.fxState||{}).forEach(function(cy){ nb[cy]={amt:fy.fxState[cy].amt||0, krw:fy.fxState[cy].krw||0}; });
-      fxState=nb; fxDetail=(fy.fxDetail||[]).slice(); fxSrcIso=iso;
+      fxState=nb; fxDetail=fxLotsNorm(fy.fxDetail, c); fxSrcIso=iso;
     } else if(rec.fxState && Object.keys(rec.fxState).length && !(RV_OFF[c.id] && fxRevalHas(c, iso)) && fxAnchorOk(c, rec, iso, fxAfter, fxAnchorSkip)){   // [v58] CMS 외화 잔액과 맞는 보고서만
       /* 보고서(sheet) 앵커 — CMS 재업로드로 source가 바뀐 뒤에도 보존된 fxState/fxDetail이면 그대로 인정합니다.
          원본 객체를 그대로 쓰지 않고 복제해서, 이후 CMS 확정분이 다음 보고서 전까지 덧붙습니다 */
       var nf={}; Object.keys(rec.fxState).forEach(function(cy){ nf[cy]={amt:rec.fxState[cy].amt||0, krw:rec.fxState[cy].krw||0}; });
-      fxState=nf; fxDetail=(rec.fxDetail||[]).slice(); fxSrcIso=iso;
+      fxState=nf; fxDetail=fxLotsNorm(rec.fxDetail, c); fxSrcIso=iso;   // [v99]
     } else {
       var nf2={}; Object.keys(fxState).forEach(function(cy){ nf2[cy]={amt:fxState[cy].amt||0, krw:fxState[cy].krw||0}; });
       fxState=nf2; fxDetail=fxDetail.slice();
@@ -4465,7 +4507,7 @@ function coState0(c){
     if(XS && XS.fx && !xfxDone && iso>=XD){           // [v87] 외화 잔액·랏 승계 — 외화금액은 센트 단위로 더해 소수점 2자리 보존
       xfxDone=true;
       if(fxSrcIso!==iso){ Object.keys(XS.fxState).forEach(function(cy){ var sl=fxState[cy]||(fxState[cy]={amt:0,krw:0}); sl.amt=(fxCents(sl.amt)+fxCents(XS.fxState[cy].amt))/100; sl.krw=(sl.krw||0)+(XS.fxState[cy].krw||0); });
-        fxDetail=fxDetail.concat(XS.fxDetail); }   // [v88] 그날 보고서 외화 앵커(합병 후 잔액)를 썼으면 이미 포함
+        fxDetail=fxDetail.concat(fxLotsNorm(XS.fxDetail, c)); }   // [v88] 그날 보고서 외화 앵커(합병 후 잔액)를 썼으면 이미 포함
       fxPrev+=XS.fxKrw;
     }
     /* CMS로 잡힌 외화 입출금 중 환율을 확인·확정한 건은 그날부터 외화 잔액에 증분 반영 */
@@ -6042,7 +6084,7 @@ function reportFlow(c, fromIso, toIso){
   var first=ds[0], last=ds[ds.length-1];
   r.open=daySummary(c,first).open;
   var sl=daySummary(c,last);
-  r.close=sl.close; r.trust=manualOf(c,last).trust||0; r.fx=sl.fx||0; r.gov=sl.gov||0;
+  r.close=sl.close; r.trust=manualOf(c,last).trust||0; r.fx=ilboFxDed(c,last,sl); r.gov=sl.gov||0;   // [v99] 이관 외화 제외
   var dq=deductAt(c,last); r.fin=dq.fin; r.fut=dq.fut;
   return r;
 }
@@ -6086,7 +6128,7 @@ function buildDailyReport(c, iso, prevIso, prevEnd){
       var refIso = d.openAt || iso;
       var missing = prevIso && !p.fromSlip && !p.inTotal && !p.outTotal;   // 전표·수기 계획 모두 없음
       return {label:d.label, in:p.in, inTotal:p.inTotal, out:p.out, outTotal:p.outTotal, open:openBal, net:net, close:openBal+net, planMissing:missing,
-        borrow:p.borrow||0, repay:p.repay||0, trust:manualOf(c,refIso).trust||0, fx:daySummary(c,refIso).fx||0, gov:daySummary(c,refIso).gov||0,
+        borrow:p.borrow||0, repay:p.repay||0, trust:manualOf(c,refIso).trust||0, fx:ilboFxDed(c,refIso), gov:daySummary(c,refIso).gov||0,
         fin:deductAt(c,refIso).fin, fut:deductAt(c,refIso).fut, oracle:p.oracle||0, hasData:true};
     }
     var f=reportFlow(c,d.from,d.to);
@@ -10449,6 +10491,379 @@ saveSlipDays=(function(f){ return function(c, days){ var r=f.apply(this, argumen
       setTimeout(function(){ ["#importLog","#ilboLog"].forEach(function(sel){ var el=$(sel); if(el) el.insertAdjacentHTML("beforeend", '<div class="filerow" style="border-color:var(--warn)"><span>전표 없음 확인 해제</span><span class="chip auto">알림</span><span class="mini">'+esc(msg)+'</span></div>'); }); toast(msg); }, 1200); } }catch(e){}
   return r; }; })(saveSlipDays);
 
+/* ===================== [v99] 외화 랏 은행 표기 정리 · 이관 외화 공제 제외 ===================== */
+/* 보고서 [외화예적금 세부 내역]의 은행 칸이 '하나 88138'·'하나 73032'처럼 계좌 끝자리까지 적혀 오면(솔루션 26.10 보고서)
+   CMS 외화 잔액 대조(fxAnchorOk)·계좌 행 연결이 '하나'와 달라 보고서 외화 앵커가 버려졌다
+   → 10-21부터 굿어스 원 랏(평가 전) 10개가 붙어 73032가 118,565,749원(정답 110,272,562원, 10-19 평가환율 1,342.40)으로 남음.
+   랏을 받을 때 은행 = 첫 단어, 끝자리 = acct5로 나누고, 끝자리가 이관 외화 계좌면 xfer 표시. 저장된 원본은 그대로. */
+function fxLotNorm(l, c){
+  if(!l) return l;
+  var b=String(l.bank||"").trim(), m=b.match(/^(\S+)\s+(\d{4,6})$/);
+  if(!m) return l;
+  var o=Object.assign({}, l, {bank:m[1], acct5:m[2]});
+  if(c && !o.xfer && typeof xferAccts==="function"){
+    var hit=xferAccts(c).filter(function(r){ return r.acc.group==="외화" && digitsOnly(r.acc.num).slice(-m[2].length)===m[2]; })[0];
+    if(hit) o.xfer=hit.src.id;
+  }
+  return o;
+}
+function fxLotsNorm(list, c){ return (list||[]).map(function(l){ return fxLotNorm(l, c); }); }
+/* 자금일보 공제 '외화' — 이관 계좌(굿어스 → 솔루션 하나 73032) 외화는 빼고 원래 법인 외화만 (사용자 결정 2026-10-29, 정답지 817,646천원) */
+function ilboFxDed(c, iso, s){
+  s=s||daySummary(c, iso); var v=+s.fx||0;
+  if(c && typeof xferSrcs==="function" && xferSrcs(c).length) (s.fxDetail||[]).forEach(function(l){ if(l.xfer) v-=(+l.krw||0); });
+  return v;
+}
+/* 승계 법인 보고서 외화 앵커 대조: 이관 외화 계좌(73032)는 승계 법인 CMS에 아직 없으니 원 법인에서 넘겨받은 외화 금액을 CMS 쪽에 더해서 비교 */
+fxAnchorOk=(function(f){ return function(c, rec, iso, fxAfter, log){
+  try{ if(c && xferSrcs(c).length){ var XS=xferSeed(c);
+    if(XS && XS.fx && XS.date && iso>=XS.date){ var fa=Object.assign({}, fxAfter||{}), add={};
+      (XS.fxDetail||[]).forEach(function(l){ if((l.ccy||"USD")!=="USD") return; var bk=fxLotNorm(l).bank; add[bk]=(add[bk]||0)+fxCents(l.amt); });
+      var xl=xferAccts(c).filter(function(r){ return r.acc.group==="외화"; }).map(function(r){ return r.acc.label; });
+      if(!Object.keys(fa).some(function(k){ return xl.indexOf(k)>=0; }))
+        Object.keys(add).forEach(function(bk){ fa["__xfer|"+bk]={bank:bk, amt:add[bk]/100}; });
+      return f.call(this, c, rec, iso, fa, log); } } }catch(e){}
+  return f.apply(this, arguments); }; })(fxAnchorOk);
+/* [v99] 승계 외화 = 굿어스(원 법인)가 외화평가한 금액. 승계 법인 보고서의 이관일 이후 첫 외화 랏(이관 계좌 끝자리 '하나 73032')의
+   외화금액(센트)이 원 법인 랏 합과 정확히 같으면 그 랏(평가 환율·원화)으로 승계한다 — 이관일 기초 = 전일 원 법인 잔액(평가 후)으로 항등식 유지.
+   금액이 다르거나 보고서 랏이 없으면 종전대로(원 법인 장부 랏). */
+xferSeed=(function(f){ return function(c){ var out=f.apply(this, arguments);
+  try{ if(!out || !out.fx || !out.date) return out;
+    var tails=xferAccts(c).filter(function(r){ return r.acc.group==="외화"; }).map(function(r){ return digitsOnly(r.acc.num).slice(-5); }).filter(Boolean);
+    if(!tails.length) return out;
+    var xs=(out.fxDetail||[]).filter(function(l){ return (l.ccy||"USD")==="USD"; }), xc=xs.reduce(function(s,l){ return s+fxCents(l.amt); },0);
+    if(!xc) return out;
+    var ds=Object.keys(c.days||{}).filter(function(d){ return d>=out.date; }).sort().slice(0,15);
+    for(var i=0;i<ds.length;i++){ var rec=dayRec(c, ds[i]); if(!rec || !(rec.fxDetail||[]).length) continue;
+      var hit=fxLotsNorm(rec.fxDetail).filter(function(l){ return (l.ccy||"USD")==="USD" && l.acct5 && tails.some(function(t){ return t.slice(-l.acct5.length)===l.acct5; }); });
+      if(!hit.length) continue;
+      if(hit.reduce(function(s,l){ return s+fxCents(l.amt); },0)!==xc) return out;
+      var ok=xs.reduce(function(s,l){ return s+(+l.krw||0); },0), nk=hit.reduce(function(s,l){ return s+(+l.krw||0); },0);
+      out.fxDetail=(out.fxDetail||[]).filter(function(l){ return (l.ccy||"USD")!=="USD"; }).concat(hit.map(function(l){ return Object.assign({}, l, {xfer:out.src}); }));
+      if(out.fxState.USD) out.fxState.USD.krw=(out.fxState.USD.krw||0)-ok+nk;
+      out.fxKrw=(out.fxKrw||0)-ok+nk; out.fxReval={from:ok, to:nk, date:ds[i]};
+      return out; }
+  }catch(e){} return out; }; })(xferSeed);
+/* [v99] 외화 랏의 계좌 끝자리 — 보고서 표기('하나 73032') 또는 이관 랏이면 이관 외화계좌 번호 끝 5자리 */
+function fxLotA5(c, d0){ var d=fxLotNorm(d0), a5=d.acct5||null;
+  if(!a5 && d.xfer && typeof xferFxAcct==="function"){ var xa=xferFxAcct(c, d.bank, d.ccy||"USD"); if(xa) a5=digitsOnly(xa.num||xa.label||"").slice(-5)||null; }
+  return Object.assign({}, d, {acct5:a5}); }
+
+/* ===================== [v99] 외화 자금 집행 예정 — 일자별 여러 줄 · 일정 미정 · Invoice 미발행 (법인별 c.fxSched) ===================== */
+/* 저장: c.fxSched={rows:[{id,date,spot,rebate,debt,sell}], undecided:{…}, noinv:{…}} (USD, 소수점 2자리 · 센트 단위 합)
+   자금일보 [외화 자금 집행 예정일자]: 집행일 줄(입력 없으면 종전 전표 저장값 fxPlan) + 집행일 뒤 날짜 줄 + 일정 미정 + Invoice 미발행 + 합계, 예금 잔액 = 외화예적금 USD 합 + 입금 − 출금 누적. */
+var FXS_K=["spot","rebate","debt","sell"];
+function fxSchedOf(c){ var s=(c&&c.fxSched)||{}; return {rows:(s.rows||[]).slice(), undecided:s.undecided||{}, noinv:s.noinv||{}}; }
+function fxsVals(o){ var r={}; FXS_K.forEach(function(k){ r[k]=Math.round((+(o&&o[k])||0)*100)/100; }); return r; }
+function fxSchedTable(m, usd0){
+  var c=m.c, S=fxSchedOf(c), iso=m.iso, rows=[];
+  var tr=S.rows.filter(function(r){ return r.date===iso; })[0];
+  rows.push(Object.assign({kind:"day", date:iso, id:tr?tr.id:null}, fxsVals(tr||m.fxPlan||{})));
+  S.rows.filter(function(r){ return r.date>iso; }).sort(function(a,b){ return a.date<b.date?-1:1; })
+    .forEach(function(r){ rows.push(Object.assign({kind:"day", date:r.date, id:r.id}, fxsVals(r))); });
+  rows.push(Object.assign({kind:"undecided", label:"일정 미정"}, fxsVals(S.undecided)));
+  rows.push(Object.assign({kind:"noinv", label:"Invoice 미발행"}, fxsVals(S.noinv)));
+  var bal=fxCents(usd0), tc={spot:0,rebate:0,debt:0,sell:0};
+  rows.forEach(function(r){ bal+=fxCents(r.spot)+fxCents(r.rebate)-fxCents(r.debt)-fxCents(r.sell); r.bal=bal/100; FXS_K.forEach(function(k){ tc[k]+=fxCents(r[k]); }); });
+  var tot={}; FXS_K.forEach(function(k){ tot[k]=tc[k]/100; });
+  return {rows:rows, tot:tot};
+}
+function fxsDay(iso){ var p=iso.split("-"); return {md:(+p[1])+"/"+(+p[2]), dow:["일","월","화","수","목","금","토"][new Date(+p[0],+p[1]-1,+p[2]).getDay()]}; }
+function fxsAmt(v){ return Math.abs(+v||0)>=0.005 ? fxSym("USD",v) : ""; }
+function fxSchedHtml(m, usd0){
+  var T=fxSchedTable(m, usd0);
+  return '<table class="ilbo-tbl"><thead><tr><th rowspan="2">일자</th><th rowspan="2">요일</th><th colspan="2">입금</th><th colspan="2">출금</th><th rowspan="2">예금 잔액</th></tr><tr><th>SPOT</th><th>Rebate/채권 외</th><th>채무결제 및 기타</th><th>달러 매도</th></tr></thead><tbody>'+
+    T.rows.map(function(r){ var dd=r.kind==="day"?fxsDay(r.date):null;
+      return '<tr>'+(dd?'<td class="c">'+dd.md+'</td><td class="c">'+dd.dow+'</td>':'<td colspan="2" class="c">'+esc(r.label)+'</td>')+
+        FXS_K.map(function(k){ return '<td class="num">'+fxsAmt(r[k])+'</td>'; }).join("")+'<td class="num">'+fxSym("USD",r.bal)+'</td></tr>'; }).join("")+
+    '<tr class="total"><td colspan="2" class="c">합계금액</td>'+FXS_K.map(function(k){ return '<td class="num">'+fxSym("USD",T.tot[k])+'</td>'; }).join("")+'<td></td></tr></tbody></table>';
+}
+/* 화면 입력표(③ 아래) */
+function fxSchedEditor(m){
+  var c=m.c, S=fxSchedOf(c), iso=m.iso;
+  var tr=S.rows.filter(function(r){ return r.date===iso; })[0], legacy=tr?null:fxsVals(m.fxPlan||{});
+  var list=[Object.assign({id:tr?tr.id:"", date:iso, fixed:true}, fxsVals(tr||legacy||{}))].concat(
+    S.rows.filter(function(r){ return r.date>iso; }).sort(function(a,b){ return a.date<b.date?-1:1; }).map(function(r){ return Object.assign({}, r, fxsVals(r)); }));
+  var inp=function(key, k, v){ return '<td><input type="number" step="0.01" class="fxnuminput ilboFx fxs-in" data-row="'+esc(key)+'" data-k="'+k+'" value="'+(Math.abs(v)>=0.005?v:"")+'" placeholder="0.00" style="width:110px"></td>'; };
+  var row=function(key, head, o, del){ return '<tr>'+head+FXS_K.map(function(k){ return inp(key, k, o[k]); }).join("")+'<td>'+(del?'<button class="btn sm ilboFx fxs-del" data-row="'+esc(key)+'">빼기</button>':'')+'</td></tr>'; };
+  var past=S.rows.filter(function(r){ return r.date<iso; }).length;
+  return '<div class="fxs-edit"><div class="ilbo-h" style="margin-top:12px"><span>외화 자금 집행 예정 입력 (USD) — 화면 전용</span><span class="mini">집행일 뒤 날짜는 [일자 추가] · 저장하면 다음 날 자금일보에도 이어집니다'+(past?' · 지난 날짜 '+past+'줄은 숨김':'')+'</span></div>'+
+    '<table class="ilbo-tbl"><thead><tr><th>일자</th><th>SPOT</th><th>Rebate/채권 외</th><th>채무결제 및 기타</th><th>달러 매도</th><th></th></tr></thead><tbody>'+
+    list.map(function(r){ var key=r.fixed?"day:"+iso:"id:"+r.id;
+      var head=r.fixed?'<td class="c">'+esc(iso)+' (집행일)</td>':'<td><input type="date" class="ilboFx fxs-date" data-row="'+esc(key)+'" value="'+esc(r.date)+'" min="'+esc(isoAdd(iso,1))+'"></td>';
+      return row(key, head, r, !r.fixed); }).join("")+
+    row("undecided", '<td class="c">일정 미정</td>', fxsVals(S.undecided), false)+
+    row("noinv", '<td class="c">Invoice 미발행</td>', fxsVals(S.noinv), false)+
+    '</tbody></table><div style="margin-top:6px"><button class="btn sm ilboFx fxs-add">일자 추가</button></div></div>';
+}
+function fxSchedSave(c, iso, key, mut, what){
+  var s=c.fxSched||(c.fxSched={rows:[], undecided:{}, noinv:{}}); s.rows=s.rows||[];
+  var r;
+  if(key==="undecided") r=s.undecided=s.undecided||{};
+  else if(key==="noinv") r=s.noinv=s.noinv||{};
+  else if(key.indexOf("day:")===0){ var d=key.slice(4); r=s.rows.filter(function(x){ return x.date===d; })[0]; if(!r){ r={id:"r"+Date.now().toString(36), date:d}; s.rows.push(r); } }
+  else { var id=key.slice(3); r=s.rows.filter(function(x){ return x.id===id; })[0]; }
+  if(!r) return;
+  mut(r, s);
+  /* 빈 날짜 줄은 정리 */
+  s.rows=s.rows.filter(function(x){ return x.del!==true; });
+  save().then(function(){ audit("fxsched_set", {co:c.id, menu:"ilbo", target:what||key}); toast("외화 집행 예정 저장"); renderIlbo(); });
+}
+renderIlbo=(function(f){ return function(){ var r=f.apply(this, arguments);
+  try{ var c=ilboCo(); if(!c || view!=="ilbo") return r; var iso=ILBO.date;
+    $$("#ilboBody .fxs-in").forEach(function(el){ el.onchange=function(){ var v=Math.round((parseFloat(el.value)||0)*100)/100;
+      fxSchedSave(c, iso, el.dataset.row, function(x){ x[el.dataset.k]=v; }, el.dataset.row+" "+el.dataset.k+" "+v.toFixed(2)); }; });
+    $$("#ilboBody .fxs-date").forEach(function(el){ el.onchange=function(){ var v=el.value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v) || v<=iso){ toast("집행일 뒤 날짜를 고르세요"); renderIlbo(); return; }
+      fxSchedSave(c, iso, el.dataset.row, function(x, s){ var dup=s.rows.filter(function(y){ return y!==x && y.date===v; })[0];
+        if(dup){ FXS_K.forEach(function(k){ dup[k]=Math.round(((+dup[k]||0)+(+x[k]||0))*100)/100; }); x.del=true; } else x.date=v; }, "날짜 "+v); }; });
+    $$("#ilboBody .fxs-del").forEach(function(b){ b.onclick=function(){ fxSchedSave(c, iso, b.dataset.row, function(x){ x.del=true; }, "줄 빼기"); }; });
+    $$("#ilboBody .fxs-add").forEach(function(b){ b.onclick=function(){ var S=fxSchedOf(c), d=calNextBiz(iso), g=0;
+      while(S.rows.some(function(x){ return x.date===d; }) && g++<30) d=calNextBiz(d);
+      fxSchedSave(c, iso, "day:"+d, function(){}, "일자 추가 "+d); }; });
+    if(typeof lockIlboUi==="function") lockIlboUi();
+  }catch(e){ console.warn("fxsched", e); }
+  return r; }; })(renderIlbo);
+
+/* ===================== [v99] 자금일보 엑셀 — 사용자 양식(맑은 고딕 · 음영 · 테두리) + 예적금현황표 수식 ===================== */
+/* ilboSheetsData의 행 값(v)은 그대로 둔다(값 전용 저장·검증과 같음). 엑셀(ExcelJS)에만 xv(숫자 값) · f(수식) · nf(서식)을 덧붙인다.
+   수식은 값이 정확히 맞아떨어질 때만 넣는다(맞지 않으면 기존 값 그대로) — 항등식(기초+입금−출금=기말)을 엑셀이 바꾸지 않게. */
+var XLS_FONT="맑은 고딕", XLS_F2="FFF2F2F2", XLS_D9="FFD9D9D9", XLS_BL="FFDDEBF7", XLS_HL="FFFFFF99";
+function xlsCcyFmt(cy){ var p=cy==="USD"?'"$"':cy==="EUR"?'"€ "':'"'+cy+' "'; return p+'#,##0.00;'+p+'-#,##0.00'; }
+function xlsCol(i){ return "ABCDEFGH".charAt(i); }
+function ilboXlsPrep(sheets){
+  var s3=(sheets.filter(function(sh){ return sh.name==="3.예적금현황표"; })[0]||{}).rows||[];
+  var N=function(v){ return typeof v==="number"?v:0; };
+  var set=function(r, j, xv, f, nf){ r.xv=r.xv||[]; r.f=r.f||[]; r.nf=r.nf||[]; if(xv!==undefined) r.xv[j]=xv; if(f) r.f[j]=f; if(nf) r.nf[j]=nf; };
+  var cash=[], acct=[], fxk=[], subs={};
+  s3.forEach(function(r, i){ var rn=i+1;
+    /* 계좌 줄(현금 · 원화 · 외화 원화환산): H = C + D − E + F − G (맞을 때만) */
+    if(r.k==="cash"||r.k==="acct"||r.k==="fxk"){
+      var v=r.v, calc=N(v[2])+N(v[3])-N(v[4])+N(v[5])-N(v[6]);
+      if(typeof v[7]==="number" && Math.abs(calc-v[7])<0.5) set(r, 7, undefined, "C"+rn+"+D"+rn+"-E"+rn+"+F"+rn+"-G"+rn);
+      (r.k==="cash"?cash:r.k==="acct"?acct:fxk).push(rn);
+    }
+    /* 외화 계좌 금액 줄: 숫자(통화 서식) + H = C + F − G (센트 단위로 맞을 때만) */
+    if(r.k==="fxt" && r.fx){ var x=r.fx, nf=xlsCcyFmt(x.ccy);
+      set(r, 2, Math.round((+x.oAmt||0)*100)/100, null, nf); set(r, 7, Math.round((+x.cAmt||0)*100)/100, null, nf);
+      if(x.uMvInC) set(r, 5, x.uMvInC/100, null, nf); if(x.uMvOutC) set(r, 6, x.uMvOutC/100, null, nf);
+      if(fxCents(x.oAmt)+(x.uMvInC||0)-(x.uMvOutC||0)===fxCents(x.cAmt)) set(r, 7, Math.round((+x.cAmt||0)*100)/100, "C"+rn+"+F"+rn+"-G"+rn, nf);
+    }
+    if(r.k==="sub") subs[r.sk]=rn;
+  });
+  /* 소계: 맞을 때만 SUM / 참조 */
+  var sumRow=function(rn, list, mk){ var r=s3[rn-1]; if(!r||!list.length) return;
+    for(var j=2;j<=7;j++){ var tot=list.reduce(function(s,q){ return s+N(s3[q-1].v[j]); },0);
+      if(typeof r.v[j]==="number" && Math.abs(tot-r.v[j])<0.5) set(r, j, undefined, mk(xlsCol(j), list)); } };
+  var rng=function(cl, l){ var a=l[0], b=l[l.length-1]; return (b-a+1===l.length) ? "SUM("+cl+a+":"+cl+b+")" : "SUM("+l.map(function(q){ return cl+q; }).join(",")+")"; };
+  Object.keys(subs).forEach(function(lab){ var rn=subs[lab];
+    if(/^현금시재 소계/.test(lab)) sumRow(rn, cash, rng);
+    else if(/^원화 일반 소계/.test(lab)) sumRow(rn, acct, rng);
+    else if(/^외화 일반 소계/.test(lab)) sumRow(rn, fxk, rng);
+    else if(/^시재표 계/.test(lab)){ var b=Object.keys(subs).filter(function(k){ return /^원화 일반 소계/.test(k); })[0], c2=Object.keys(subs).filter(function(k){ return /^외화 일반 소계/.test(k); })[0];
+      if(b && c2) sumRow(rn, [subs[b], subs[c2]], function(cl, l){ return cl+l[0]+"+"+cl+l[1]; }); }
+  });
+  /* 외화예적금 세부: 외화금액 숫자 · 소계 SUM · 총합계 = 소계 합 */
+  var grp=[], totRn=0, lotTot=null;
+  s3.forEach(function(r, i){ var rn=i+1;
+    if(r.k==="lot"){ grp.push(rn); set(r, 3, Math.round((+r.amt||0)*100)/100, null, xlsCcyFmt(r.ccy)); }
+    else if(r.k==="lotsub"){ var nf=xlsCcyFmt(r.ccy), l=grp.slice(); grp=[];
+      set(r, 3, Math.round((+r.amt||0)*100)/100, l.length?rng("D", l):null, nf);
+      if(l.length){ var tk=l.reduce(function(s,q){ return s+N(s3[q-1].v[4]); },0); if(typeof r.v[4]==="number" && Math.abs(tk-r.v[4])<0.5) set(r, 4, undefined, rng("E", l)); }
+      if(r.ccy==="USD") (lotTot=lotTot||[]).push(rn); }
+    else if(r.k==="lottot"){ totRn=rn; var nf2=xlsCcyFmt("USD"), L=lotTot||[];
+      set(r, 3, Math.round((+r.amt||0)*100)/100, L.length?L.map(function(q){ return "D"+q; }).join("+"):null, nf2);
+      if(L.length){ var tk2=L.reduce(function(s,q){ return s+N(s3[q-1].v[4]); },0); if(typeof r.v[4]==="number" && Math.abs(tk2-r.v[4])<0.5) set(r, 4, undefined, L.map(function(q){ return "E"+q; }).join("+")); } }
+  });
+  /* 외화 자금 집행 예정: 금액 숫자 · 예금 잔액 = 앞 줄 잔액 + 입금 − 출금 · 합계 SUM */
+  var prev=totRn?("D"+totRn):null, fr=[], usd=xlsCcyFmt("USD");
+  s3.forEach(function(r, i){ var rn=i+1;
+    if(r.k==="fxs"){ fr.push(rn); var o=r.fxr||{};
+      ["spot","rebate","debt","sell"].forEach(function(k, j){ var a=Math.round((+o[k]||0)*100)/100; if(Math.abs(a)>=0.005) set(r, 2+j, a, null, usd); else set(r, 2+j, null); });
+      set(r, 6, Math.round((+o.bal||0)*100)/100, prev?(prev+"+C"+rn+"+D"+rn+"-E"+rn+"-F"+rn):null, usd); prev="G"+rn; }
+    else if(r.k==="fxstot"){ var t=r.fxt||{};
+      ["spot","rebate","debt","sell"].forEach(function(k, j){ set(r, 2+j, Math.round((+t[k]||0)*100)/100, fr.length?rng(xlsCol(2+j), fr):null, usd); }); fr=[]; }
+  });
+  return sheets;
+}
+/* 셀 서식 — 사용자 양식 기준 */
+function ilboXlsStyle(ws, sh){
+  var T={style:"thin",color:{argb:"FF7F7F7F"}}, M={style:"medium",color:{argb:"FF000000"}};
+  var fill=function(c, a){ c.fill={type:"pattern",pattern:"solid",fgColor:{argb:a}}; };
+  var font=function(c, o){ c.font=Object.assign({name:XLS_FONT, size:9.5}, o||{}); };
+  var bd=function(c, l, r, t, b){ var o={}; if(l) o.left=l; if(r) o.right=r; if(t) o.top=t; if(b) o.bottom=b; c.border=o; };
+  var al=function(c, h){ c.alignment={horizontal:h, vertical:"middle"}; };
+  var nm=sh.name, rows=sh.rows, n=rows.length;
+  /* 바탕 글꼴: 맑은 고딕 */
+  for(var rr=1; rr<=n; rr++) for(var cc=1; cc<=8; cc++){ var c0=ws.getCell(rr,cc); var f0=c0.font||{}; c0.font=Object.assign({}, f0, {name:XLS_FONT}); }
+  var SKIP={isMerged:true, master:null, font:null, fill:null, border:null, alignment:null, numFmt:null};
+  rows.forEach(function(r, i){ var rn=i+1, row=ws.getRow(rn), C=function(j){ var c=row.getCell(j); return (c.isMerged && c.master && c.master.address!==c.address) ? Object.create(SKIP) : c; };
+    var bordered=!(r.t==="title"||r.t==="h2"||r.t==="blank");
+    if(r.t==="title"){ row.height=(r.k==="s2title")?27.6:25.95; font(C(1), {bold:true, size:18}); al(C(1), "center"); return; }
+    if(r.t==="h2"){
+      if(r.k==="date"){ bd(C(2), null, null, null, T); try{ ws.mergeCells(rn,1,rn,2); }catch(e){} font(C(1), {bold:true, size:10.5}); al(C(1), "left"); bd(C(1), null, null, null, T); }
+      else if(r.k==="t3"||r.k==="sec"){ font(C(1), {bold:true, size:(r.k==="t3"?9:10)}); al(C(1), "left"); }
+      else font(C(1), {bold:true, size:10.5});
+      if(r.v.length>1){ font(C(r.v.length), {size:9}); C(r.v.length).alignment={horizontal:"right"}; }
+      return; }
+    if(!bordered) return;
+    for(var j=1;j<=r.v.length;j++){ if(r.only && r.only.indexOf(j-1)<0) continue; var c=C(j);
+      var b=(r.t==="head"||r.t==="sub"||r.hl||r.xb||(r.xa&&j===1));
+      if(nm==="3.예적금현황표" && r.k==="sub" && j===3) b=false;
+      if(nm==="3.예적금현황표" && (r.blueLast && j===r.v.length) && r.k!=="sub") b=true;
+      font(c, {bold:!!b});
+      if(r.t==="head") fill(c, r.gray?XLS_D9:XLS_F2);
+      else if(r.t==="sub" && !r.hl) fill(c, XLS_F2);
+      if(r.cf && !r.hl && (j===3||j===6)) fill(c, XLS_BL);
+      if(r.blueAt && r.blueAt.indexOf(j-1)>=0) fill(c, XLS_BL);
+    }
+    /* 2. 입출금 내역 — 내역 줄은 세로선만(첫 줄 위 · 마지막 줄 아래) · 내역(B/F) 오른쪽 정렬 + 분류(C/G) 왼쪽 정렬 */
+    if(nm==="2.입출금내역" && (r.k==="cash"||r.k==="bank")){
+      var top=r.first?T:null, bot=r.last?T:null;
+      for(var k=1;k<=8;k++){ var cl=C(k);
+        if(r.k==="cash"){ bd(cl, T, T, top, bot); if(typeof r.v[k-1]!=="number") al(cl, "center"); continue; }   // B:C · F:G 병합(마스터 테두리 = 병합 영역 바깥선)
+        var mB=(r.merge2||[]).some(function(mg){ return mg[0]===k-1||mg[1]===k-1; });
+        if((k===2||k===6) && !mB){ bd(cl, T, null, top, bot); cl.alignment={horizontal:"right", vertical:"middle", shrinkToFit:true}; }   // 긴 내용은 칸에 맞춰 줄임(왼쪽 잘림 방지)
+        else if((k===3||k===7) && !mB){ bd(cl, null, T, top, bot); al(cl, "left"); }
+        else { bd(cl, T, T, top, bot); if(typeof r.v[k-1]!=="number") al(cl, "center"); }
+      } }
+    /* 3. 예적금 현황표 */
+    if(nm==="3.예적금현황표"){
+      if(r.k==="cash"){ row.height=18; for(var k2=1;k2<=8;k2++){ var c2=C(k2), ob=c2.border||{}; bd(c2, ob.left||T, ob.right||T, ob.top||T, M); } }
+      if(r.k==="sub"){ row.height=18; var cashSub=/^현금시재/.test(r.sk||"");
+        for(var k3=1;k3<=8;k3++) bd(C(k3), (k3===1&&!cashSub)?M:T, (k3===8&&!cashSub)?M:T, M, M); }
+      if(r.k==="fxt"||r.k==="fxk"){ for(var k4=1;k4<=2;k4++){ var top4=r.k==="fxt"?(r.firstFx?M:T):null, bot4=r.k==="fxk"?(r.lastFx?M:T):null; bd(C(k4), T, T, top4, bot4); }
+        if(r.k==="fxk" && r.lastFx) row.height=18; }
+      if(r.k==="lot"){ for(var k5=1;k5<=2;k5++) bd(C(k5), T, T, r.first?T:null, r.last?T:null); }
+    }
+    if(r.nf) r.nf.forEach(function(f, j){ if(f){ C(j+1).numFmt=f; C(j+1).alignment={horizontal:"right", vertical:"middle"}; } });
+    if(bordered) for(var q=1;q<=r.v.length;q++){ var cq=C(q); if(typeof r.v[q-1]==="number" && cq.alignment) cq.alignment=Object.assign({}, cq.alignment, {vertical:"middle"}); }
+  });
+}
+
+/* ===================== [v99] 금융 › 금융상품 가입현황 (정기예금) — 법인별 c.deposits ===================== */
+/* c.deposits=[{id, bank, num, start, end, rate(소수: 0.0325), amount, note}] (관리자 전용 값)
+   연동:
+   ① 계좌: 계좌 목록에 없는 계좌번호면 자동 등록(원화 · 비고 '정기예금 · 만기 …', autoDep) — 예적금 현황표 계좌현황에 나온다.
+   ② 잔액: CMS·보고서 잔액이 우선. 가입일(3일 안) 같은 금액 자사 출금이 있으면 예금 계좌 예치(자금이동 입금)를, 만기일(5일 안) 원리금 입금이 있으면
+      예금 계좌 해지(자금이동 출금 + 차액 이자수익)를 자동 보정(rcApply R5-d)으로 만든다 — 근거 없는 금액은 만들지 않는다(항등식 유지).
+   ③ 자금일보 금융상품 공제: 가입기간(시작일~종료일) 동안만. 예금 계좌 잔액이 있으면 그 잔액, 없으면 등록 금액. 종료일 다음 날부터 제외.
+   ④ 예적금 현황표: 가입기간 밖이고 잔액·거래가 모두 0인 예금 계좌 줄은 숨긴다. */
+INFO_ADMIN_KEYS.push("deposits"); INFO_ADMIN_KEYS.push("fxSched");
+function depList(c){ return ((c&&c.deposits)||[]).filter(function(x){ return x && digitsOnly(x.num).length>=6; }); }
+function depActive(dp, iso){ return !!(dp && iso && (!dp.start || dp.start<=iso) && (!dp.end || iso<=dp.end)); }
+function depAcctOf(c, dp){ var d=digitsOnly(dp.num); if(d.length<6) return null;
+  return effAccounts(c).filter(function(a){ return a.group!=="외화" && digitsOnly(a.num)===d; })[0] || null; }
+function depLinks(c){ return depList(c).map(function(dp){ var a=depAcctOf(c, dp); return {dep:dp, label:a?a.label:null, acc:a}; }); }
+function depEnsureAcct(c, dp){
+  var d=digitsOnly(dp.num); if(d.length<6 || !dp.bank) return null;
+  c.accounts=c.accounts||[];
+  var hit=c.accounts.filter(function(a){ return digitsOnly(a.num)===d; })[0];
+  if(hit){ if(hit.autoDep) hit.note="정기예금 · "+(dp.end?dp.end+" 만기":"만기 미정"); return hit; }
+  var labs=c.accounts.map(function(a){ return a.label; }), lab=null;
+  [5,6,7,8,d.length].some(function(n){ var l=String(dp.bank).trim()+" "+d.slice(-n); if(labs.indexOf(l)<0){ lab=l; return true; } return false; });
+  var mx=c.accounts.reduce(function(m,x){ return Math.max(m, +x.order||0); },0);
+  var a={bank:String(dp.bank).trim(), num:String(dp.num).trim(), label:lab||String(dp.bank).trim()+" "+d, order:mx+1, group:"원화", note:"정기예금 · "+(dp.end?dp.end+" 만기":"만기 미정"), autoDep:true};
+  c.accounts.push(a); return a;
+}
+function depAcctUsed(c, lab){ return Object.keys(c.days||{}).some(function(d){ var r=c.days[d]; if(!r) return false;
+  if(Array.isArray(r)) return r.some(function(t){ return t.acct===lab; });
+  return (r.txns||[]).some(function(t){ return t.acct===lab && !t.rcSyn; }) || (r.accts||[]).some(function(a){ return a.label===lab && (+a.close||+a.open); }) || !!(r.repAccts && +r.repAccts[lab]); }); }
+/* ③ 금융상품 공제 — 등록된 예금 계좌는 가입기간에만 */
+deductAt=(function(f){ return function(c, iso){ var r=f.apply(this, arguments);
+  try{ var L=depLinks(c); if(!L.length) return r;
+    var st=coState(c), ds=st.dates.filter(function(d){ return d<=iso; }), d=ds[ds.length-1], ch=d?st.chain[d]:null, fin=r.fin, byLab={}, free=0;
+    L.forEach(function(x){ if(x.label){ var o=byLab[x.label]||(byLab[x.label]={acc:x.acc, amt:0, on:false}); if(depActive(x.dep, iso)){ o.on=true; o.amt+=Math.round(+x.dep.amount||0); } }
+      else if(depActive(x.dep, iso)) free+=Math.round(+x.dep.amount||0); });
+    Object.keys(byLab).forEach(function(lab){ var o=byLab[lab], cl=(ch && ch[lab]) ? (+ch[lab].close||0) : 0;
+      if(/정기예금|금융상품/.test((o.acc&&o.acc.note)||"")) fin-=cl;     // 종전 합산분을 빼고
+      if(o.on) fin+=(cl>0 ? cl : o.amt); });                               // 가입기간이면 잔액(없으면 등록 금액)
+    r.fin=fin+free;
+  }catch(e){} return r; }; })(deductAt);
+/* ④ 예적금 현황표 — 가입기간 밖 · 잔액·거래 0인 예금 계좌 줄 숨김 */
+function depHideRows(c, iso, rows){
+  var L=depLinks(c), auto=(c.accounts||[]).filter(function(a){ return a.autoDep; }).map(function(a){ return digitsOnly(a.num); });
+  if(!L.length && !auto.length) return rows;
+  var zero=function(x){ return ["open","in","out","mvIn","mvOut","close"].every(function(k){ return Math.abs(+x[k]||0)<0.5; }); };
+  return rows.filter(function(x){ var d=digitsOnly(x.num); if(!d || !zero(x)) return true;
+    var mine=L.filter(function(y){ return digitsOnly(y.dep.num)===d; });
+    if(mine.length) return mine.some(function(y){ return depActive(y.dep, iso); });
+    return auto.indexOf(d)<0; });
+}
+ilboModel=(function(f){ return function(c, iso){ var m=f.apply(this, arguments);
+  try{ if(m && m.krwRows) m.krwRows=depHideRows(c, m.prevEnd||iso, m.krwRows); }catch(e){} return m; }; })(ilboModel);
+/* 자금일보 화면 안내(화면 전용) — 가입기간인데 잔액 0 · 만기 지났는데 잔액 남음 */
+function depIssues(c, iso){
+  var st=coState(c), ds=st.dates.filter(function(d){ return d<=iso; }), d=ds[ds.length-1], ch=d?st.chain[d]:null, out=[];
+  depLinks(c).forEach(function(x){ var cl=(x.label && ch && ch[x.label]) ? (+ch[x.label].close||0) : 0, nm=x.label||(String(x.dep.bank||"")+" "+digitsOnly(x.dep.num).slice(-5));
+    if(depActive(x.dep, iso) && cl<1) out.push(nm+" — 가입기간인데 계좌 잔액이 0입니다. 공제에는 등록 금액 "+fmt(Math.round(+x.dep.amount||0))+"을 썼습니다. 가입 이체(자금이동)·보고서 잔액을 확인하세요.");
+    if(x.dep.end && iso>x.dep.end && cl>=1) out.push(nm+" — 만기("+x.dep.end+")가 지났는데 잔액 "+fmt(Math.round(cl))+"이 남아 있습니다(공제에서는 제외). 해지 입금을 확인하세요."); });
+  return out;
+}
+renderIlbo=(function(f){ return function(){ var r=f.apply(this, arguments);
+  try{ var c=ilboCo(); if(!c || view!=="ilbo") return r; var host=$("#ilboBody"); if(!host) return r;
+    var old=host.querySelector(".dep-note"); if(old) old.remove();
+    var L=depIssues(c, ILBO.date||todayISO()); if(L.length) host.insertAdjacentHTML("afterbegin", '<div class="banner warn dep-note no-print" style="margin-bottom:8px"><b>금융상품 가입현황</b><br>'+L.map(esc).join("<br>")+'</div>');
+  }catch(e){} return r; }; })(renderIlbo);
+
+/* --------- 금융 › 금융상품 가입현황 화면 --------- */
+function depStatus(dp, iso){ if(dp.start && iso<dp.start) return "예정"; if(dp.end && iso>dp.end) return "만기"; return "가입중"; }
+function depRecalc(){ try{ fxPostAll(); }catch(e){ console.warn("fxPostAll", e); } invalidate(); }
+function finDeposits(host){
+  var iso=todayISO(), refs=[];   // 상태·합계는 오늘 기준
+  finCos().forEach(function(c){ (c.deposits||[]).forEach(function(dp,i){ refs.push({c:c,dp:dp,i:i}); }); });
+  refs.sort(function(a,b){ return String(a.c.id).localeCompare(String(b.c.id)) || String(a.dp.start||"").localeCompare(String(b.dp.start||"")); });
+  var live=refs.filter(function(r){ return depActive(r.dp, iso); });
+  var tot=live.reduce(function(a,r){ return a+Math.round(+r.dp.amount||0); },0);
+  var yi=live.reduce(function(a,r){ return a+(+r.dp.amount||0)*(+r.dp.rate||0); },0);
+  var byCo={}; live.forEach(function(r){ byCo[r.c.short]=(byCo[r.c.short]||0)+Math.round(+r.dp.amount||0); });
+  var rows=refs.map(function(r,n){ var dp=r.dp, s=depStatus(dp, iso), a=depAcctOf(r.c, dp);
+    return '<tr'+(s==="가입중"?'':' style="opacity:.55"')+'><td>'+coSel("co",r.c.id,'data-n="'+n+'"')+'</td>'+
+      '<td><input class="cellsel" data-n="'+n+'" data-f="bank" value="'+esc(dp.bank||"")+'" placeholder="은행" style="width:70px"></td>'+
+      '<td><input class="cellsel" data-n="'+n+'" data-f="num" value="'+esc(dp.num||"")+'" placeholder="계좌번호" style="width:150px"></td>'+
+      '<td><input class="cellsel" type="date" data-n="'+n+'" data-f="start" value="'+esc(dp.start||"")+'"></td>'+
+      '<td><input class="cellsel" type="date" data-n="'+n+'" data-f="end" value="'+esc(dp.end||"")+'"></td>'+
+      '<td><input class="cellsel num" type="number" step="0.001" data-n="'+n+'" data-f="rate" value="'+(dp.rate?+(dp.rate*100).toFixed(4):"")+'" placeholder="%" style="width:72px"></td>'+
+      '<td><input class="cellsel num" type="number" step="1" data-n="'+n+'" data-f="amount" value="'+(+dp.amount||0)+'" style="width:130px"></td>'+
+      '<td class="c"><span class="chip'+(s==="가입중"?' ok':'')+'">'+s+'</span></td>'+
+      '<td class="mini">'+(a?esc(a.label)+(a.autoDep?' (자동 등록)':''):'<span style="color:var(--bad,#c00)">계좌 없음</span>')+'</td>'+
+      '<td><input class="cellsel" data-n="'+n+'" data-f="note" value="'+esc(dp.note||"")+'" style="width:150px"></td>'+
+      '<td class="act"><button class="btn sm" data-ddel="'+n+'">삭제</button></td></tr>'; }).join("");
+  host.innerHTML='<div class="kpis">'+
+    '<div class="kpi lead"><div class="lbl">가입중 금액</div><div class="v">'+fmt(tot)+'</div><div class="d">'+iso+' 기준 '+live.length+'건'+(Object.keys(byCo).length?' · '+Object.keys(byCo).map(function(k){ return esc(k)+' '+fmt(byCo[k]); }).join(" · "):'')+'</div></div>'+
+    '<div class="kpi"><div class="lbl">등록 건수</div><div class="v">'+refs.length+'</div><div class="d">만기 · 예정 포함</div></div>'+
+    '<div class="kpi i"><div class="lbl">연 이자 (예상)</div><div class="v">'+fmt(Math.round(yi))+'</div><div class="d">금액 × 이자율</div></div></div>'+
+    '<div class="panel"><header><h2>금융상품 가입현황 (정기예금)</h2>'+finSub(curCo==="ALL"?"전 법인":co(curCo).name)+
+    '<div class="sp"><button class="btn sm" id="btnAddDep">정기예금 추가</button></div></header>'+
+    '<div class="pad mini" style="padding-top:0">가입중(시작일~종료일)이면 예적금 현황표 계좌현황에 나오고 자금일보 금융상품 공제에 들어갑니다 · 종료일 다음 날부터 빠집니다 · 계좌 목록에 없는 계좌번호는 자동으로 등록합니다 · 잔액은 CMS·보고서 값이 우선입니다</div>'+
+    '<div class="scroll"><table class="tbl" id="depTbl"><thead><tr><th>법인</th><th>은행</th><th>계좌번호</th><th>시작일</th><th>종료일</th>'+
+    '<th style="text-align:right">이자율(%)</th><th style="text-align:right">금액</th><th>상태</th><th>계좌 목록</th><th>비고</th><th></th></tr></thead><tbody>'+
+    (rows||'<tr><td colspan="11" class="mini" style="padding:18px;text-align:center">등록된 정기예금이 없습니다. [정기예금 추가]로 은행·계좌번호·시작일·종료일·이자율·금액을 넣으세요.</td></tr>')+'</tbody></table></div></div>';
+  var done=function(c, dp, what){ var tail=String(dp.bank||"")+" "+auditTail(dp.num);
+    audit("deposit_set", {co:c.id, menu:"fin", target:tail, detail:{what:what, start:dp.start||"", end:dp.end||"", amount:Math.round(+dp.amount||0)}});
+    depRecalc(); return save().then(function(){ toast(c.short+" 정기예금 "+what); render(); }); };
+  $$("#depTbl [data-n][data-f]").forEach(function(el){ el.onchange=function(){
+    var r=refs[+el.dataset.n], f=el.dataset.f, dp=r.dp;
+    if(f==="co"){ if(el.value===r.c.id) return; var to=co(el.value); if(!to) return;
+      r.c.deposits.splice(r.c.deposits.indexOf(dp),1); to.deposits=to.deposits||[]; to.deposits.push(dp); depEnsureAcct(to, dp); done(to, dp, "법인 이동"); return; }
+    if(f==="amount") dp.amount=Math.round(+el.value||0);
+    else if(f==="rate") dp.rate=Math.round((+el.value||0)*100000)/10000000;   // % 입력 → 소수(0.0325)
+    else if(f==="start"||f==="end"){ var v=el.value||""; if(v && !/^\d{4}-\d{2}-\d{2}$/.test(v)){ toast("날짜 형식(YYYY-MM-DD)"); renderFin(); return; } dp[f]=v;
+      if(dp.start && dp.end && dp.end<dp.start){ toast("종료일이 시작일보다 앞입니다"); } }
+    else dp[f]=String(el.value||"").trim();
+    if(f==="bank"||f==="num"||f==="end") depEnsureAcct(r.c, dp);
+    done(r.c, dp, "저장"); }; });
+  $$("#depTbl [data-ddel]").forEach(function(b){ b.onclick=function(){ var r=refs[+b.dataset.ddel], c=r.c, dp=r.dp, a=depAcctOf(c, dp);
+    c.deposits.splice(c.deposits.indexOf(dp),1);
+    if(a && a.autoDep && !depList(c).some(function(x){ return digitsOnly(x.num)===digitsOnly(a.num); }) && !depAcctUsed(c, a.label)) c.accounts=c.accounts.filter(function(x){ return x!==a; });   // 자동 등록했고 자료가 없는 계좌만 정리
+    done(c, dp, "삭제"); }; });
+  $("#btnAddDep").onclick=function(){ var t=curCo==="ALL"?D.companies[0]:co(curCo);
+    t.deposits=t.deposits||[];
+    var dp={id:t.id+"-D"+Date.now().toString(36), bank:"", num:"", start:todayISO(), end:"", rate:0, amount:0, note:""};
+    t.deposits.push(dp);
+    save().then(function(){ toast(t.short+" 정기예금 줄 추가 — 은행·계좌번호를 넣으세요"); render(); }); };
+}
+renderFin=(function(f){ return function(){ if(finTab==="dep"){ $$("#segFin button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.f===finTab?"true":"false"); }); finDeposits($("#finBody")); if(typeof lockFinUi==="function") lockFinUi(); return; } return f.apply(this, arguments); }; })(renderFin);
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -12312,7 +12727,7 @@ function ilboPage1(m, screen){
   var keep={"기초시재":1,"기 말 시 재(①)":1,"이월시재(④=①+②-③)":1}; keep[DR.usable]=1; DR.rows.forEach(function(r){ keep[r.label]=1; });
   function cell(x, label, v){
     if(x.hasData===false) return '<td class="num"></td>';
-    if(x.planMissing && label!=="기초시재" && !DR.rows.some(function(r){ return r.label===label; })) return '<td class="num"></td>';
+    if(x.planMissing && label!=="기초시재" && !/기 말 시 재|이월시재|사용 가능/.test(label) && !DR.rows.some(function(r){ return r.label===label; })) return '<td class="num"></td>';   // [v99]
     return '<td class="num">'+(keep[label]?Math.round(v/1000).toLocaleString("ko-KR"):k1000(v))+'</td>';
   }
   function tr(grp, label, get, cls){ return '<tr class="'+(cls||"")+'">'+grp+'<td class="lbl">'+esc(label)+'</td>'+cols.map(function(x){ return cell(x,label,get(x)); }).join("")+'</tr>'; }
@@ -12422,25 +12837,34 @@ function ilboPage3(m){
   var det=m.fxDetail.slice(), groups={}, gorder=[];
   var xk=function(bank,ccy,xl){ return ccy+"|"+bank+(xl?" "+String(xl).replace(/^\S+\s+/,"").replace(/\s*\[.*$/,""):""); };   // [v90] 이관 계좌 랏은 그 계좌 묶음(하나 73032)
   m.fxRows.forEach(function(r){ var k=xk(r.bank,r.ccy,r.xferAcct); if(!groups[k] && (r.ccy==="USD"||r.cAmt)){ groups[k]=[]; gorder.push(k); } });
-  det.forEach(function(d){ var xa=d.xfer?xferFxAcct(m.c, d.bank, d.ccy||"USD"):null, k=xk(d.bank, d.ccy||"USD", xa&&xa.label); if(!groups[k]){ groups[k]=[]; gorder.push(k); } groups[k].push(d); });
+  if(false) det.forEach(function(d){ var xa=d.xfer?xferFxAcct(m.c, d.bank, d.ccy||"USD"):null, k=xk(d.bank, d.ccy||"USD", xa&&xa.label); if(!groups[k]){ groups[k]=[]; gorder.push(k); } groups[k].push(d); });
+  /* [v99] 은행별 묶음 하나 · 계좌 표시는 랏 줄에(정답지: USD 하나 88138 / 하나 73032 → USD 하나 일반 소계) */
+  groups={}; gorder=[]; var xk2=function(bank,ccy){ return ccy+"|"+bank; };
+  m.fxRows.forEach(function(r){ var k=xk2(r.bank,r.ccy); if(!groups[k] && (r.ccy==="USD"||r.cAmt)){ groups[k]=[]; gorder.push(k); } });
+  det.forEach(function(d0){ var d=fxLotA5(m.c, d0), k=xk2(d.bank, d.ccy||"USD"); if(!groups[k]){ groups[k]=[]; gorder.push(k); } groups[k].push(d); });
+  var ak3=function(d){ if(!d.acct5) return 999; for(var q=0;q<m.fxRows.length;q++) if(digitsOnly(m.fxRows[q].num).slice(-String(d.acct5).length)===String(d.acct5)) return q; return 998; };
   var tot={}, fd="";
   gorder.forEach(function(k){
-    var p=k.split("|"), list=groups[k].slice().sort(function(a,b){ return String(a.date||"").localeCompare(String(b.date||"")); });
-    var sa=0, sk=0;
+    var p=k.split("|"), bl=function(d){ return d.acct5?p[1]+" "+d.acct5:p[1]; };
+    var multi=groups[k].map(bl).filter(function(v,i,a){ return a.indexOf(v)===i; }).length>1;
+    var list=groups[k].slice().sort(function(a,b){ return multi&&ak3(a)!==ak3(b) ? ak3(a)-ak3(b) : String(a.date||"").localeCompare(String(b.date||"")); });
+    var sa=0, sk=0, sac=0;
     if(!list.length) fd+='<tr><td class="c">'+esc(p[0])+'</td><td class="c">'+esc(p[1])+'</td><td></td><td></td><td></td><td></td></tr>';
-    list.forEach(function(d,i){ sa+=+d.amt||0; sk+=+d.krw||0;
-      fd+='<tr><td class="c">'+(i?"":esc(p[0]))+'</td><td class="c">'+(i?"":esc(p[1]))+'</td><td class="num">'+(d.rate?(+d.rate).toLocaleString("ko-KR",{minimumFractionDigits:2,maximumFractionDigits:2}):"")+'</td><td class="num">'+fxSym(p[0],d.amt)+'</td><td class="num">'+w0(d.krw)+'</td><td class="c">'+esc(d.date||"")+'</td></tr>'; });
-    var acc=m.fxRows.filter(function(r){ return xk(r.bank,r.ccy,r.xferAcct)===k; }).reduce(function(s,r){ return s+r.cAmt; },0);
+    list.forEach(function(d,i){ sac+=fxCents(d.amt); sk+=+d.krw||0; var nb=multi?(i===0||bl(list[i-1])!==bl(d)):i===0;
+      fd+='<tr><td class="c">'+(nb?esc(p[0]):"")+'</td><td class="c">'+(nb?esc(multi?bl(d):p[1]):"")+'</td><td class="num">'+(d.rate?(+d.rate).toLocaleString("ko-KR",{minimumFractionDigits:2,maximumFractionDigits:2}):"")+'</td><td class="num">'+fxSym(p[0],d.amt)+'</td><td class="num">'+w0(d.krw)+'</td><td class="c">'+esc(d.date||"")+'</td></tr>'; });
+    sa=sac/100;
+    var acc=m.fxRows.filter(function(r){ return xk2(r.bank,r.ccy)===k; }).reduce(function(s,r){ return s+fxCents(r.cAmt); },0)/100;
     fd+='<tr class="sub"><td colspan="3" class="c">'+esc(p[1])+' '+esc(p[0])+' 일반 소계</td><td class="num">'+fxSym(p[0],sa)+'</td><td class="num">'+w0(sk)+'</td><td class="c">'+(Math.abs(acc-sa)<0.005?"TRUE":"FALSE")+'</td></tr>';
     var t=tot[p[0]]||(tot[p[0]]={a:0,k:0}); t.a+=sa; t.k+=sk;
   });
   Object.keys(tot).forEach(function(cy){ fd+='<tr class="total"><td colspan="3" class="c">'+esc(cy)+' 총 합 계</td><td class="num">'+fxSym(cy,tot[cy].a)+'</td><td class="num">'+w0(tot[cy].k)+'</td><td class="c">'+(Math.abs(tot[cy].k-m.C.close)<1||Object.keys(tot).length>1?"TRUE":"FALSE")+'</td></tr>'; });
-  var usd=(tot.USD||{a:0}).a, fp=m.fxPlan, bal=usd+(+fp.spot||0)+(+fp.rebate||0)-(+fp.debt||0)-(+fp.sell||0);
+  var usd=(tot.USD||{a:0}).a, fxp=fxSchedHtml(m, usd);   // [v99] 일자별 · 일정 미정 · Invoice 미발행
+  if(false){ var fp=m.fxPlan, bal=0;
   var pp=m.iso.split("-"), dnm=["일","월","화","수","목","금","토"][new Date(+pp[0],+pp[1]-1,+pp[2]).getDay()];
   var fxp='<table class="ilbo-tbl"><thead><tr><th rowspan="2">일자</th><th rowspan="2">요일</th><th colspan="2">입금</th><th colspan="2">출금</th><th rowspan="2">예금 잔액</th></tr><tr><th>SPOT</th><th>Rebate/채권 외</th><th>채무결제 및 기타</th><th>달러 매도</th></tr></thead><tbody>'+
     '<tr><td class="c">'+(+pp[1])+'/'+(+pp[2])+'</td><td class="c">'+dnm+'</td><td class="num">'+fxSym("USD",fp.spot)+'</td><td class="num">'+fxSym("USD",fp.rebate)+'</td><td class="num">'+fxSym("USD",fp.debt)+'</td><td class="num">'+fxSym("USD",fp.sell)+'</td><td class="num">'+fxSym("USD",bal)+'</td></tr>'+
     '<tr><td colspan="6" class="c">일정 미정</td><td class="num">'+fxSym("USD",bal)+'</td></tr>'+
-    '<tr class="total"><td colspan="2" class="c">합계금액</td><td class="num">'+fxSym("USD",fp.spot)+'</td><td class="num">'+fxSym("USD",fp.rebate)+'</td><td class="num">'+fxSym("USD",fp.debt)+'</td><td class="num">'+fxSym("USD",fp.sell)+'</td><td></td></tr></tbody></table>';
+    '<tr class="total"><td colspan="2" class="c">합계금액</td><td class="num">'+fxSym("USD",fp.spot)+'</td><td class="num">'+fxSym("USD",fp.rebate)+'</td><td class="num">'+fxSym("USD",fp.debt)+'</td><td class="num">'+fxSym("USD",fp.sell)+'</td><td></td></tr></tbody></table>'; }
   return '<div class="rpt-page ilbo-page p3">'+
     '<div class="rpt-title">'+ilboRangeText(m,"kopad")+' 예적금 현황표</div><div class="ilbo-h"><span></span><span class="rpt-unit">(단위 : 원)</span></div>'+
     '<table class="ilbo-tbl ilbo-bal">'+h+'<tbody>'+b+'</tbody></table>'+
@@ -12478,8 +12902,8 @@ function renderIlbo(){
     '<div class="grid2"><div class="panel"><header><h2>당일 자금이동 전표</h2><span class="sub">'+iso+'</span></header><div class="scroll">'+moves+'</div></div>'+
       '<div class="panel"><header><h2>계좌별 예상 잔액</h2><span class="sub">전일 금일시재 + 당일 계획</span></header><div class="scroll">'+(exp||'<div class="empty" style="padding:14px">전표 없음</div>')+'</div></div></div>'+
     '<div class="panel"><header><h2>③ 예적금 현황표</h2><span class="sub">'+m.prev+' 기준 · 원 단위</span>'+
-      '<div class="sp" style="gap:8px;flex-wrap:wrap;align-items:center"><span class="mini">외화 집행 예정(USD)</span>'+fxIn("spot","SPOT")+fxIn("rebate","Rebate/채권")+fxIn("debt","채무결제")+fxIn("sell","달러매도")+'</div></header>'+
-      '<div class="scroll pad">'+ilboPage3(m)+xferCheckHtml(m)+'</div></div>';   // [v90] 이관 계좌 잔액 확인(화면 전용)
+      '</header>'+
+      '<div class="scroll pad">'+ilboPage3(m)+fxSchedEditor(m)+xferCheckHtml(m)+'</div></div>';   // [v99] 외화 집행 예정 입력표   // [v90] 이관 계좌 잔액 확인(화면 전용)
   bindCatCells();
   $$(".ilboPlanCat").forEach(function(sel){ sel.onchange=function(){
     var sl=c.slips[iso]; if(!sl) return;
@@ -12616,17 +13040,17 @@ function ilboSheetsData(m){
   if(G.cols){
     var e=G.asOf;
     s1.push({t:"h2", v:["■ 3社 통합 자금수지","","","","","","",e.slice(0,4)+"/"+(+e.slice(5,7))+"/"+(+e.slice(8,10))+" 기준 누계실적"]});
-    s1.push({t:"head", v:["구    분",""].concat(G.heads)}); M1.push([rn1(),1,rn1(),2]);
+    s1.push({t:"head", gray:true, v:["구    분",""].concat(G.heads)}); M1.push([rn1(),1,rn1(),2]);
     G.rows.forEach(function(r){ s1.push({t:r[2]?"sub":"row", hl:!!r[2], zeroBlank:true, v:[r[0],""].concat(G.cols.map(function(x){
       if(!x.has) return null; return K(r[1]==="carry"?x.close+x.borrow-x.repay:x[r[1]]); }))}); M1.push([rn1(),1,rn1(),2]); });
     s1.push({t:"blank", v:[]});
   }
   s1.push({t:"h2", v:[f.title,"","","","","","","(단위:천원)"]});
-  s1.push({t:"head", v:["구    분",""].concat(cols.map(function(x){return x.label}))}); M1.push([rn1(),1,rn1(),2]);
+  s1.push({t:"head", gray:true, v:["구    분",""].concat(cols.map(function(x){return x.label}))}); M1.push([rn1(),1,rn1(),2]);
   var line=function(g,l,get,style,key){ var lab=l||g; s1.push({t:style==="keep"?"row":(style||"row"), v:[g,l].concat(cols.map(function(x){
       if(x.hasData===false) return null;
-      if(x.planMissing && lab!=="기초시재" && dedL.indexOf(lab)<0) return null;
-      return K(get(x)); })), zeroBlank:style!=="keep"}); if(!l) M1.push([rn1(),1,rn1(),2]); };
+      if(x.planMissing && lab!=="기초시재" && !/기 말 시 재|이월시재|사용 가능/.test(lab) && dedL.indexOf(lab)<0) return null;   // [v99]
+      return K(get(x)); })), zeroBlank:style!=="keep", cf:true, xb:lab==="기초시재", xa:!!(g&&l)}); if(!l) M1.push([rn1(),1,rn1(),2]); };   // [v99] cf: 당일계획·당월누계 음영
   line("기초시재","",function(x){return x.open},"keep");
   var gs=rn1()+1;
   line("입금",f.sale,function(x){return x.in.판매대}); line("","이자수익",function(x){return x.in.이자수익}); line("","기 타",function(x){return x.in.기타}); line("","소계",function(x){return x.inTotal},"sub");
@@ -12665,14 +13089,14 @@ function ilboSheetsData(m){
     s1.push({t:"sub", zeroBlank:true, pct:7, merge:[0,3], v:["합계","","","",K(LN.lim),K(LN.used),K(LN.avail),avgV]});
   }
   /* 2. 입출금 내역 */
-  s2.push({t:"h2", v:["■ 시재표"]});
-  s2.push({t:"h2", v:[ilboRangeText(m,"ko"),"","","","","","","(단위 : 원)"]});
+  s2.push({t:"title", k:"s2title", v:["  시  재  현  황  표"]});   // [v99] 사용자 양식
+  s2.push({t:"h2", k:"date", v:[ilboRangeText(m,"ko"),"","","","","","","(단위 : 원)"]});
   s2.push({t:"head", v:["","","현          금","","","예        금","",""], merge2:[[0,1],[2,4],[5,7]]});
   [["전 일 시 재",m.cash.open,m.D.open],["금 일 입 금",m.cash.in,m.D.in],["금 일 출 금",m.cash.out,m.D.out],["금 일 시 재",m.cash.close,m.D.close]].forEach(function(r,i){
-    s2.push({t:i===3?"sub":"row", v:[r[0],"",r[1],"","",r[2],"",""], merge2:[[0,1],[2,4],[5,7]], dash:true, blue:i===0});
+    s2.push({t:i===3?"sub":"row", v:[r[0],"",r[1],"","",r[2],"",""], merge2:[[0,1],[2,4],[5,7]], dash:true, blueAt:i===0?[2,5]:null, xa:true, k:"sj"});
   });
   var flow=function(title, ci, co2, di, do2, planMode){
-    s2.push({t:"blank",v:[]}); s2.push({t:"h2", v:[title]});
+    s2.push({t:"blank",v:[]}); s2.push({t:"h2", k:"sec", v:[title]});
     s2.push({t:"head", v:["구분","입   금","","","구분","출   금","",""], merge2:[[1,3],[5,7]]});
     s2.push({t:"head", v:["","내 역","","원화금액","","내 역","","원화금액"], merge2:[[1,2],[5,6]]});
     var sec=function(a,b,minN,cash){
@@ -12680,9 +13104,9 @@ function ilboSheetsData(m){
       for(var i=0;i<n;i++){ var x=a[i], y=b[i], mg=[];
         var xc=cash || (x && x.acct==="현금"), yc=cash || (y && y.acct==="현금");
         if(xc) mg.push([1,2]); if(yc) mg.push([5,6]);
-        s2.push({t:"row", dash:true, v:[x?x.acct:"", x?(x.memo||""):"", x&&!xc?(x.cat||""):"", x?(x.amt!=null?x.amt:x.amount):null, y?y.acct:"", y?(y.memo||""):"", y&&!yc?(y.cat||""):"", y?(y.amt!=null?y.amt:y.amount):null], merge2:mg}); }
+        s2.push({t:"row", dash:true, v:[x?x.acct:"", x?(x.memo||""):"", x&&!xc?(x.cat||""):"", x?(x.amt!=null?x.amt:x.amount):null, y?y.acct:"", y?(y.memo||""):"", y&&!yc?(y.cat||""):"", y?(y.amt!=null?y.amt:y.amount):null], merge2:mg, k:cash?"cash":"bank", first:i===0, last:i===n-1}); }
       var sm=function(l){ return l.reduce(function(s,z){ return s+(z.amt!=null?z.amt:z.amount); },0); };
-      s2.push({t:"sub", dash:true, v:["계","","",sm(a),"계","","",sm(b)], merge2:[[0,2],[4,6]]});
+      s2.push({t:"sub", dash:true, v:["계","","",sm(a),"계","","",sm(b)], merge2:[[0,2],[4,6]], k:"gye"});
     };
     sec(ci,co2,2,true); sec(di,do2,8,false);
   };
@@ -12698,35 +13122,42 @@ function ilboSheetsData(m){
   s3.push({t:"h2", v:["","","","","","","","(단위 : 원)"]});
   s3.push({t:"head", v:["은행명","계좌번호",o+" 잔액","입금","출금","자금이동","",cl+" 잔액"], merge2:[[5,6]]});
   s3.push({t:"head", v:["","","","","","입금","출금",""]});
-  var R=function(t,a,b,x,blue){ s3.push({t:t, dash:true, blueLast:true, v:[a,b,x.open,x.in,x.out,x.mvIn,x.mvOut,x.close]}); };
+  var R=function(t,a,b,x,blue){ var ca=a==="현금시재"&&t==="row"; s3.push({t:t, dash:true, blueLast:true, v:[a,b,x.open,x.in,x.out,x.mvIn,x.mvOut,x.close], k:ca?"cash":(t==="sub"?"sub":"acct"), sk:t==="sub"?a:undefined, merge2:(ca||t==="sub")?[[0,1]]:undefined}); };   // [v99] 태그 · A:B 병합
   R("row","현금시재","",m.cash); R("sub","현금시재 소계(A)","",m.cash);
   m.krwRows.forEach(function(x){ R("row",x.bank,x.num,x); });
   if(Math.abs(m.unalloc)>=1) R("row","기초이월(미배분)","",{open:m.unalloc,in:0,out:0,mvIn:0,mvOut:0,close:m.unalloc});
   R("sub","원화 일반 소계(B)","",m.B);
-  m.fxRows.forEach(function(x){
-    s3.push({t:"row", blueLast:true, v:[x.bank,x.num,fxSym(x.ccy,x.oAmt),"","",x.uMvInC?fxSym(x.ccy,x.uMvInC/100):"",x.uMvOutC?fxSym(x.ccy,x.uMvOutC/100):"",fxSym(x.ccy,x.cAmt)], rightText:true});
-    s3.push({t:"row", dash:true, blueLast:true, v:[x.ccy,"",x.oKrw,x.in||null,x.out||null,x.mvIn||null,x.mvOut||null,x.cKrw]});
+  m.fxRows.forEach(function(x, xi){
+    s3.push({t:"row", blueLast:true, v:[x.bank,x.num,fxSym(x.ccy,x.oAmt),"","",x.uMvInC?fxSym(x.ccy,x.uMvInC/100):"",x.uMvOutC?fxSym(x.ccy,x.uMvOutC/100):"",fxSym(x.ccy,x.cAmt)], rightText:true, k:"fxt", fx:x, firstFx:xi===0});
+    s3.push({t:"row", dash:true, blueLast:true, v:[x.ccy,"",x.oKrw,x.in||null,x.out||null,x.mvIn||null,x.mvOut||null,x.cKrw], k:"fxk", lastFx:xi===m.fxRows.length-1});
   });
   R("sub","외화 일반 소계(C)","",m.C); R("sub","시재표 계(D = B + C)","",m.D);
-  s3.push({t:"blank",v:[]}); s3.push({t:"h2", v:["[외화예적금 세부 내역]"]});
-  s3.push({t:"head", v:["구분","은행","환율","외화금액","원화금액","비고"]});
+  s3.push({t:"blank",v:[]}); s3.push({t:"h2", k:"t3", v:["[외화예적금 세부 내역]"]});
+  s3.push({t:"head", gray:true, v:["구분","은행","환율","외화금액","원화금액","비고"]});
   var groups={}, gorder=[];
   m.fxRows.forEach(function(r){ var k=r.ccy+"|"+r.bank; if(!groups[k] && (r.ccy==="USD"||r.cAmt)){ groups[k]=[]; gorder.push(k); } });
-  m.fxDetail.forEach(function(d){ var k=(d.ccy||"USD")+"|"+d.bank; if(!groups[k]){ groups[k]=[]; gorder.push(k); } groups[k].push(d); });
+  m.fxDetail.forEach(function(d0){ var d=fxLotA5(m.c, d0), k=(d.ccy||"USD")+"|"+d.bank; if(!groups[k]){ groups[k]=[]; gorder.push(k); } groups[k].push(d); });   // [v99] 은행 표기 정리 · 계좌 끝자리
   var ta=0, tk=0;
   gorder.forEach(function(k){ var p=k.split("|"), list=groups[k].slice().sort(function(a,b){ return String(a.date||"").localeCompare(String(b.date||"")); }), sa=0, sk=0;
     if(!list.length) s3.push({t:"row", v:[p[0],p[1],"","","",""]});
-    list.forEach(function(d,i){ sa+=+d.amt||0; sk+=+d.krw||0; s3.push({t:"row", dash:true, v:[i?"":p[0], i?"":p[1], d.rate||null, fxSym(p[0],d.amt), d.krw, d.date||""], rate:2, rightText:true}); });
-    s3.push({t:"sub", dash:true, v:[p[1]+" "+p[0]+" 일반 소계","","",fxSym(p[0],sa),sk,"TRUE"], merge2:[[0,2]], rightText:true});
+    var sac=0, bl=function(d){ return d.acct5?p[1]+" "+d.acct5:p[1]; };   // [v99] 계좌가 둘 이상이면 '하나 88138' · '하나 73032'로 나눠 표시(소계는 은행별)
+    var multi=list.some(function(d){ return d.acct5; }) && list.map(bl).filter(function(v,i,a){ return a.indexOf(v)===i; }).length>1;
+    var ak=function(d){ if(!d.acct5) return 999; for(var q=0;q<m.fxRows.length;q++) if(digitsOnly(m.fxRows[q].num).slice(-String(d.acct5).length)===String(d.acct5)) return q; return 998; };   // 예적금 현황표 계좌 순서
+    list.sort(function(a,b){ return multi&&ak(a)!==ak(b) ? ak(a)-ak(b) : String(a.date||"").localeCompare(String(b.date||"")); });
+    list.forEach(function(d,i){ sa+=+d.amt||0; sac+=fxCents(d.amt); sk+=+d.krw||0; var nb=multi?(i===0||bl(list[i-1])!==bl(d)):i===0;
+      s3.push({t:"row", dash:true, v:[nb?p[0]:"", nb?(multi?bl(d):p[1]):"", d.rate||null, fxSym(p[0],d.amt), d.krw, d.date||""], rate:2, rightText:true, k:"lot", ccy:p[0], amt:d.amt, first:nb, last:i===list.length-1||(multi&&bl(list[i+1])!==bl(d))}); });
+    sa=sac/100;
+    s3.push({t:"sub", dash:true, v:[p[1]+" "+p[0]+" 일반 소계","","",fxSym(p[0],sa),sk,"TRUE"], merge2:[[0,2]], rightText:true, k:"lotsub", ccy:p[0], amt:sa});
     if(p[0]==="USD"){ ta+=sa; tk+=sk; } });
-  s3.push({t:"sub", dash:true, v:["USD 총 합 계","","",fxSym("USD",ta),tk,"TRUE"], merge2:[[0,2]], rightText:true});
-  var fp=m.fxPlan, bal=ta+(+fp.spot||0)+(+fp.rebate||0)-(+fp.debt||0)-(+fp.sell||0), pp=m.iso.split("-");
-  s3.push({t:"blank",v:[]}); s3.push({t:"h2", v:["[외화 자금 집행 예정일자]"]});
-  s3.push({t:"head", v:["일자","요일","입금","","출금","","예금 잔액"], merge2:[[2,3],[4,5]]});
-  s3.push({t:"head", v:["","","SPOT","Rebate/채권 외","채무결제 및 기타","달러 매도",""]});
-  s3.push({t:"row", v:[(+pp[1])+"/"+(+pp[2]), dowOf(m.iso), fxSym("USD",fp.spot), fxSym("USD",fp.rebate), fxSym("USD",fp.debt), fxSym("USD",fp.sell), fxSym("USD",bal)], rightText:true});
-  s3.push({t:"row", v:["","일정 미정","","","","",fxSym("USD",bal)], rightText:true});
-  s3.push({t:"sub", v:["합계금액","",fxSym("USD",fp.spot),fxSym("USD",fp.rebate),fxSym("USD",fp.debt),fxSym("USD",fp.sell),""], merge2:[[0,1]], rightText:true});
+  ta=Math.round(ta*100)/100;
+  s3.push({t:"sub", dash:true, v:["USD 총 합 계","","",fxSym("USD",ta),tk,"TRUE"], merge2:[[0,2]], rightText:true, k:"lottot", amt:ta});
+  var FT=fxSchedTable(m, ta);   // [v99] 외화 자금 집행 예정 — 일자별 · 일정 미정 · Invoice 미발행
+  s3.push({t:"blank",v:[]}); s3.push({t:"h2", k:"t3", v:["[외화 자금 집행 예정일자]"]});
+  s3.push({t:"head", v:["일자","요일","입금","","출금","","예금 잔액"], merge2:[[2,3],[4,5]], fxs:true});
+  s3.push({t:"head", v:["","","SPOT","Rebate/채권 외","채무결제 및 기타","달러 매도",""], fxs:true});
+  FT.rows.forEach(function(r){ var dd=r.kind==="day"?fxsDay(r.date):null;
+    s3.push({t:"row", v:dd?[dd.md, dd.dow, fxsAmt(r.spot), fxsAmt(r.rebate), fxsAmt(r.debt), fxsAmt(r.sell), fxSym("USD",r.bal)]:[r.label,"",fxsAmt(r.spot), fxsAmt(r.rebate), fxsAmt(r.debt), fxsAmt(r.sell), fxSym("USD",r.bal)], merge2:dd?[]:[[0,1]], rightText:true, k:"fxs", fxr:r}); });
+  s3.push({t:"sub", v:["합계금액","",fxSym("USD",FT.tot.spot),fxSym("USD",FT.tot.rebate),fxSym("USD",FT.tot.debt),fxSym("USD",FT.tot.sell),""], merge2:[[0,1]], rightText:true, fxs:true, k:"fxstot", fxt:FT.tot});
   return [{name:"1.자금수지", rows:s1, merges:M1, widths:[12,16,15,15,15,17,16,16]}, {name:"2.입출금내역", rows:s2, widths:[13,26,11,15,13,30,11,15]}, {name:"3.예적금현황표", rows:s3, widths:[12,20,17,15,15,15,15,17]}];
 }
 function ilboExcel(){
@@ -12734,6 +13165,7 @@ function ilboExcel(){
   var m=ilboModel(c, ILBO.date), sheets=ilboSheetsData(m);
   var fname=(CO_FORMAL[c.id]||c.name).replace(/[()주식회사]/g,"")+"_자금일보_"+m.iso+".xlsx";
   return loadExcelJS().then(function(EX){
+    ilboXlsPrep(sheets);   // [v99] 예적금현황표 수식 · 외화 숫자 값
     var wb=new EX.Workbook();
     var thin={style:"thin",color:{argb:"FF7F7F7F"}}, border={top:thin,left:thin,bottom:thin,right:thin};
     sheets.forEach(function(sh){
@@ -12743,6 +13175,9 @@ function ilboExcel(){
       sh.rows.forEach(function(r){
         var row=ws.addRow(r.v.map(function(v){ return v==null?null:v; }));
         var rn=row.number;
+        if(r.xv||r.f) for(var xj=0;xj<r.v.length;xj++){ var xfm=r.f&&r.f[xj], xvv=r.xv?r.xv[xj]:undefined;   // [v99]
+          if(xfm) row.getCell(xj+1).value={formula:xfm, result:(xvv!==undefined&&xvv!==null)?xvv:(typeof r.v[xj]==="number"?r.v[xj]:0)};
+          else if(r.xv && xj in r.xv) row.getCell(xj+1).value=xvv; }
         if(r.t==="title"){ ws.mergeCells(rn,1,rn,ncol); row.height=26; var cc=row.getCell(1); cc.font={bold:true,size:15}; cc.alignment={horizontal:"center",vertical:"middle"}; return; }
         if(r.t==="h2"){ row.getCell(1).font={bold:true,size:10.5}; row.getCell(r.v.length).alignment={horizontal:"right"}; row.getCell(r.v.length).font={size:9}; return; }
         if(r.t==="blank") return;
@@ -12774,6 +13209,7 @@ function ilboExcel(){
       /* [v22] 행 번호: 4 기초시재 · 5~8 입금 · 9~13 지출 · 14 수지차 · 15~22 기말시재~사용가능원화 (기존 10~14 병합이 '수 지 차' 라벨을 지우던 문제 수정) */
       /* [v26] 법인별 양식 — ilboSheetsData가 기록한 병합 좌표 사용 (행 번호 고정 제거) */
       (sh.merges||[]).forEach(function(g){ try{ ws.mergeCells(g[0],g[1],g[2],g[3]); }catch(e){} });
+      ilboXlsStyle(ws, sh);   // [v99] 사용자 양식 서식
     });
     return wb.xlsx.writeBuffer().then(function(buf){
       return offerDownload(fname, new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
