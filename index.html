@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v100 · 2026-10-29</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v101 · 2026-10-30</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -806,7 +806,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
           <div class="seg wrap" id="arViewSeg"><button data-v="item" aria-pressed="true">건별</button><button data-v="party">매출처별</button></div>
           <div class="seg wrap" id="arSeg"><button data-f="all" aria-pressed="true">전체 채권</button><button data-f="od">예상일 경과</button><button data-f="long">장기 (60일 초과)</button><button data-f="samsung">삼성</button></div>
           <select id="arKind"><option value="">전체 계정</option><option>외상매출금</option><option>외화외상매출금</option></select>
-          <input type="search" id="arQ" placeholder="거래처명·사업자번호 검색" style="flex:1;min-width:150px">
+          <input type="search" id="arQ" placeholder="거래처명·사업자번호·프로젝트 코드 검색" style="flex:1;min-width:150px">
         </div>
         <div class="scroll" style="max-height:62vh"><table class="tbl" id="arTbl"></table></div>
         <div class="pad mini" id="arFoot"></div>
@@ -9150,7 +9150,7 @@ renderBondView=function(){
     if(AR.f==="samsung" && !r.isSamsung) return false;
     if(AR.f==="od" && r.wk!=="od") return false;
     if(AR.wk && (r.wk!==AR.wk || (AR.wkCo && r.c.id!==AR.wkCo))) return false;
-    if(q && String(r.x.party+" "+r.x.memo+" "+(r.x.partyCode||"")).toLowerCase().indexOf(q)<0) return false;
+    if(q && String(r.x.party+" "+r.x.memo+" "+(r.x.partyCode||"")+" "+arProjCode(r.x)+" "+(r.x.project||"")).toLowerCase().indexOf(q)<0) return false;   // [v101] 프로젝트 코드·명
     return true; });
   $$("#arSeg button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.f===AR.f?"true":"false"); });
   $$("#arViewSeg button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.v===AR.view?"true":"false"); });
@@ -9166,7 +9166,7 @@ function arItemTable(rows){
       '<td class="ar-plan"><input type="text" maxlength="200" data-ai="'+idx+'" value="'+esc(plan?plan.t:"")+'" placeholder="회수계획 입력"'+(readOnly?' disabled':'')+'>'+
       '<button type="button" class="btn sm" data-as="'+idx+'"'+(readOnly?' disabled':'')+'>저장</button>'+(plan?'<span class="ar-ok" title="'+esc((plan.by||"")+" · "+String(plan.at||"").slice(0,16).replace("T"," "))+'">✓</span>':'')+'</td>';
     return '<tr>'+(multi?'<td>'+coChip(r.c)+'</td>':'')+'<td class="num">'+ageChip+'</td><td class="mini ar-date">'+esc(x.date)+'</td><td class="ar-party" title="'+esc(x.party)+'">'+esc(x.party)+(r.isSamsung?' <span class="chip ar-sam">삼성</span>':'')+'</td>'+
-      '<td class="mini ar-memo" title="'+esc(x.memo)+'">'+esc(x.memo)+'</td><td class="num">'+fmt(x.amt)+'</td><td class="num">'+fmt(x.paid)+'</td><td class="num '+(x.bal<0?'neg':'')+'"><b>'+fmt(x.bal)+'</b>'+(x.ccy&&x.ccy!=="KRW"&&x.fxBal?'<div class="mini">'+esc(x.ccy)+' '+(+x.fxBal).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>':'')+'</td>'+
+      '<td class="mini ar-memo" title="'+esc(x.memo+(arProjCode(x)?" · 프로젝트 "+arProjCode(x)+(x.project?" "+x.project:""):""))+'">'+esc(x.memo)+'</td><td class="num">'+fmt(x.amt)+'</td><td class="num">'+fmt(x.paid)+'</td><td class="num '+(x.bal<0?'neg':'')+'"><b>'+fmt(x.bal)+'</b>'+(x.ccy&&x.ccy!=="KRW"&&x.fxBal?'<div class="mini">'+esc(x.ccy)+' '+(+x.fxBal).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>':'')+'</td>'+
       '<td class="c">'+arGradeChip(e.g)+'</td><td class="ar-expc">'+arExpCell(r.c,x)+'</td>'+
       '<td><span class="chip nv">'+esc(x.kind)+'</span></td>'+planCell+'</tr>'; };
   var flat=[], body="";
@@ -10921,6 +10921,69 @@ function v100FixCats(c){ var n=0;
 applyFixedCats=(function(f){ return function(c){ var n=f.apply(this, arguments); try{ n+=v100FixCats(c); }catch(e){} return n; }; })(applyFixedCats);
 /* 전표 매칭(전표 구분 우선) 뒤에 한 번 더 — 사용자 확인 구분·정부지원 환급은 전표보다 우선 */
 fxPostAll=(function(f){ return function(){ var r=f.apply(this, arguments); try{ (D.companies||[]).forEach(function(c){ v100FixCats(c); }); invalidate(); }catch(e){} return r; }; })(fxPostAll);
+
+/* ===================== [v101] 매출채권 — 예상입금일 수기 수정 · '외화평가' 제외 · 프로젝트 코드 검색 ===================== */
+/* ① 예상입금일 수기 수정: c.arExp[arPlanKey(x)]={d, at, by, rule} (회수계획과 같은 키 — 재업로드해도 같은 채권이면 유지)
+      수기 날짜가 있으면 규칙보다 우선 → 목록 · 주간 입금 예정 · 경과 · 대시보드 카드 · 자금일보 참고 모두 그 날짜로. [규칙대로]로 되돌림. 기록 ar_exp_set.
+   ② 적요에 '외화평가'가 든 채권(결산 외화평가 조정 전표)은 4개 법인 모두 목록·합계·주간 예정에서 뺀다(저장 자료는 그대로).
+   ③ 프로젝트 코드(관리항목2 코드 CD_MNGD2) · 프로젝트명(내역명2 NM_MNGD2) — 검색창에서 거래처·사업자번호와 함께 검색. 예전 업로드분은 적요 앞 코드(PD2603-0028 등)로 대신 */
+function arIsFxEval(x){ return /외화\s*평가/.test(String((x&&x.memo)||"")); }
+function arProjCode(x){ if(x && x.projCode) return String(x.projCode); var m=/^\s*([A-Z]{2,3}\d{4}-\d{3,5})(?=\s|$)/.exec(String((x&&x.memo)||"")); return m?m[1]:""; }
+arRows=(function(f){ return function(){ return f.apply(this, arguments).filter(function(r){ return !arIsFxEval(r.x); }); }; })(arRows);
+arUpcoming=(function(f){ return function(){ var R=f.apply(this, arguments), ok=function(r){ return !arIsFxEval(r.x); }; return {od:R.od.filter(ok), win:R.win.filter(ok)}; }; })(arUpcoming);
+function arExpOf(c, x){ return ((c && c.arExp)||{})[arPlanKey(x)]||null; }
+arExpect=(function(f){ return function(c, x){ var e=f.apply(this, arguments), o=arExpOf(c, x);
+  if(!o || !o.d || !c || c.id==="GU" || !((+x.bal||0)>0)) return e;
+  return Object.assign({}, e, {k:"man", date:o.d, man:o, ruleDate:e.date||null}); }; })(arExpect);
+arExpCell=function(c, x){
+  var e=arExpect(c, x), can=!readOnly && c.id!=="GU" && (+x.bal||0)>0;
+  var edit=can?'<button type="button" class="ar-expedit" data-aek="'+esc(c.id+"¦"+arPlanKey(x))+'" title="예상입금일 수정">✎</button>':'';
+  if(!e.date) return '<span class="mini ar-nodate" title="'+esc(e.label||"")+'">'+esc(e.k==="rel"?"관계사":e.k==="none"?"규칙 미등록":"—")+'</span>'+edit;
+  var od=arDaysBetween(e.date, arAsOf(c,x));
+  var tip=e.man ? ("수기 수정 "+e.man.d+(e.ruleDate?" · 규칙 "+e.ruleDate:" · 규칙 날짜 없음")+(e.man.by?" · "+e.man.by:"")+(e.man.at?" "+String(e.man.at).slice(0,16).replace("T"," "):""))
+    : ((e.r?(e.r.n+" · "+arRuleText(e.r)+(e.r.hit!=null?" · 적중 "+e.r.hit+"%":"")):e.label)||"");
+  return '<span class="ar-exp'+(od>0?" od":"")+(e.man?" man":"")+'" title="'+esc(tip)+'">'+esc(e.date.slice(5))+'</span>'+
+    (e.man?' <span class="chip ar-man" title="'+esc(tip)+'">수기</span>':'')+
+    (od>0?' <span class="chip ar-od" title="예상입금일이 파일 기준일보다 '+od+'일 지남">+'+od+'일</span>':'')+edit;
+};
+function arExpSave(c, x, d){
+  if(readOnly){ toast("보기 전용입니다 — 예상입금일을 바꿀 수 없습니다."); return Promise.resolve(); }
+  var k=arPlanKey(x), prev=arExpOf(c, x); c.arExp=c.arExp||{};
+  AR_EXP={}; var rule=(function(){ var o=c.arExp[k]; delete c.arExp[k]; var e=arExpect(c, x); if(o) c.arExp[k]=o; return e.date||""; })();
+  if(!d) delete c.arExp[k];
+  else { if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ toast("날짜 형식(YYYY-MM-DD)"); return Promise.resolve(); } c.arExp[k]={d:d, at:new Date().toISOString(), by:wcWho(), rule:rule}; }
+  audit("ar_exp_set", {co:c.id, menu:"ar", target:String(x.voucher||x.memo||"").slice(0,40), detail:{party:String(x.party||"").slice(0,30), bal:Math.round(+x.bal||0), rule:rule, from:prev?prev.d:"", to:d||"(규칙대로)"}});
+  AR_EXP={}; return save().then(function(){ toast(d?"예상입금일 "+d+" 저장 — 주간 입금 예정에 반영":"규칙 날짜로 되돌림"); renderAr(); });
+}
+function arExpBind(){
+  var host=$("#arTbl"); if(!host) return;
+  var idx=null, find=function(key){ if(!idx){ idx={}; arRows().forEach(function(r){ idx[r.c.id+"¦"+arPlanKey(r.x)]=r; }); } return idx[key]; };
+  $$("#arTbl .ar-expedit").forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation(); var r=find(b.dataset.aek); if(!r) return;
+    var e=arExpect(r.c, r.x), td=b.parentNode, ruleD=e.man?(e.ruleDate||""):(e.date||"");
+    td.innerHTML='<span class="ar-expform"><input type="date" class="ar-expin" value="'+esc(e.date||ruleD||todayISO())+'"> '+
+      '<button type="button" class="btn sm primary ar-exps">저장</button> '+(e.man?'<button type="button" class="btn sm ar-expr" title="규칙 날짜 '+esc(ruleD||"없음")+'로">규칙대로</button> ':'')+
+      '<button type="button" class="btn sm ar-expc0">취소</button></span>';
+    td.onclick=function(e2){ e2.stopPropagation(); };
+    var inp=td.querySelector(".ar-expin"); inp.focus();
+    td.querySelector(".ar-exps").onclick=function(){ arExpSave(r.c, r.x, inp.value); };
+    inp.onkeydown=function(k){ if(k.key==="Enter") arExpSave(r.c, r.x, inp.value); if(k.key==="Escape") renderAr(); };
+    var rr=td.querySelector(".ar-expr"); if(rr) rr.onclick=function(){ arExpSave(r.c, r.x, ""); };
+    td.querySelector(".ar-expc0").onclick=function(){ renderAr(); };
+  }; });
+}
+renderBondView=(function(f){ return function(){ var r=f.apply(this, arguments); try{ arExpBind();
+  var ft=$("#arWeekFoot"); if(ft && ft.innerHTML && !/수기 수정/.test(ft.innerHTML)) ft.insertAdjacentHTML("beforeend", ' · 예상입금일 옆 ✎로 날짜를 바꾸면(수기) 규칙보다 우선해 주간 예정에 반영');
+  var n=0; scopeCos().forEach(function(c){ n+=Object.keys(c.arExp||{}).length; });
+  var sub=$("#arWeekSub"); if(sub && n && !/수기/.test(sub.textContent)) sub.textContent+=" · 수기 수정 "+n+"건 반영";
+}catch(e){ console.warn("arExp", e); } return r; }; })(renderBondView);
+renderAr=renderBondView;
+(function(){ var st=document.createElement("style"); st.textContent=
+  ".ar-expedit{border:0;background:transparent;color:var(--mute,#888);cursor:pointer;padding:0 4px;font-size:12px;opacity:.55}"+
+  ".ar-expedit:hover{opacity:1;color:var(--navy,#1f3a68)}"+
+  ".ar-exp.man{font-weight:600;color:var(--navy,#1f3a68)}"+
+  ".chip.ar-man{background:var(--navy-soft,#e8eef8);color:var(--navy,#1f3a68);border-color:transparent;font-size:10px;padding:0 5px}"+
+  ".ar-expform{display:inline-flex;gap:4px;align-items:center;white-space:nowrap}.ar-expform input{font-size:12px;padding:2px 4px}";
+  document.head.appendChild(st); })();
 
 function enter(){
   AUTH.entered=true;
@@ -13336,7 +13399,7 @@ function parseBondExcel(ab, fileName){
   var col=function(code,kor){ var i=code?cd.indexOf(code):-1; return i>=0?i:h.indexOf(kor); };
   var C={acct:col("DT_ACCT","회계일자"), ban:col("DT_BANACCT","최종반제일자"), due:col("DT_END","만기일자"), note:col("NM_NOTE","적요"),
     amt:col("","전표금액"), paid:col("","반제금액"), bal:col("","잔액"), banMng:col("BAN_MNG","반제항목"),
-    mng3:col("NM_MNG3","항목3"), nm3:col("NM_MNGD3","내역명3"), cd3:col("CD_MNGD3","코드3"), nm1:col("NM_MNGD1","내역명1"), nm2:col("NM_MNGD2","내역명2"),
+    mng3:col("NM_MNG3","항목3"), nm3:col("NM_MNGD3","내역명3"), cd3:col("CD_MNGD3","코드3"), nm1:col("NM_MNGD1","내역명1"), nm2:col("NM_MNGD2","내역명2"), cd2:col("CD_MNGD2","코드2"),
     unit:col("NM_PC","회계단위"), ccy:col("NM_EXCH","환종구분"), fx:col("","외화금액"), fxBal:col("","외화미상환잔액"), docu:col("CD_DOCU","전표유형"), no:col("NO_DOCU","전표번호")};
   if(C.acct<0||C.amt<0||C.paid<0||C.bal<0||C.note<0) return null;
   var g=function(row,k){ return C[k]>=0?row[C[k]]:""; };
@@ -13354,7 +13417,7 @@ function parseBondExcel(ab, fileName){
     var party=txt(g(row,"nm3"))||txt(g(row,"banMng")), memo=txt(g(row,"note"));
     var age=Math.round((new Date(asOf)-new Date(d))/86400000);
     rows.push({date:d, lastPaid:toISO(g(row,"ban"))||"", due:toISO(g(row,"due"))||"", memo:memo,
-      amt:amt, paid:paid, bal:bal, party:party, partyCode:txt(g(row,"cd3")), project:txt(g(row,"nm2")), dept:txt(g(row,"nm1")),
+      amt:amt, paid:paid, bal:bal, party:party, partyCode:txt(g(row,"cd3")), project:txt(g(row,"nm2")), projCode:txt(g(row,"cd2")), dept:txt(g(row,"nm1")),
       ccy:txt(g(row,"ccy"))||"KRW", fxAmt:toNum(g(row,"fx")), fxBal:toNum(g(row,"fxBal")), docType:txt(g(row,"docu")), voucher:txt(g(row,"no")),
       age:age, isLongTerm:age>60, isSamsung:/삼성|samsung/i.test(party+" "+memo)});
   }
@@ -13520,7 +13583,7 @@ function renderBondView(){
       '<td class="ar-plan"><input type="text" maxlength="200" data-ai="'+idx+'" value="'+esc(plan?plan.t:"")+'" placeholder="회수계획 입력"'+(readOnly?' disabled':'')+'>'+
       '<button type="button" class="btn sm" data-as="'+idx+'"'+(readOnly?' disabled':'')+'>저장</button>'+(plan?'<span class="ar-ok" title="'+esc((plan.by||"")+" · "+String(plan.at||"").slice(0,16).replace("T"," "))+'">✓</span>':'')+'</td>';
     return '<tr>'+(multi?'<td>'+coChip(r.c)+'</td>':'')+'<td class="num">'+ageChip+'</td><td class="mini ar-date">'+esc(x.date)+'</td><td class="ar-party" title="'+esc(x.party)+'">'+esc(x.party)+(r.isSamsung?' <span class="chip ar-sam">삼성</span>':'')+'</td>'+
-      '<td class="mini ar-memo" title="'+esc(x.memo)+'">'+esc(x.memo)+'</td><td class="num">'+fmt(x.amt)+'</td><td class="num">'+fmt(x.paid)+'</td><td class="num '+(x.bal<0?'neg':'')+'"><b>'+fmt(x.bal)+'</b>'+(x.ccy&&x.ccy!=="KRW"&&x.fxBal?'<div class="mini">'+esc(x.ccy)+' '+fmtFx(x.fxBal)+'</div>':'')+'</td>'+
+      '<td class="mini ar-memo" title="'+esc(x.memo+(arProjCode(x)?" · 프로젝트 "+arProjCode(x)+(x.project?" "+x.project:""):""))+'">'+esc(x.memo)+'</td><td class="num">'+fmt(x.amt)+'</td><td class="num">'+fmt(x.paid)+'</td><td class="num '+(x.bal<0?'neg':'')+'"><b>'+fmt(x.bal)+'</b>'+(x.ccy&&x.ccy!=="KRW"&&x.fxBal?'<div class="mini">'+esc(x.ccy)+' '+fmtFx(x.fxBal)+'</div>':'')+'</td>'+
       '<td><span class="chip nv">'+esc(x.kind)+'</span></td>'+planCell+'</tr>'; };
   var flat=[], body="";
   AR_GROUPS.forEach(function(g){
@@ -13588,8 +13651,8 @@ function dailyCoTable(iso, s){
 var renderAr=renderBondView;   // v26 호출부 호환
 function arExport(){
   var rows=arRows().filter(function(r){ return (!AR.kind||r.x.kind===AR.kind) && (AR.f!=="long"||r.isLongTerm) && (AR.f!=="samsung"||r.isSamsung); });
-  var aoa=[["법인","계정","회계일자","거래처명","적요","전표금액","반제금액","잔액","경과일수","장기(60일초과)","삼성","통화","외화미상환잔액","프로젝트","부서","전표번호","구분(경과)","회수계획"]];   // [v81] 끝에 2열 추가
-  rows.forEach(function(r){ var x=r.x; var gk=arBucket(r.age), pl=gk!=="normal"?arPlanOf(r.c,x):null; aoa.push([r.c.name,x.kind,x.date,x.party,x.memo,x.amt,x.paid,x.bal,r.age,r.isLongTerm?"Y":"",r.isSamsung?"Y":"",x.ccy,x.fxBal||0,x.project,x.dept,x.voucher,gk==="bad"?"악성(90일 초과)":gk==="long"?"장기(61~90일)":"정상(60일 이내)",pl?pl.t:""]); });
+  var aoa=[["법인","계정","회계일자","거래처명","적요","전표금액","반제금액","잔액","경과일수","장기(60일초과)","삼성","통화","외화미상환잔액","프로젝트","부서","전표번호","구분(경과)","회수계획","프로젝트코드","예상입금일","예상입금일 구분"]];   // [v101] 끝에 3열   // [v81] 끝에 2열 추가
+  rows.forEach(function(r){ var x=r.x; var gk=arBucket(r.age), pl=gk!=="normal"?arPlanOf(r.c,x):null; aoa.push([r.c.name,x.kind,x.date,x.party,x.memo,x.amt,x.paid,x.bal,r.age,r.isLongTerm?"Y":"",r.isSamsung?"Y":"",x.ccy,x.fxBal||0,x.project,x.dept,x.voucher,gk==="bad"?"악성(90일 초과)":gk==="long"?"장기(61~90일)":"정상(60일 이내)",pl?pl.t:"",arProjCode(x),(function(){ var e=arExpect(r.c,x); return e.date||""; })(),(function(){ var e=arExpect(r.c,x); return e.man?"수기":(e.date?"규칙":""); })()]); });
   var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,aoaSheet(aoa,[12,14,11,28,40,15,15,15,8,8,6,6,14,30,16,18,14,36]),"매출채권");
   return saveBook(wb,"매출채권현황_"+(curCo==="ALL"?"그룹":curCo)+"_"+todayISO().replace(/-/g,"")+".xlsx");
 }
