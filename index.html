@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v101 · 2026-10-30</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v103 · 2026-11-03</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4108,6 +4108,7 @@ function rcApply(c){
         unIn=unIn.filter(function(x){ return x!==u; }); unOut=unOut.filter(function(x){ return x!==o; }); } });
     var hasRow={}; r.txns.forEach(function(t){ if(!t.rcSyn) hasRow[t.acct]=1; });
     var SL=((c.slips||{})[d]||{}).lines||[];
+    if(typeof ssfRuleDay==="function") st.ssf=(st.ssf||0)+ssfRuleDay(c, d, r, function(l){ return rcBalBefore(c,l); }, syn, hasRow);   // [v102] 삼성선물 월간거래보고서 월말 예탁총액
     /* R5-a 적요 계좌번호로 CMS 없는 자사 계좌와 연결 */
     var mkMature=function(lab, amt, why){ var P=Math.round(rcBalBefore(c, lab)); if(P<=0) return false;
       var iv=Math.round(amt-P); if(iv<-1 || iv>P*RC_INT_MAX) return false;
@@ -5738,12 +5739,17 @@ function fxPanel(s, c, fxTxns){
           '<td class="num">'+fmt(d.krw)+'</td><td class="mini">'+esc(d.date||"")+'</td></tr>';
       }).join("");
     var hasCo=det.some(function(d){return d.co});
+    var fxChk=keys.map(function(k){ var L=det.filter(function(d){ return (d.ccy||"USD")===k; }), la=L.reduce(function(a,d){ return a+fxCents(d.amt); },0), lk=L.reduce(function(a,d){ return a+(+d.krw||0); },0);   // [v102] 건별 합계 = 잔액 확인
+        var oa=fxCents(st[k].amt), ok2=(la===oa && Math.abs(lk-(+st[k].krw||0))<1);
+        return ok2 ? '<span class="fxchk ok">✓ '+esc(k)+' 건별 합계 = 잔액 ('+(la/100).toLocaleString("ko-KR",{minimumFractionDigits:2,maximumFractionDigits:2})+' · '+fmt(lk)+'원)</span>'
+          : '<span class="fxchk bad">⚠ '+esc(k)+' 건별 합계 '+(la/100).toLocaleString("ko-KR",{minimumFractionDigits:2,maximumFractionDigits:2})+' · '+fmt(lk)+'원 ≠ 잔액 '+(oa/100).toLocaleString("ko-KR",{minimumFractionDigits:2,maximumFractionDigits:2})+' · '+fmt(st[k].krw)+'원</span>'; }).join(" ");
+    var cmsN=det.filter(function(d){ return d.cms; }).length;
     var sumAmt=det.reduce(function(a,d){return a+(d.amt||0)},0), sumKrw=det.reduce(function(a,d){return a+(d.krw||0)},0);
-    detail='<details class="fxdetails"><summary>건별 환율 내역 (은행·입금일자별) · '+det.length+'건 — 펼쳐서 보기</summary>'+
+    detail='<div class="pad fxchkline">'+fxChk+'</div><details class="fxdetails"><summary>건별 환율 내역 (은행·입금일자별) · '+det.length+'건 — 펼쳐서 보기</summary>'+
       '<div class="scroll" style="max-height:38vh"><table class="tbl">'+
       '<thead><tr>'+(hasCo?'<th>법인</th>':'')+'<th>통화</th><th>은행</th><th style="text-align:right">적용환율</th><th style="text-align:right">외화금액</th><th style="text-align:right">원화금액</th><th>입금일</th></tr></thead><tbody>'+rows+
       '<tr class="total">'+(hasCo?'<td></td>':'')+'<td colspan="3">합계</td><td class="num fxc">'+sumAmt.toLocaleString("ko-KR",{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td class="num">'+fmt(sumKrw)+'</td><td></td></tr></tbody></table></div>'+
-      '<div class="pad hint" style="padding-top:8px">환율은 임의 적용이 아니라 <b>자금현황보고 파일의 [외화예적금 세부 내역]</b>에 입금일자별로 적어두신 환율·원화금액을 그대로 가져옵니다.</div></details>';
+      '<div class="pad hint" style="padding-top:8px">환율은 임의 적용이 아니라 <b>자금현황보고 파일의 [외화예적금 세부 내역]</b>에 입금일자별로 적어두신 환율·원화금액을 그대로 가져옵니다'+(cmsN?' · 그 뒤 CMS로 확정한 외화 입출금 '+cmsN+'건 포함':'')+'.</div></details>';
   } else {
     detail='<div class="pad hint">건별 환율 내역은 해당 월 자금현황보고 파일을 올리면 표시됩니다.</div>';
   }
@@ -10985,6 +10991,205 @@ renderAr=renderBondView;
   ".ar-expform{display:inline-flex;gap:4px;align-items:center;white-space:nowrap}.ar-expform input{font-size:12px;padding:2px 4px}";
   document.head.appendChild(st); })();
 
+/* ===================== [v102] ① 삼성선물 월간거래보고서(PDF) → 월말 예탁총액으로 잔액 조정 ===================== */
+/* 데이터 업로드에 삼성선물 [월간거래보고서] PDF를 올리면 [예탁금현황] 월말금 행의 예탁총액(예: 2026-10-31 112,816,166)을 읽어
+   그 달 마지막 영업일(기준일 이전 · 예: 10-30)에 삼성선물 계좌 '예탁금 잔액 조정' 한 줄을 만든다(자금현황보고 11.02 시트 71행 · 145행과 같은 방식).
+     금액 = 월말 예탁총액 − 그날 직전 삼성선물 잔액(대시보드)  →  + 이면 입금 기타 · − 이면 출금 기타 · 그날 마감 = 월말 예탁총액
+   저장: c.ssfRep[YYYY-MM]={asOf, bizDate, total, carry, carryDate, sumSettle, fee, interest, n, file, at, by}
+   자동 보정(rcApply)으로 매번 다시 만든다 — 그날 이미 보고서의 '예탁금' 행이 있거나 그날이 보고서(시트) 날이면 만들지 않는다(이중 반영 방지).
+   그날 CMS가 아직 없으면 저장만 해 두고, CMS가 올라오는 대로 반영. */
+function ssfLines(ab){
+  var lib=window.pdfjsLib; if(!lib) return Promise.reject(new Error("pdf.js를 불러오지 못했습니다(네트워크 확인)"));
+  return lib.getDocument({data:new Uint8Array(ab)}).promise.then(function(doc){
+    var toks=[], p=Promise.resolve();
+    for(var n=1;n<=doc.numPages;n++)(function(n){ p=p.then(function(){ return doc.getPage(n).then(function(pg){ var vh=pg.getViewport({scale:1}).height;
+      return pg.getTextContent().then(function(tc){ tc.items.forEach(function(it){ var s=it.str; if(!s||!s.trim()) return;
+        toks.push({s:s.trim(), x:it.transform[4], y:(n-1)*100000+(vh-it.transform[5])}); }); }); }); }); })(n);
+    return p.then(function(){
+      toks.sort(function(a,b){ return a.y-b.y || a.x-b.x; });
+      var lines=[], cur=null;
+      toks.forEach(function(t){ if(!cur || Math.abs(t.y-cur.y)>2.5){ cur={y:t.y, t:[]}; lines.push(cur); } cur.t.push(t); });
+      lines.forEach(function(l){ l.t.sort(function(a,b){ return a.x-b.x; }); l.s=l.t.map(function(t){ return t.s; }).join(" "); l.c=l.s.replace(/\s+/g,""); });
+      return lines; });
+  });
+}
+function ssfNums(s){ return (String(s).match(/-?\d[\d,]*(?:\.\d+)?/g)||[]).filter(function(x){ return !/^\d{4}[\/\-]\d{2}/.test(x); }).map(function(x){ return +x.replace(/,/g,""); }); }
+function parseSsfPdf(ab, name){
+  return ssfLines(ab).then(function(lines){
+    var all=lines.map(function(l){ return l.c; }).join("\n");
+    if(!/삼성선물/.test(all) || !/월간거래보고서/.test(all)) return null;
+    var cid=/굿어스스마트솔루션/.test(all)?"GS":/굿어스데이터/.test(all)?"GD":/에스넷시스템/.test(all)?"SN":/굿어스/.test(all)?"GU":null;
+    var per=/거래일자[:：]?(\d{4})\/(\d{2})\/(\d{2})~(\d{4})\/(\d{2})\/(\d{2})/.exec(all);
+    var bal=function(word){ for(var i=0;i<lines.length;i++){ var L=lines[i]; if(L.c.indexOf(word)<0) continue;
+        var dm=/(\d{4})-(\d{2})-(\d{2})/.exec(L.s); var nums=ssfNums(L.s.replace(/\d{4}-\d{2}-\d{2}/,""));
+        if(nums.length>=4) return {date:dm?dm[0]:"", total:nums[3], cash:nums[0]};
+        for(var j=i-1;j>=Math.max(0,i-3);j--){ var nn=ssfNums(lines[j].s); if(nn.length>=4 && !/[가-힣]/.test(lines[j].s)) return {date:dm?dm[0]:"", total:nn[3], cash:nn[0]}; } }
+      return null; };
+    var carry=bal("이월금"), end=bal("월말금");
+    if(!end || !end.date) return {err:"[예탁금현황] 월말금 행을 찾지 못했습니다", co:cid, file:name};
+    /* 예탁총액 거래내역: '2026/10/12 예탁금이용료입금 226,362 0 191,522 112,658,166' + 다음 줄 '34,840 0 0'(세금/수수료) */
+    var tx=[], inTx=false;
+    lines.forEach(function(L, i){ if(/예탁총액거래내역/.test(L.c)){ inTx=true; return; } if(/선물\/옵션거래내역|인수도거래내역|공지사항/.test(L.c)) inTx=false;
+      if(!inTx) return; var m=/^(\d{4})\/(\d{2})\/(\d{2})\s+(\S+)/.exec(L.s); if(!m) return;
+      var nums=ssfNums(L.s.slice(m[0].length)); if(nums.length<4) return;
+      var nx=lines[i+1], fee=0; if(nx && !/^\d{4}\/\d{2}\/\d{2}/.test(nx.s)){ var f=ssfNums(nx.s); if(f.length>=3) fee=f[f.length-3]; }
+      tx.push({date:m[1]+"-"+m[2]+"-"+m[3], type:m[4], amt:nums[0], settle:nums[2], bal:nums[3], fee:fee}); });
+    var sumSettle=tx.reduce(function(s,t){ return s+t.settle; },0);
+    return {co:cid, file:name, from:per?per[1]+"-"+per[2]+"-"+per[3]:"", to:per?per[4]+"-"+per[5]+"-"+per[6]:"", carry:carry?carry.total:null, carryDate:carry?carry.date:"",
+      asOf:end.date, total:end.total, tx:tx, n:tx.length, sumSettle:sumSettle,
+      interest:tx.filter(function(t){ return /이용료/.test(t.type); }).reduce(function(s,t){ return s+t.amt; },0),
+      fee:tx.reduce(function(s,t){ return s+(t.fee||0); },0),
+      chk:carry ? Math.round(carry.total+sumSettle-end.total) : null};
+  });
+}
+function ssfAcct(c){ return effAccounts(c).filter(function(a){ return a.group!=="외화" && /삼성선물/.test(String(a.bank||"")+" "+String(a.label||"")); })[0]||null; }
+function ssfBizDate(asOf){ var d=asOf, g=0; while(!isBizDay(d) && g++<10) d=isoAdd(d,-1); return d; }
+/* 미리보기용: 그날 직전 잔액 · 조정액 */
+function ssfPreview(c, R){
+  var a=ssfAcct(c), bd=ssfBizDate(R.asOf), st=coState(c), pd=st.dates.filter(function(d){ return d<bd; }).pop();
+  var prev=(a && pd && st.chain[pd] && st.chain[pd][a.label]) ? (+st.chain[pd][a.label].close||0) : null;
+  var rec=dayRec(c, bd);
+  return {acct:a, bizDate:bd, prev:prev, net:prev==null?null:Math.round(R.total-prev), hasDay:!!rec, sheet:!!(rec&&rec.source==="sheet"),
+    dup:!!(rec && a && (rec.txns||[]).some(function(t){ return !t.rcSyn && t.acct===a.label && /예탁금/.test(String(t.summary||"")+String(t.client||"")); }))};
+}
+var SSF_PEND=[];
+handleFiles=(function(f){ return function(files){
+  var arr=Array.prototype.slice.call(files||[]), pdfs=arr.filter(function(x){ return /\.pdf$/i.test(x.name); }), rest=arr.filter(function(x){ return !/\.pdf$/i.test(x.name); });
+  if(!pdfs.length) return f.call(this, files);
+  var log=$("#importLog"); if(!pvResult && !rest.length) log.innerHTML="";
+  var seq=pdfs.reduce(function(p, file){ return p.then(function(){ return readFile(file).then(function(ab){ return parseSsfPdf(ab, file.name); }).then(function(R){
+      if(!R){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(file.name)+'</span><span class="mini">삼성선물 월간거래보고서가 아닙니다 — PDF는 삼성선물 월간거래보고서만 읽습니다</span></div>'); return; }
+      if(R.err){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(file.name)+'</span><span class="mini">'+esc(R.err)+'</span></div>'); return; }
+      var c=R.co&&co(R.co); if(!c){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--warn)"><span>'+esc(file.name)+'</span><span class="chip auto">법인 미판별</span></div>'); return; }
+      SSF_PEND=SSF_PEND.filter(function(x){ return !(x.co===R.co && x.asOf===R.asOf); }); SSF_PEND.push(R);
+      log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(file.name)+'</span><span class="chip mv">삼성선물 월간거래보고서</span><span class="mini">'+esc(c.short)+' · '+esc(R.asOf)+' 월말 예탁총액 '+fmt(R.total)+(R.carry!=null?' · 이월 '+fmt(R.carry):'')+' · 거래 '+R.n+'건'+(R.chk?' · ⚠ 이월+정산 합 ≠ 월말 ('+fmt(R.chk)+')':'')+'</span></div>');
+    }).catch(function(e){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--out);color:var(--out)"><span>'+esc(file.name)+'</span><span class="mini">읽기 실패: '+esc(e&&e.message||e)+'</span></div>'); }); }); }, Promise.resolve());
+  var self=this;
+  return seq.then(function(){
+    if(rest.length) return f.call(self, rest);
+    if(!SSF_PEND.length) return;
+    if(!pvResult) pvResult={cms:{}, xlsm:{}, sheet:{}, cashbook:{}, fxLedger:{}, slips:{}, ar:{}, loans:null, contacts:null, holidays:null, guarantees:null, notes:[], fileNames:pdfs.map(function(x){ return x.name; })};
+    else pvResult.fileNames=(pvResult.fileNames||[]).concat(pdfs.map(function(x){ return x.name; }));
+    renderPreview();
+  });
+}; })(handleFiles);
+renderPreview=(function(f){ return function(){ var r=f.apply(this, arguments);
+  try{ if(SSF_PEND.length){ var tb=$("#previewSummary tbody"); if(tb){
+    var none=tb.querySelector("td[colspan='9']"); if(none && /없음/.test(none.textContent)) none.parentNode.remove();
+    tb.insertAdjacentHTML("afterbegin", SSF_PEND.map(function(R){ var c=co(R.co), P=ssfPreview(c, R);
+      var st=!P.acct?'<span class="chip out">삼성선물 계좌 없음</span>':P.sheet?'<span class="chip auto">그날은 보고서 자료 — 반영 안 함</span>':P.dup?'<span class="chip auto">그날 보고서 예탁금 행 있음 — 반영 안 함</span>':!P.hasDay?'<span class="chip auto">'+esc(P.bizDate)+' CMS 올리면 반영</span>':'<span class="chip nv">'+esc(P.bizDate)+' 반영</span>';
+      var warn=(R.carry!=null && P.prev!=null && R.carryDate && Math.abs(R.carry-(function(){ var st2=coState(c), d0=st2.dates.filter(function(d){ return d<=R.carryDate; }).pop(); return d0&&st2.chain[d0]&&P.acct&&st2.chain[d0][P.acct.label]?+st2.chain[d0][P.acct.label].close||0:R.carry; })())>=1)?' <span class="chip out" title="보고서 이월금과 대시보드 전월말 잔액이 다릅니다">이월금 불일치</span>':'';
+      return '<tr><td class="mini" style="color:'+c.color+'">'+esc(c.short)+'</td><td>'+esc(P.bizDate)+' (기준 '+esc(R.asOf)+')</td><td><span class="chip mv">삼성선물</span></td><td class="num">1</td>'+
+        '<td class="num pos">'+(P.net>0?fmt(P.net):'')+'</td><td class="num neg">'+(P.net<0?fmt(-P.net):'')+'</td><td class="mini">월말 예탁총액 '+fmt(R.total)+(P.prev!=null?' · 직전 '+fmt(P.prev):'')+'</td><td></td><td>'+st+warn+'</td></tr>'; }).join(""));
+  } } }catch(e){ console.warn("ssf preview", e); }
+  return r; }; })(renderPreview);
+commitImport=(function(f){ return function(res){ var out=f.apply(this, arguments);
+  try{ if(SSF_PEND.length){ var by=wcWho(), at=new Date().toISOString();
+    SSF_PEND.forEach(function(R){ var c=co(R.co); if(!c) return; c.ssfRep=c.ssfRep||{};
+      c.ssfRep[R.asOf.slice(0,7)]={asOf:R.asOf, bizDate:ssfBizDate(R.asOf), total:R.total, carry:R.carry, carryDate:R.carryDate, sumSettle:R.sumSettle, interest:R.interest, fee:R.fee, n:R.n, file:R.file, at:at, by:by};
+      audit("ssf_report", {co:c.id, menu:"import", target:R.file, detail:{asOf:R.asOf, total:R.total, carry:R.carry, n:R.n}}); });
+    SSF_PEND=[]; fxPostAll(); invalidate(); } }catch(e){ console.warn("ssf commit", e); }
+  return out; }; })(commitImport);
+(function(){ var b=$("#btnPvCancel"); if(!b) return; var o=b.onclick; b.onclick=function(){ SSF_PEND=[]; return o&&o.apply(this, arguments); }; })();
+(function(){ var fi=$("#fileIn"); if(fi && !/\.pdf/.test(fi.accept)) fi.accept+=",.pdf"; })();
+/* rcApply 안에서 호출(R5-s) — 그날 삼성선물 잔액을 월말 예탁총액으로 */
+function ssfRuleDay(c, d, r, Bget, syn, hasRow){
+  var M=c.ssfRep||{}, R=null; Object.keys(M).forEach(function(k){ if(M[k] && M[k].bizDate===d) R=M[k]; }); if(!R) return 0;
+  var a=ssfAcct(c); if(!a) return 0; var lab=a.label;
+  if((r.txns||[]).some(function(t){ return !t.rcSyn && t.acct===lab && /예탁금/.test(String(t.summary||"")+String(t.client||"")); })) return 0;
+  var same=(r.txns||[]).filter(function(t){ return !t.rcSyn && t.acct===lab; }).reduce(function(s,t){ return s+(+t.deposit||0)-(+t.withdraw||0); },0);
+  var net=Math.round(R.total-(Math.round(Bget(lab))+same)); hasRow[lab]=1;
+  if(!net) return 0;
+  syn(r,{date:d, acct:lab, kind:net>0?"수입":"지출", cat:"기타", deposit:net>0?net:0, withdraw:net<0?-net:0, summary:"예탁금 잔액 조정", client:"삼성선물 월간거래보고서",
+    hasAfter:true, after:R.total, ssfAdj:true, rcWhy:"삼성선물 월간거래보고서 "+R.asOf+" 예탁총액 "+fmt(R.total)+" − 직전 잔액 "+fmt(Math.round(Bget(lab))+same)});
+  return 1;
+}
+
+/* ===================== [v102] ② 매출채권 — 예상입금일 일괄 변경(체크박스) · 매출처 한 번에 ===================== */
+function arSelKey(c, x){ return c.id+"¦"+arPlanKey(x); }
+function arEditable(c, x){ return !readOnly && c.id!=="GU" && (+x.bal||0)>0; }
+function arExpSaveMany(list, d){
+  if(readOnly){ toast("보기 전용입니다 — 예상입금일을 바꿀 수 없습니다."); return Promise.resolve(); }
+  if(d && !/^\d{4}-\d{2}-\d{2}$/.test(d)){ toast("날짜 형식(YYYY-MM-DD)"); return Promise.resolve(); }
+  var at=new Date().toISOString(), by=wcWho(), n=0, bal=0, cos={};
+  list.forEach(function(r){ var c=r.c, x=r.x; if(!arEditable(c, x)) return; c.arExp=c.arExp||{}; var k=arPlanKey(x);
+    AR_EXP={}; var o=c.arExp[k]; delete c.arExp[k]; var rule=arExpect(c, x).date||""; if(o) c.arExp[k]=o;
+    if(!d) delete c.arExp[k]; else c.arExp[k]={d:d, at:at, by:by, rule:rule, bulk:true};
+    n++; bal+=+x.bal||0; cos[c.id]=1; });
+  if(!n){ toast("바꿀 수 있는 채권이 없습니다(굿어스·잔액 0 이하 제외)."); return Promise.resolve(); }
+  audit("ar_exp_bulk", {menu:"ar", target:(d||"규칙대로")+" · "+n+"건", detail:{n:n, bal:Math.round(bal), cos:Object.keys(cos), to:d||"(규칙대로)"}});
+  AR_EXP={}; AR.sel={};
+  return save().then(function(){ toast(n+"건 예상입금일 "+(d?d+"로":"규칙대로")+" 변경 — 주간 입금 예정에 반영"); renderAr(); });
+}
+function arIndex(){ var m={}; arRows().forEach(function(r){ m[arSelKey(r.c, r.x)]=r; }); return m; }
+function arSameParty(r, idx){ var biz=arDigits(r.x.partyCode), nm=r.x.party;
+  return Object.keys(idx).map(function(k){ return idx[k]; }).filter(function(o){ return o.c.id===r.c.id && (biz ? arDigits(o.x.partyCode)===biz : o.x.party===nm) && arEditable(o.c, o.x); }); }
+function arBulkUi(){
+  AR.sel=AR.sel||{};
+  var tbl=$("#arTbl"); if(!tbl) return; var idx=null, I=function(){ return idx||(idx=arIndex()); };
+  if(AR.view!=="party"){
+    /* 건별: 경과일수 칸 앞에 체크박스 */
+    $$("#arTbl .ar-expedit").forEach(function(b){ var tr=b.closest("tr"); if(!tr || tr.querySelector(".ar-sel")) return; var k=b.dataset.aek, td=tr.querySelector("td.num")||tr.firstElementChild;
+      td.insertAdjacentHTML("afterbegin", '<input type="checkbox" class="ar-sel" data-sk="'+esc(k)+'"'+(AR.sel[k]?' checked':'')+' title="일괄 변경 선택"> ');
+      if(AR.sel[k]) tr.classList.add("ar-picked"); });
+    var th=tbl.querySelector("thead th:nth-child("+(scopeCos().length>1?2:1)+")");
+    if(th && !th.querySelector(".ar-selall") && tbl.querySelector(".ar-sel")) th.insertAdjacentHTML("afterbegin", '<input type="checkbox" class="ar-selall" title="보이는 채권 모두 선택"> ');
+    var all=tbl.querySelector(".ar-selall"), boxes=$$("#arTbl .ar-sel");
+    if(all){ all.checked=boxes.length && boxes.every(function(b){ return b.checked; }); all.onclick=function(e){ e.stopPropagation(); boxes.forEach(function(b){ if(all.checked) AR.sel[b.dataset.sk]=1; else delete AR.sel[b.dataset.sk]; }); arBulkUi(); renderAr(); }; }
+    boxes.forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); if(b.checked) AR.sel[b.dataset.sk]=1; else delete AR.sel[b.dataset.sk]; renderAr(); }; });
+  } else {
+    /* 매출처별: 매출처 행에 [일괄 변경] */
+    $$("#arTbl .ar-prow").forEach(function(tr){ if(tr.querySelector(".ar-pbulk")) return; var pk=tr.dataset.pk, cell=tr.querySelector("td:nth-last-child(2)"); if(!cell || readOnly) return;
+      cell.insertAdjacentHTML("beforeend", ' <button type="button" class="ar-expedit ar-pbulk" data-pk="'+esc(pk)+'" title="이 매출처 미결 채권 모두 예상입금일 변경">✎ 일괄</button>'); });
+    $$("#arTbl .ar-pbulk").forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); var pk=b.dataset.pk, cid=pk.split("|")[0], biz=pk.slice(cid.length+1);
+      var L=Object.keys(I()).map(function(k){ return I()[k]; }).filter(function(r){ return r.c.id===cid && (arDigits(r.x.partyCode)||("nm:"+r.x.party))===biz && arEditable(r.c, r.x); });
+      var td=b.parentNode; td.innerHTML='<span class="ar-expform"><input type="date" class="ar-expin" value="'+esc(todayISO())+'"> <button type="button" class="btn sm primary">'+L.length+'건 저장</button> <button type="button" class="btn sm">규칙대로</button> <button type="button" class="btn sm">취소</button></span>';
+      td.onclick=function(e2){ e2.stopPropagation(); }; var bs=td.querySelectorAll("button"), inp=td.querySelector("input");
+      bs[0].onclick=function(){ arExpSaveMany(L, inp.value); }; bs[1].onclick=function(){ arExpSaveMany(L, ""); }; bs[2].onclick=function(){ renderAr(); }; }; });
+  }
+  /* 선택 막대 */
+  var keys=Object.keys(AR.sel).filter(function(k){ return I()[k]; }); Object.keys(AR.sel).forEach(function(k){ if(!I()[k]) delete AR.sel[k]; });
+  var bar=$("#arBulk"); if(!bar){ tbl.insertAdjacentHTML("beforebegin", '<div id="arBulk" class="ar-bulk" hidden></div>'); bar=$("#arBulk"); }
+  if(!keys.length || AR.view==="party"){ bar.hidden=true; bar.innerHTML=""; return; }
+  var L=keys.map(function(k){ return I()[k]; }), bal=L.reduce(function(s,r){ return s+(+r.x.bal||0); },0);
+  var parties={}; L.forEach(function(r){ parties[r.c.id+"|"+(arDigits(r.x.partyCode)||r.x.party)]=1; });
+  bar.hidden=false;
+  bar.innerHTML='<b>'+L.length+'건 선택</b><span class="mini">잔액 '+fmt(bal)+' · 매출처 '+Object.keys(parties).length+'곳</span>'+
+    '<span class="ar-bsp"></span><label class="mini">예상입금일 <input type="date" id="arBulkD" value="'+esc(todayISO())+'"></label>'+
+    '<button type="button" class="btn sm primary" id="arBulkGo">일괄 적용</button><button type="button" class="btn sm" id="arBulkRule">규칙대로</button>'+
+    '<button type="button" class="btn sm" id="arBulkParty" title="선택한 채권의 매출처 미결 채권을 모두 선택">같은 매출처 모두 선택</button><button type="button" class="btn sm" id="arBulkClr">선택 해제</button>';
+  $("#arBulkGo").onclick=function(){ arExpSaveMany(L, $("#arBulkD").value); };
+  $("#arBulkRule").onclick=function(){ arExpSaveMany(L, ""); };
+  $("#arBulkParty").onclick=function(){ L.forEach(function(r){ arSameParty(r, I()).forEach(function(o){ AR.sel[arSelKey(o.c, o.x)]=1; }); }); renderAr(); };
+  $("#arBulkClr").onclick=function(){ AR.sel={}; renderAr(); };
+}
+/* 한 건 수정 폼에 '같은 매출처 n건 모두' */
+arExpBind=(function(f){ return function(){ f.apply(this, arguments);
+  $$("#arTbl .ar-expedit:not(.ar-pbulk)").forEach(function(b){ var o=b.onclick; if(!o) return; b.onclick=function(ev){ o.call(this, ev);
+    try{ var td=ev.currentTarget&&ev.currentTarget.parentNode||null; td=td||document.querySelector("#arTbl .ar-expform").parentNode;
+      var form=document.querySelector("#arTbl .ar-expform"); if(!form) return; var idx=arIndex(), r=idx[b.dataset.aek]; if(!r) return;
+      var same=arSameParty(r, idx); if(same.length<2) return;
+      form.insertAdjacentHTML("beforeend", ' <label class="mini" title="이 매출처 미결 채권 모두에 같은 날짜"><input type="checkbox" class="ar-expall"> 같은 매출처 '+same.length+'건 모두</label>');
+      var inp=form.querySelector(".ar-expin"), chk=form.querySelector(".ar-expall"), sv=form.querySelector(".ar-exps"), rr=form.querySelector(".ar-expr");
+      sv.onclick=function(){ if(chk.checked) arExpSaveMany(same, inp.value); else arExpSave(r.c, r.x, inp.value); };
+      inp.onkeydown=function(k){ if(k.key==="Enter") sv.onclick(); if(k.key==="Escape") renderAr(); };
+      if(rr) rr.onclick=function(){ if(chk.checked) arExpSaveMany(same, ""); else arExpSave(r.c, r.x, ""); };
+    }catch(e){ console.warn("arExpAll", e); } }; });
+}; })(arExpBind);
+renderBondView=(function(f){ return function(){ var r=f.apply(this, arguments); try{ arBulkUi(); }catch(e){ console.warn("arBulk", e); } return r; }; })(renderBondView);
+renderAr=renderBondView;
+(function(){ var st=document.createElement("style"); st.textContent=
+  ".ar-bulk{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px;padding:8px 12px;border:1px solid var(--navy,#1f3a68);border-radius:10px;background:var(--navy-soft,#e8eef8)}"+
+  ".ar-bulk .ar-bsp{flex:1}.ar-bulk input[type=date]{font-size:12px;padding:2px 4px}"+
+  "#arTbl tr.ar-picked td{background:color-mix(in srgb,var(--navy,#1f3a68) 7%,transparent)}#arTbl .ar-sel,#arTbl .ar-selall{vertical-align:middle;margin:0 4px 0 0;cursor:pointer}";
+  document.head.appendChild(st); })();
+(function(){ var st=document.createElement("style"); st.textContent=".fxchkline{padding-top:6px;padding-bottom:0;display:flex;flex-wrap:wrap;gap:10px}.fxchk{font-size:12px}.fxchk.ok{color:var(--in,#1a7f4b)}.fxchk.bad{color:var(--out,#c0392b);font-weight:600}"; document.head.appendChild(st); })();
+
+/* [v103] 전표 매칭 전 입금 내역: CMS 적요가 은행 참조번호뿐(예: 48ITT261002084 · 3776289239 · OTT260900412)이고 의뢰인 칸에 거래처가 있으면 의뢰인을 먼저 (사용자 결정 2026-11-03) */
+function cmsRefLike(s){ s=String(s||"").trim(); return s.length>=6 && !/[가-힣]/.test(s) && /^[A-Za-z0-9\-\/\.\s]+$/.test(s) && (s.match(/\d/g)||[]).length>=6; }
+function cmsMemoName(t){ var s=String(t.summary||"").trim(), cl=String(t.client||"").trim();
+  if(cl && (!s || cmsRefLike(s)) && !cmsRefLike(cl)) return cl; return s||cl||t.txType||""; }
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -12528,10 +12733,10 @@ function ilboModel(c, iso){
       if(t.kind!=="수입" && t.kind!=="지출" && !fx) return;
       var isIn=t.kind==="수입"||t.kind==="외화(입금)";
       var fxAmt=dSheet ? (isIn?t.deposit:t.withdraw) : (t.fxKrw||0);
-      var row={d:d, acct:t.acct, memo:ilboMemoFix(t.planMemo||t.summary||t.client||t.txType||""), cat:fx?fxEffCat(t,isIn):t.cat, amt:fx?fxAmt:(isIn?t.deposit:t.withdraw), auto:t.auto, idx:i, fx:fx, slip:!!t.slipVoucher};
+      var row={d:d, acct:t.acct, memo:ilboMemoFix(t.planMemo||((t.kind==="수입"||t.kind==="외화(입금)")?cmsMemoName(t):(t.summary||t.client||t.txType||""))), cat:fx?fxEffCat(t,isIn):t.cat, amt:fx?fxAmt:(isIn?t.deposit:t.withdraw), auto:t.auto, idx:i, fx:fx, slip:!!t.slipVoucher};
       /* [v55] 전표 매칭 건은 전표 줄 단위로 묶는다(자리 표시만 넣고 아래에서 펼침) */
       if(t.slip && t.slip.type!=="자금이동" && !dSheet){
-        row.name=ilboMemoFix(t.summary||t.client||t.txType||""); row.split=!!t.slip.split;
+        row.name=ilboMemoFix((t.kind==="수입"||t.kind==="외화(입금)")?cmsMemoName(t):(t.summary||t.client||t.txType||"")); row.split=!!t.slip.split;   // [v103]
         var gk=d+"|"+t.slip.key, g=SG[gk];
         if(!g){ g=SG[gk]={d:d, s:t.slip, rows:[]}; (isIn?aIn:aOut).push({__g:g}); }
         g.rows.push(row); return;
@@ -12562,6 +12767,8 @@ function ilboModel(c, iso){
       var LL=slipLineOf(c, g.d, s.key);
       var sameNm=g.rows.every(function(r){ return r.name===r0.name; });     // [v56]
       var memo=(LL&&LL.textManual) || ((s.dir==="in" && sameNm && s.type!=="전표만") ? (r0.name||s.text) : s.text);
+      var LX=LL || ((((c.slips||{})[g.d]||{}).lines)||[]).filter(function(L){ return String(L.voucher)===String(s.slipNo) && L.kind==="in"; })[0] || null;   // [v102]
+      if(!(LL&&LL.textManual) && s.dir==="in" && LX && /외화외상매출금/.test(String(LX.cpAccount||"")) && (LX.pnames||[]).length) memo=LX.pnames.length>1 ? LX.pnames[0]+" 외 "+(LX.pnames.length-1) : LX.pnames[0];
       if(s.lineAmt!=null && Math.abs(s.lineAmt-sum)>=1) m.slipWarn.push(g.d+" "+r0.acct+" "+s.text+": 전표 줄 "+fmt(s.lineAmt)+" ≠ 매칭 CMS 합계 "+fmt(sum));
       out.push(Object.assign({}, base, {memo:memo, amt:sum, slipRow:{key:s.key, d:g.d, slipNo:s.slipNo, type:s.type, n:g.rows.length, members:mem, split:g.rows.some(function(r){ return r.split; }), mixed:!!s.mixed}}));
     });
