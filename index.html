@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v103 · 2026-11-03</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v104 · 2026-11-04</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4113,7 +4113,8 @@ function rcApply(c){
     var mkMature=function(lab, amt, why){ var P=Math.round(rcBalBefore(c, lab)); if(P<=0) return false;
       var iv=Math.round(amt-P); if(iv<-1 || iv>P*RC_INT_MAX) return false;
       if(iv>=1){ syn(r,{date:d, acct:lab, kind:"수입", cat:"이자수익", deposit:iv, summary:"[자동] 만기이자 (원리금 "+fmt(amt)+" − 원금 "+fmt(P)+")", rcWhy:why}); st.int+=iv; }
-      syn(r,{date:d, acct:lab, kind:"자금이동(출금)", cat:"자금이동", withdraw:Math.round(amt), summary:"[자동] 만기 원리금 이동", rcWhy:why}); st.r5++; return true; };
+      syn(r,{date:d, acct:lab, kind:"자금이동(출금)", cat:"자금이동", withdraw:Math.round(amt), summary:"[자동] 만기 원리금 이동", rcWhy:why,
+        hasAfter:true, after:P+(iv>=1?iv:0)-Math.round(amt)}); st.r5++; return true; };   // [v104] 만기 해지 = 예금 계좌 잔액 0(보고서에 옛 잔액이 남아 있어도)
     unIn.slice().forEach(function(u){ var lab=rcLinkAcct(c, String(u.summary||"")+" "+String(u.client||""), digs, u.acct); if(!lab || hasRow[lab]) return;
       if(mkMature(lab, +u.deposit||0, "적요 계좌번호 "+lab+" → "+u.acct)){ unIn=unIn.filter(function(x){ return x!==u; }); hasRow[lab]=1; } });
     unOut.slice().forEach(function(o){ var lab=rcLinkAcct(c, String(o.summary||"")+" "+String(o.client||""), digs, o.acct); if(!lab || hasRow[lab]) return;
@@ -4434,7 +4435,7 @@ function coState0(c){
   var dates=Object.keys(c.days).filter(function(d){ return d<=_t && (!base || d>=base); }).sort(), accs=effAccounts(c);
   var hasBase=!!(base && dates[0]===base);
   var XS=xferSeed(c), XD=XS?XS.date:null, xfxDone=false, xtDone=false;   // [v87] 계좌 이관 승계 기초
-  var chain={}, totals={}, fxState={}, fxDetail=[], fxSrcIso=null, cashState=null, fxPrev=0, fxAfter={}, fxAnchorSkip=[];   // [v58]
+  var chain={}, totals={}, fxState={}, fxDetail=[], fxSrcIso=null, cashState=null, cashAdj=0, fxPrev=0, fxAfter={}, fxAnchorSkip=[];   // [v58]
   if(fy){
     Object.keys(fy.fxState||{}).forEach(function(cy){ fxState[cy]={amt:fy.fxState[cy].amt||0, krw:fy.fxState[cy].krw||0}; });
     fxDetail=fxLotsNorm(fy.fxDetail, c); fxSrcIso=base; fxPrev=fy.fx||0;
@@ -4563,9 +4564,11 @@ function coState0(c){
     fxDetail=fxRevalApply(c, iso, fxState, fxDetail);   // [v88] 외화평가 반영일 — 평가환율 단일 랏
     var fxKrw=0; Object.keys(fxState).forEach(function(cy){ fxKrw+=fxState[cy].krw||0; });
 
-    var cbDay=(c.cashBook||{})[iso];
-    if(cbDay) cashState={open:cbDay.open||0, inAmt:cbDay.inAmt||0, outAmt:cbDay.outAmt||0, close:cbDay.close||0, items:cbDay.items||[], src:"book"};
-    else if(rec.cash) cashState={open:rec.cash.open||0, inAmt:rec.cash.inAmt||0, outAmt:rec.cash.outAmt||0, close:rec.cash.close||0, src:"sheet"};
+    var cbDay=(c.cashBook||{})[iso], cSl=cashSlipItems(c, iso), sIn=0, sOut=0;   // [v104] 현금출납장 > 전표(출납장에 없는 것) > 보고서
+    cSl.forEach(function(x){ sIn+=x.inAmt; sOut+=x.outAmt; });
+    if(cbDay){ cashState={open:(cbDay.open||0)+cashAdj, inAmt:(cbDay.inAmt||0)+sIn, outAmt:(cbDay.outAmt||0)+sOut, close:(cbDay.close||0)+cashAdj+sIn-sOut, items:(cbDay.items||[]).concat(cSl), src:"book"}; cashAdj+=sIn-sOut; }
+    else if(cSl.length){ var o0=cashState?cashState.close:((rec.cash&&rec.cash.open)||0); cashState={open:o0, inAmt:sIn, outAmt:sOut, close:o0+sIn-sOut, items:cSl, src:"slip"}; cashAdj+=sIn-sOut; }
+    else if(rec.cash) cashState={open:(rec.cash.open||0)+cashAdj, inAmt:rec.cash.inAmt||0, outAmt:rec.cash.outAmt||0, close:(rec.cash.close||0)+cashAdj, src:"sheet"};
     else { var mm=manualOf(c,iso);
       if(mm.cash||mm.cashIn||mm.cashOut) cashState={open:(mm.cash||0)-(mm.cashIn||0)+(mm.cashOut||0), inAmt:mm.cashIn||0, outAmt:mm.cashOut||0, close:mm.cash||0};
       else if(cashState) cashState={open:cashState.close, inAmt:0, outAmt:0, close:cashState.close};
@@ -11190,6 +11193,63 @@ function cmsRefLike(s){ s=String(s||"").trim(); return s.length>=6 && !/[가-힣
 function cmsMemoName(t){ var s=String(t.summary||"").trim(), cl=String(t.client||"").trim();
   if(cl && (!s || cmsRefLike(s)) && !cmsRefLike(cl)) return cl; return s||cl||t.txType||""; }
 
+/* ===================== [v104] 빈 보고서 시트 무시 · 현금시재 전표 반영 ===================== */
+/* (1) 빈 자금현황보고 시트 — 미리 만들어 둔 날짜 시트(계좌 마감 전부 0·거래 없음·현금 0)를 그날 확정 마감으로 쓰지 않는다.
+       예: SN 2026-11-03 시트(11-03 08:55 업로드)가 계좌 44개 모두 0 → CMS 없는 정기예금·증권 계좌가 0으로 앵커되어
+       전일실적·당월누계 차이 1,512,271,796 · 금융상품 '잔액 0' 경고 · 현금시재 0 이 생겼다. */
+function sheetIsBlank(r){
+  if(!r) return false;
+  var ac=r.accts||[]; if(!ac.length) return false;
+  if(ac.some(function(a){ return Math.abs(+a.close||0)>=1; })) return false;
+  if((r.txns||[]).some(function(t){ return (+t.deposit||0)>=1 || (+t.withdraw||0)>=1; })) return false;
+  var cs=r.cash||{}; if(Math.abs(+cs.close||0)>=1 || Math.abs(+cs.inAmt||0)>=1 || Math.abs(+cs.outAmt||0)>=1) return false;
+  return true;
+}
+var SHEET_BLANK_LOG=[];
+function sheetDropBlank(c, sh){
+  var o={}; Object.keys(sh||{}).forEach(function(d){
+    if(sheetIsBlank(sh[d])){ SHEET_BLANK_LOG.push(c.short+" "+d); return; }
+    o[d]=sh[d]; });
+  return o;
+}
+/* 이미 저장된 빈 시트 흔적(CMS 날의 repAccts 전부 0 · 현금 0) 정리 — 다음 저장 때 반영 */
+function repAcctsBlank(r){ if(!r || !r.repAccts) return false; var ks=Object.keys(r.repAccts); return ks.length>0 && ks.every(function(k){ return Math.abs(+r.repAccts[k]||0)<1; }); }
+function cashBlank(cs){ return !!cs && !(Math.abs(+cs.open||0)>=1 || Math.abs(+cs.close||0)>=1 || Math.abs(+cs.inAmt||0)>=1 || Math.abs(+cs.outAmt||0)>=1); }
+function blankSheetClean(c){
+  var n=0;
+  Object.keys(c.days||{}).forEach(function(d){ var r=c.days[d]; if(!r) return;
+    if(r.source==="cms" && repAcctsBlank(r)){ delete r.repAccts; if(cashBlank(r.cash)) delete r.cash; n++;
+      if(typeof RELABEL_PENDING!=="undefined") RELABEL_PENDING["co/"+c.id+"/m/"+d.slice(0,7)]=1; } });
+  return n;
+}
+migrate=(function(f){ return function(){ var r=f.apply(this, arguments);
+  try{ (D.companies||[]).forEach(function(c){ blankSheetClean(c); }); }catch(e){ console.warn("v104 blank", e); }
+  return r; }; })(migrate);
+
+/* (2) 현금시재 = 현금출납장 + 출납장에 아직 없는 전표(현금 계정 1110100, 승인·미결) — 사용자 결정 2026-11-04
+       우선순위: 현금출납장 > 전표 > 보고서 시트. 같은 전표번호가 출납장에 들어오면 전표 쪽은 빠진다(중복 없음).
+       현금출납장을 쓰는 법인(출납장 자료가 있는 법인)만, 출납장 첫날 이후에만 적용한다. */
+var _cashBookedC={};
+function cashBookedSet(c){
+  var cb=c.cashBook||{}, ks=Object.keys(cb).sort(), k=ks.length+"|"+(ks[0]||"")+"|"+(ks[ks.length-1]||"");
+  ks.forEach(function(d){ k+="|"+((cb[d]||{}).items||[]).length; });
+  var h=_cashBookedC[c.id]; if(h && h.k===k) return h;
+  var set={}; ks.forEach(function(d){ ((cb[d]||{}).items||[]).forEach(function(it){ if(it && it.slip) set[String(it.slip)]=1; }); });
+  h=_cashBookedC[c.id]={k:k, set:set, first:ks[0]||"", last:ks[ks.length-1]||""}; return h;
+}
+function cashSlipItems(c, d){
+  var bk=cashBookedSet(c); if(!bk.first || d<bk.first) return [];
+  var L=((c.slips||{})[d]||{}).lines||[], seen={}, out=[];
+  L.forEach(function(x){ if(x.kind!=="cash-in" && x.kind!=="cash-out") return;
+    var v=String(x.voucher||""); if(v && bk.set[v]) return;
+    var key=v+"-"+(x.line||0); if(seen[key]) return; seen[key]=1;
+    var a=Math.round(+x.amount||0); if(a<1) return;
+    out.push({slip:v, line:x.line||0, inAmt:x.kind==="cash-in"?a:0, outAmt:x.kind==="cash-out"?a:0,
+      summary:x.memo||x.text||"", status:x.status||"", fromSlip:true}); });
+  return out;
+}
+function cashSlipMemo(it){ return (it.summary||"")+(it.fromSlip && it.status==="미결"?" (전표 미결)":""); }
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -11477,6 +11537,7 @@ function commitImport(res){
   if(res.holidays && res.holidays.length) D.holidays=res.holidays;
   D.companies.forEach(function(c){
     var cms=res.cms[c.id]||{}, sh=res.sheet[c.id]||{}, xl=res.xlsm[c.id]||{};
+    sh=sheetDropBlank(c, sh);   // [v104] 미리 만들어 둔 빈 날짜 시트(마감 전부 0·거래 없음)는 반영하지 않는다
     Object.keys(xl).forEach(function(d){                      // 3순위: 일별현황 집계
       var ex=dayRec(c,d);
       if(ex&&(ex.source==="cms"||ex.source==="sheet")) return;
@@ -12799,9 +12860,9 @@ function ilboModel(c, iso){
     aIn=out; })();
   R.days.forEach(function(d){
     var cb=(c.cashBook||{})[d];
-    ((cb&&cb.items)||[]).forEach(function(it){
-      if(it.inAmt) cIn.push({acct:"현금", memo:it.summary||"", amt:it.inAmt});
-      if(it.outAmt) cOut.push({acct:"현금", memo:it.summary||"", amt:it.outAmt});
+    ((cb&&cb.items)||[]).concat(cashSlipItems(c, d)).forEach(function(it){   // [v104] 출납장에 아직 없는 현금 전표도
+      if(it.inAmt) cIn.push({acct:"현금", memo:cashSlipMemo(it), amt:it.inAmt, slipNo:it.fromSlip?it.slip:undefined});
+      if(it.outAmt) cOut.push({acct:"현금", memo:cashSlipMemo(it), amt:it.outAmt, slipNo:it.fromSlip?it.slip:undefined});
     });
   });
   xferIlboRows(c, rdays, aIn, aOut);   // [v88] 외화평가 차손익 · 합병 승계 행
