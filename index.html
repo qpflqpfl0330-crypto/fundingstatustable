@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v104 · 2026-11-04</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v105 · 2026-11-09</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -2400,9 +2400,19 @@ function sbErr(e){   // dbFlush()의 기존 오류 코드 체계로 변환 (RLS 
 function sbSnap(path,row){ return {id:path, exists:!!row, data:function(){ return row?row.data:undefined; }, metadata:{hasPendingWrites:false}}; }
 /* [v60] 읽기 재시도 — DB가 일시적으로 느려 statement timeout(57014)·네트워크 오류가 나면 1.5초·3초 간격으로 최대 2번 더 시도 */
 function sbRetryable(e){ return !!e && (e.code==="57014" || /statement timeout|failed to fetch|network|timeout|503|504/i.test(String(e.message||""))); }
+/* [v105] 접속 시 법인 4곳 × 자료 5종 = 20개 대용량 조회를 한꺼번에 보내면 DB(Micro)가 포화되어
+   SN m(문서 73개 · JSON 약 12.9MB)이 statement timeout(20초) → 재시도 끝에 40초 넘게 로딩 화면이 멈춰 보였다.
+   동시 조회는 4개까지, m·slip 은 12개 문서씩 나눠 받는다. 진행 상황은 로딩 문구에 표시. */
+var SB_Q={max:4, run:0, wait:[], done:0, total:0, slow:false};
+function sbQueue(fn){ return new Promise(function(ok, no){
+  var go=function(){ SB_Q.run++; Promise.resolve().then(fn).then(function(r){ SB_Q.run--; sbQNext(); ok(r); }, function(e){ SB_Q.run--; sbQNext(); no(e); }); };
+  if(SB_Q.run<SB_Q.max) go(); else SB_Q.wait.push(go); }); }
+function sbQNext(){ if(SB_Q.wait.length && SB_Q.run<SB_Q.max) SB_Q.wait.shift()(); }
+function sbLoadMsg(){ try{ var el=document.querySelector("#lockLoad .hint"); if(!el) return;
+  el.textContent="공용 저장소에서 데이터를 불러오는 중입니다… ("+SB_Q.done+"/"+SB_Q.total+")"+(SB_Q.slow?" · 저장소 응답이 느려 다시 시도하는 중":""); }catch(e){} }
 function sbRetry(fn, left){
   left = left==null ? 2 : left;
-  var again=function(){ return new Promise(function(ok){ setTimeout(ok, (3-left)*1500); }).then(function(){ return sbRetry(fn, left-1); }); };
+  var again=function(){ SB_Q.slow=true; sbLoadMsg(); return new Promise(function(ok){ setTimeout(ok, (3-left)*1500); }).then(function(){ return sbRetry(fn, left-1); }); };
   return Promise.resolve().then(fn).then(function(r){
     if(r && r.error && left>0 && sbRetryable(r.error)) return again();
     return r;
@@ -2420,10 +2430,11 @@ function sbAdapter(sb){
     }; },
     collection:function(prefix){ return {
       get:function(){
-        var pat=String(prefix).replace(/[\\%_]/g,"\\$&")+"/%", out=[], N=1000;
-        var page=function(from){ return sbRetry(function(){ return T().select("path, data").like("path",pat).order("path").range(from, from+N-1); }).then(chk).then(function(r){
+        var pat=String(prefix).replace(/[\\%_]/g,"\\$&")+"/%", out=[], N=/\/(m|slip)$/.test(String(prefix))?12:1000;   // [v105] 큰 문서는 작은 페이지
+        SB_Q.total++; sbLoadMsg();
+        var page=function(from){ return sbRetry(function(){ return sbQueue(function(){ return T().select("path, data").like("path",pat).order("path").range(from, from+N-1); }); }).then(chk).then(function(r){
           var rows=r.data||[]; out=out.concat(rows); return rows.length===N ? page(from+N) : out; }); };   // 1,000행 상한 대비 페이지 조회
-        return page(0).then(function(rows){ var docs=rows.map(function(x){ return sbSnap(x.path, x); }); return {docs:docs, size:docs.length, empty:!docs.length}; });
+        return page(0).then(function(rows){ SB_Q.done++; sbLoadMsg(); var docs=rows.map(function(x){ return sbSnap(x.path, x); }); return {docs:docs, size:docs.length, empty:!docs.length}; });
       }
     }; }
   };
