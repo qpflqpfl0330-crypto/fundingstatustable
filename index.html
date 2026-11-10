@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v110 · 2026-11-10</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v111 · 2026-11-10</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -11459,6 +11459,83 @@ cpBind=(function(f){ return function(){ var r=f.apply(this, arguments);
   $$(".cp-bjuse").forEach(function(b){ b.onclick=function(){ cpSetMan(b.dataset.id, "bill", +b.dataset.v); renderCardpay(); toast("건별반제 합계 "+fmt(+b.dataset.v)+"원을 청구금액으로 입력했습니다 — 명세서 금액과 같은지 확인하세요"); }; });
   return r; }; })(cpBind);
 
+/* ===================== [v111] 법인카드 명세서 이미지 PDF — 브라우저 안 이미지 판독(OCR)으로 총액 읽기 ===================== */
+/* 신한·롯데 명세서는 웹 화면을 '인쇄 → PDF 저장'한 파일이라 글자 층이 없다(신한 = 글자 조각 그림, 롯데 = 글자 윤곽선).
+   pdf.js로 첫 페이지를 메모리 캔버스에 그리고 Tesseract.js(eng · MMT·이자수익 판독과 같은 CDN·버전)로 숫자·영문만 읽는다.
+   - 원본 파일·그림·판독 글자는 서버로 보내지 않고 저장하지 않는다. 판독 글자는 총액·카드사·카드 뒤 4자리를 뽑은 뒤 버린다.
+   - 총액 = 페이지에 2번 이상 나온 금액 중 가장 많이 나온 금액(같으면 글자가 큰 쪽). 한 번만 나오거나 동점이면 확정하지 않는다(직접 입력).
+     예) 신한 이용대금명세서 '합계 127,510,500' + '소계 127,510,500' · 카드이용내역 '일시불·카드별 소계·총합계 127,510,500'
+         롯데 '총 4,000,000원' + 일시불·소계·이번달 입금하실 금액 4,000,000 (카드이용한도 90,000,000은 덜 나옴)
+   - 카드사 = 바닥글 주소(shinhancard · lottecard)나 파일명. 카드 = 마스킹 번호 뒤 4자리(*89-6620) → 파일명 숫자(223·215) → cpPdfAutoCard. */
+var CP_TESS_URL="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js", cpOcrP=null;
+function cpOcrWorker(){
+  if(cpOcrP) return cpOcrP;
+  cpOcrP=new Promise(function(res, rej){ if(window.Tesseract) return res();
+    var s=document.createElement("script"); s.src=CP_TESS_URL; s.onload=function(){ res(); };
+    s.onerror=function(){ rej(new Error("이미지 판독(Tesseract.js)을 불러오지 못했습니다 — 네트워크(사내 방화벽)를 확인하거나 청구금액을 직접 입력하세요")); };
+    document.head.appendChild(s); })
+    .then(function(){ return window.Tesseract.createWorker("eng"); });
+  cpOcrP.catch(function(){ cpOcrP=null; });
+  return cpOcrP;
+}
+/* PDF 첫 페이지: 글자 층이 있으면 {text}, 없으면 {text:"", ocr:{text, words:[{t,h}]}} */
+function cpPdfRead(ab){
+  var lib=window.pdfjsLib; if(!lib) return Promise.reject(new Error("pdf.js를 불러오지 못했습니다(네트워크 확인)"));
+  return lib.getDocument({data:new Uint8Array(ab)}).promise.then(function(doc){
+    var fin=function(v){ try{ doc.destroy(); }catch(e){} return v; };
+    return doc.getPage(1).then(function(pg){ return pg.getTextContent().then(function(tc){
+      var text=tc.items.map(function(it){ return it.str; }).join(" ");
+      if(text.replace(/\s/g,"")) return {text:text};
+      var vp=pg.getViewport({scale:3}), cv=document.createElement("canvas"); cv.width=Math.ceil(vp.width); cv.height=Math.ceil(vp.height);
+      var ctx=cv.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+      return pg.render({canvasContext:ctx, viewport:vp}).promise.then(function(){ return cpOcrWorker(); }).then(function(w){ return w.recognize(cv); }).then(function(r){
+        var d=(r&&r.data)||{}, words=(d.words||[]).map(function(x){ return {t:String(x.text||""), h:x.bbox?(x.bbox.y1-x.bbox.y0):0}; });
+        cv.width=cv.height=0; return {text:"", ocr:{text:String(d.text||""), words:words}}; });
+    }); }).then(fin, function(e){ fin(); throw e; });
+  });
+}
+/* 판독 결과 → parseStatementText와 같은 모양 {issuer,total,payDate,hint,cardId,cands} + ocr·ocrN */
+function cpParseOcr(o, fileName, master){
+  var txt=String((o&&o.text)||""), fn=String(fileName||""), hay=(txt+" "+fn).toLowerCase();
+  var out={issuer:"", total:null, payDate:"", hint:"", cardId:"", cands:[], ocr:true, ocrN:0};
+  if(/lottecard|롯데/.test(hay)) out.issuer="롯데"; else if(/shinhan|신한/.test(hay)) out.issuer="신한";
+  else if(/samsungcard|삼성/.test(hay)) out.issuer="삼성"; else if(/hanacard|하나카드/.test(hay)) out.issuer="하나";
+  var cnt={}, hx={};
+  ((o&&o.words)||[]).forEach(function(w){ (String(w.t).match(/\d{1,3}(?:,\d{3})+/g)||[]).forEach(function(a){ cnt[a]=(cnt[a]||0)+1; hx[a]=Math.max(hx[a]||0, +w.h||0); }); });
+  var ks=Object.keys(cnt).sort(function(a,b){ return cnt[b]-cnt[a] || hx[b]-hx[a]; });
+  if(ks.length && cnt[ks[0]]>=2 && !(ks[1] && cnt[ks[1]]===cnt[ks[0]] && hx[ks[1]]===hx[ks[0]])){ out.total=+ks[0].replace(/,/g,""); out.ocrN=cnt[ks[0]]; }
+  if(!out.issuer) return out;
+  var tails={}, re=/\*\s*\d{0,2}\s*[-—–]\s*(\d{4})(?!\d)/g, m;
+  while((m=re.exec(txt))) tails[m[1]]=1;
+  re=/(?:^|\D)\d{4}\s*[-—–]\s*\d{4}\s*[-—–]\s*\d{4}\s*[-—–]\s*(\d{4})(?!\d)/g; while((m=re.exec(txt))) tails[m[1]]=1;
+  var fnN=fn.replace(/20\d{2}\s*[.\-_년]\s*\d{1,2}/g," "), h=((fnN.match(/(\d{3,5})(?!.*\d)/)||[])[1])||"";
+  var dgs=function(c){ return [c.cardNo].concat(c.aliases||[]).map(function(n){ return String(n||"").replace(/\D/g,""); }); };
+  var mine=master.filter(function(c){ return c.issuer===out.issuer; });
+  var byTail=mine.filter(function(c){ return dgs(c).some(function(d){ return d.length>=4 && tails[d.slice(-4)]; }); });
+  var byFn=h?mine.filter(function(c){ return dgs(c).some(function(d){ return d.slice(-h.length)===h; }); }):[];
+  var cands=byTail.length?byTail:byFn;
+  out.hint=byTail.length?Object.keys(tails).filter(function(t){ return byTail.some(function(c){ return dgs(c).some(function(d){ return d.slice(-4)===t; }); }); }).join("·"):h;
+  if(cands.length===1) out.cardId=cands[0].id;
+  out.cands=cands.map(function(c){ return c.id; });
+  return out;
+}
+/* 카드를 못 정한 명세서(신한 이용대금명세서처럼 카드번호가 없는 법인 명세서) — 근거가 하나로 모일 때만 자동 지정, 아니면 '카드 선택'
+   ① 같은 카드사 다른 명세서가 이미 카드를 정했고 총액이 같다 ② 그 카드사 카드가 1장 ③ 그 카드사 지급 카드 중 건별반제 내역이 있는 카드가 1장 */
+function cpPdfAutoCard(master){
+  var bj=CPS.src.banje, bjSum=function(c){ if(!bj || !c.banjeItem) return 0; return bj.rows.filter(function(r){ return r.item===String(c.banjeItem).trim(); }).reduce(function(a,r){ return a+(+r.amt||0); },0); };
+  CPS.pdfs.forEach(function(p){
+    if(p.cardId && p.auto && !master.some(function(c){ return c.id===p.cardId; })){ p.cardId=""; p.auto=""; }
+    if(p.cardId || p.manualPick || !p.issuer) return;
+    var mine=master.filter(function(c){ return c.issuer===p.issuer; }); if(p.cands && p.cands.length>1) mine=mine.filter(function(c){ return p.cands.indexOf(c.id)>=0; });
+    var same=CPS.pdfs.filter(function(q){ return q!==p && q.cardId && !q.auto && q.issuer===p.issuer && q.total===p.total; });
+    var pick="", why="";
+    if(same.length && same.every(function(q){ return q.cardId===same[0].cardId; })){ pick=same[0].cardId; why="같은 카드사 명세서와 총액이 같음"; }
+    else if(mine.length===1){ pick=mine[0].id; why="카드사 카드 1장"; }
+    else { var act=mine.filter(function(c){ return c.pay && bjSum(c)>0; }); if(act.length===1){ pick=act[0].id; why="건별반제 내역이 있는 카드 1장"; } }
+    if(pick){ p.cardId=pick; p.auto=why; }
+  });
+}
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -18261,7 +18338,11 @@ var CP=(function(){
       var bill=null, billNote="";
       if(c.billSrc==="ezwork"){ if(!src.ezwork) billNote="청구명세서 미업로드"; else if(ez[c.id]) bill=ez[c.id].bill; else billNote="내역없음"; }
       else if(c.billSrc==="hanaXls"){ if(hanaBy[c.id]) bill=hanaBy[c.id].total; else billNote="하나 이용내역 미업로드"; }
-      else { if(m.bill!=null && m.bill!=="") bill=num(m.bill); else if(src.pdf&&src.pdf[c.id]&&m.pdfAccept) bill=src.pdf[c.id].total; }
+      else { var pdf0=src.pdf&&src.pdf[c.id], pdfNote="";   // [v111] 명세서 PDF(이미지는 판독) 총액을 청구금액으로 — 수기 입력이 있으면 수기
+        if(m.bill!=null && m.bill!=="") bill=num(m.bill);
+        else if(pdf0){ bill=pdf0.total; pdfNote="명세서"+(pdf0.ocr?"(이미지 판독)":" PDF")+" "+pdf0.total.toLocaleString("ko-KR")+(pdf0.conflict?" · ⚠ 같은 카드 다른 명세서 "+pdf0.conflict:""); }
+        else if(c.pay && c.checkSrc==="banje" && src.banje && S(c.banjeItem) && !src.banje.rows.some(function(x){ return x.item===S(c.banjeItem); })
+          && Object.keys(src.pdf||{}).some(function(id){ return master.some(function(k){ return k.id===id && k.issuer===c.issuer; }); })){ bill=0; pdfNote="내역없음(같은 카드사 명세서·건별반제에 없음)"; } }
       var mt=mgr&&match[mgr]?match[mgr]:null, matched=mt?(mt.byCard[c.id]||0):0;
       var G=num(m.G), Hh=num(m.H), E=0, F=0, rcVals=false;
       var ov=num(m.ov), pre=num(m.pre), can=num(m.can);
@@ -18282,6 +18363,7 @@ var CP=(function(){
       if(mt){ var mis=mt.mismatch.filter(function(x){ return x.cardId===c.id; }); if(mis.length) notes.push("승인번호 금액 불일치 "+mis.length+"건");
         var firstId=master.filter(function(x){ return x.checkSrc===c.checkSrc; })[0];                 // 미매칭은 담당자의 첫 카드 행에 한 번만 적는다
         if(mt.unmatched.length && firstId && firstId.id===c.id) notes.push("ERP 미매칭 "+mt.unmatched.length+"건 "+mt.unmatched.reduce(function(a,x){return a+x.erp;},0).toLocaleString("ko-KR")+"원"); }
+      if(pdfNote) notes.push(pdfNote);   // [v111]
       if(bjNote) notes.push(bjNote);   // [v110]
       if(m.note) notes.push(String(m.note));
       var shown=shownNoOf(c, hanaBy[c.id], ez&&ez[c.id]); if(shown.old.length) notes.push("구 "+shown.old.join("·"));   // [v108] 재발급 이전 번호
@@ -18520,11 +18602,12 @@ function cpReadOne(f, master){
   var done=function(kind, info, bad){ ent.kind=kind; ent.info=info; ent.bad=!!bad; };
   return new Promise(function(r){ setTimeout(r,30); }).then(function(){ return readFile(f); }).then(function(ab){
     if(/\.pdf$/i.test(f.name)){
-      return cpPdfText(ab).then(function(text){
-        var r=CP.parseStatementText(text, f.name, master);
-        if(!r.issuer || r.total==null){ done("unknown", !String(text||"").replace(/\s/g,"")?"이미지로 된 PDF(인쇄 → PDF 저장)라 글자를 읽을 수 없습니다 — 청구금액을 직접 입력하세요(신한·롯데는 건별반제 합계로 확인)":"PDF에서 카드사·총액을 찾지 못했습니다 (삼성·하나·롯데만 지원)",true); return; }   // [v110]
-        CPS.pdfs=CPS.pdfs.filter(function(x){ return x.name!==f.name; }).concat([{name:f.name, issuer:r.issuer, total:r.total, payDate:r.payDate, hint:r.hint, cardId:r.cardId, cands:r.cands}]);
-        done("pdf", r.issuer+"카드 · 총액 "+fmt(r.total)+(r.cardId?"":" · 카드 선택 필요"));
+      ent.info="PDF 읽는 중… (이미지 PDF는 판독에 10~30초)"; renderCardpay();
+      return cpPdfRead(ab).then(function(res){   // [v111] 글자 층이 없는 이미지 PDF(신한·롯데 '인쇄 → PDF 저장')는 브라우저 안에서 판독(OCR)
+        var r=res.ocr?cpParseOcr(res.ocr, f.name, master):CP.parseStatementText(res.text, f.name, master); res=null;   // 판독 글자는 여기서 버린다
+        if(!r.issuer || r.total==null){ done("unknown", r.ocr?("이미지 PDF를 판독했지만 "+(!r.issuer?"카드사":"총액")+"을 확정하지 못했습니다 — 청구금액을 직접 입력하세요"+(r.issuer==="신한"||r.issuer==="롯데"?"(건별반제 합계로 확인 가능)":"")):"PDF에서 카드사·총액을 찾지 못했습니다 (삼성·하나·롯데·신한 지원)",true); return; }
+        CPS.pdfs=CPS.pdfs.filter(function(x){ return x.name!==f.name; }).concat([{name:f.name, issuer:r.issuer, total:r.total, payDate:r.payDate, hint:r.hint, cardId:r.cardId, cands:r.cands, ocr:!!r.ocr, ocrN:r.ocrN||0}]);
+        done("pdf", r.issuer+"카드 · 총액 "+fmt(r.total)+(r.ocr?" · 이미지 판독(같은 금액 "+r.ocrN+"곳) — 명세서와 대조하세요":"")+(r.cardId?"":" · 카드는 금액 확인의 명세서 표에서 확인"));
       });
     }
     var wb=XLSX.read(ab,{type:"array"}), sn=wb.SheetNames[0];
@@ -18564,9 +18647,10 @@ function cpRecalc(){
     if(o.byCard){ x.byCard={}; Object.keys(o.byCard).forEach(function(id){ var k=to[id]||id, v=o.byCard[id]; if(!x.byCard[k]) x.byCard[k]=Object.assign({}, v); else { x.byCard[k].bill+=v.bill; x.byCard[k].n+=v.n; } }); }
     return x; };
   var find=CP.cardFinder(master), pdf={};
+  cpPdfAutoCard(master);   // [v111] 카드번호 없는 법인 명세서(신한) — 근거가 하나일 때만 자동 지정
   CPS.pdfs.forEach(function(p){ var id=p.cardId?(to[p.cardId]||p.cardId):""; if(!id && p.hint && /\*/.test(p.hint)){ var f=find(p.hint); if(f&&f.card) id=f.card.id; }
     if(id && id!==p.cardId && (!p.cardId || to[p.cardId] || !master.some(function(c){ return c.id===p.cardId; }))) p.cardId=id;   // 명세서 검증 표의 카드 선택도 같은 카드로
-    if(id) pdf[id]={total:p.total, payDate:p.payDate, name:p.name}; });
+    if(id){ if(!pdf[id]) pdf[id]={total:p.total, payDate:p.payDate, name:p.name, ocr:!!p.ocr}; else if(pdf[id].total!==p.total) pdf[id].conflict=(pdf[id].conflict?pdf[id].conflict+" · ":"")+p.name+" "+fmt(p.total); } });   // [v111]
   var src={ezwork:rm(CPS.src.ezwork), approval:rm(CPS.src.approval), foreign:rm(CPS.src.foreign), hana:CPS.src.hana, erpSlips:CPS.src.erpSlips, banje:CPS.src.banje, pdf:pdf, useMonth:cpUseMonth(CPS.month)};
   var any=CPS.files.some(function(f){ return f.kind!=="unknown" && f.kind!=="reading"; });
   CPS.model=any&&master.length?CP.compute(master, src, CPS.man):null;
@@ -18684,14 +18768,14 @@ function cpMatchHtml(M){
   return h;
 }
 function cpPdfHtml(master){
-  if(!CPS.pdfs.length) return '<div class="pad"><div class="hint">카드 명세서 PDF를 1번 드롭존에 함께 올리면 카드별 총액을 청구금액과 맞춰 봅니다(선택). 삼성·하나·롯데 지원 · 신한·농협은 청구금액 수기 입력. <b>실제 명세서 PDF로는 아직 검증하지 못한 단계입니다.</b></div></div>';
+  if(!CPS.pdfs.length) return '<div class="pad"><div class="hint">카드 명세서 PDF를 1번 드롭존에 함께 올리면 카드별 총액을 청구금액과 맞춰 봅니다(선택). 삼성·하나는 글자 PDF, 신한·롯데 ‘인쇄 → PDF 저장’ 이미지 PDF는 브라우저 안에서 판독(파일은 서버로 보내지 않음)해 청구금액에 넣습니다. 농협은 수기 입력.</div></div>';
   var R=CPS.model?CPS.model.R:{};
   return '<div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th>파일</th><th class="ctr">카드사</th><th class="ctr">카드</th><th class="ctr">결제일</th><th class="num">PDF 총액</th><th class="num">청구금액</th><th class="ctr">결과</th></tr></thead><tbody>'+
     CPS.pdfs.map(function(p,i){ var opts=master.filter(function(c){ return c.issuer===p.issuer; });
-      var sel='<select class="cp-pdfcard" data-i="'+i+'"><option value="">카드 선택</option>'+opts.map(function(c){ return '<option value="'+c.id+'"'+(c.id===p.cardId?" selected":"")+'>'+esc(CP.maskCardNo(c.cardNo)+" "+c.label)+'</option>'; }).join("")+'</select>';
+      var sel='<select class="cp-pdfcard" data-i="'+i+'"><option value="">카드 선택</option>'+opts.map(function(c){ return '<option value="'+c.id+'"'+(c.id===p.cardId?" selected":"")+'>'+esc(CP.maskCardNo(c.cardNo)+" "+c.label)+'</option>'; }).join("")+'</select>'+(p.auto&&p.cardId?'<div class="mini">자동 · '+esc(p.auto)+'</div>':'');
       var r=p.cardId?R[p.cardId]:null, bill=r?r.bill:null, man=r&&r.c.billSrc==="manual";
       var res=!r?'<span class="chip auto">카드 선택</span>':bill==null?(man?'<button class="btn sm cp-pdfuse" data-i="'+i+'" type="button">청구금액에 반영</button>':'<span class="mini">청구금액 없음</span>'):bill===p.total?'<span class="chip in">O 일치</span>':'<span class="chip out">✕ 차액 '+fmt(bill-p.total)+'</span>'+(man?' <button class="btn sm cp-pdfuse" data-i="'+i+'" type="button">PDF 값으로</button>':'');
-      return '<tr><td>'+esc(p.name)+'</td><td class="ctr">'+esc(p.issuer)+'</td><td class="ctr">'+sel+'</td><td class="ctr">'+esc(p.payDate||"")+'</td><td class="num">'+fmt(p.total)+'</td><td class="num">'+cpMoney(bill)+'</td><td class="ctr">'+res+'</td></tr>'; }).join("")+'</tbody></table></div>';
+      return '<tr><td>'+esc(p.name)+'</td><td class="ctr">'+esc(p.issuer)+'</td><td class="ctr">'+sel+'</td><td class="ctr">'+esc(p.payDate||"")+'</td><td class="num">'+fmt(p.total)+(p.ocr?' <span class="chip auto" title="이미지 PDF를 판독한 값 — 같은 금액 '+p.ocrN+'곳 · 명세서와 대조하세요">판독</span>':'')+'</td><td class="num">'+cpMoney(bill)+'</td><td class="ctr">'+res+'</td></tr>'; }).join("")+'</tbody></table></div>';
 }
 function cpSumHtml(M){
   if(!M) return '<span class="mini">파일을 올리면 요약이 나옵니다.</span>';
@@ -18718,8 +18802,8 @@ function cpBind(){
   $$(".cp-st").forEach(function(b){ b.onclick=function(){ var m=CPS.man[b.dataset.id]||{}, cur=m.stmtOk===true?"O":m.stmtOk===false?"X":"", nx=cur===""?true:cur==="O"?false:"";
     cpSetMan(b.dataset.id,"stmtOk",nx); renderCardpay(); }; });
   var ob=$("#cpOnlyBad"); if(ob) ob.onchange=function(){ CPS.onlyBad=ob.checked; renderCardpay(); };
-  $$(".cp-pdfcard").forEach(function(s){ s.onchange=function(){ CPS.pdfs[+s.dataset.i].cardId=s.value; cpRecalc(); renderCardpay(); }; });
-  $$(".cp-pdfuse").forEach(function(b){ b.onclick=function(){ var p=CPS.pdfs[+b.dataset.i]; if(!p||!p.cardId) return; cpSetMan(p.cardId,"bill",p.total); var m=CPS.man[p.cardId]; if(m.check==null) m.check=p.total; cpRecalc(); renderCardpay(); toast("PDF 총액 "+fmt(p.total)+"원을 청구금액으로 반영했습니다"); }; });
+  $$(".cp-pdfcard").forEach(function(s){ s.onchange=function(){ var p=CPS.pdfs[+s.dataset.i]; p.cardId=s.value; p.manualPick=true; p.auto=""; cpRecalc(); renderCardpay(); }; });   // [v111] 직접 고른 카드는 자동 지정하지 않음
+  $$(".cp-pdfuse").forEach(function(b){ b.onclick=function(){ var p=CPS.pdfs[+b.dataset.i]; if(!p||!p.cardId) return; cpSetMan(p.cardId,"bill",p.total); var m=CPS.man[p.cardId], c0=cpMaster(CPS.co).filter(function(c){ return c.id===p.cardId; })[0]; if(m.check==null && c0 && c0.checkSrc==="manual") m.check=p.total; cpRecalc(); renderCardpay(); toast("PDF 총액 "+fmt(p.total)+"원을 청구금액으로 반영했습니다"); }; });
 }
 function cpXlsx(){
   var M=CPS.model; if(!M){ toast("먼저 파일을 올리세요"); return; }
