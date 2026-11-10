@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v106 · 2026-11-10</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v107 · 2026-11-10</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4348,6 +4348,7 @@ function dayAgg(c,iso){
           var foc=fxEffCat(t,false); a.outBy[foc]=(a.outBy[foc]||0)+t.fxKrw; a.outTotal+=t.fxKrw;
         }
       }
+      else if(t.kind==="수입" && t.splits && t.splits.length){ t.splits.forEach(function(sp){ a.inBy[sp.cat]=(a.inBy[sp.cat]||0)+sp.amt; }); a.inTotal+=t.deposit; k.in+=t.deposit; }   // [v107] 입금 전표 줄별 구분
       else if(t.kind==="수입"){ a.inBy[t.cat]=(a.inBy[t.cat]||0)+t.deposit; a.inTotal+=t.deposit; k.in+=t.deposit; }
       else if(t.kind==="지출" && t.splits && t.splits.length){ t.splits.forEach(function(sp){ a.outBy[sp.cat]=(a.outBy[sp.cat]||0)+sp.amt; }); a.outTotal+=t.withdraw; k.out+=t.withdraw; }   // [v70] 전표 줄별 구분
       else if(t.kind==="지출"){ a.outBy[t.cat]=(a.outBy[t.cat]||0)+t.withdraw; a.outTotal+=t.withdraw; k.out+=t.withdraw; }
@@ -11286,6 +11287,54 @@ function gapMissingDays(c, d){
   return miss.reverse();
 }
 
+/* ===================== [v107] 자금일보 검증 보완 ===================== */
+/* (1) 자사명이 은행명 + 잘린 형태로 찍힌 CMS(예: GS 11-03 우리 573069 '하나굿어스스마트솔루' 2,248,400 → 하나 87152 MMT)도 자사 이체로 본다.
+       CMS 의뢰인/적요는 10자 안팎에서 잘리므로, 끝부분이 회사명 키워드의 앞 6자 이상과 같으면 키워드 전체로 바꿔 다시 판정한다. */
+cmsOwnish=(function(f){ return function(c, t){
+  if(f.apply(this, arguments)) return true;
+  try{
+    var kws=(c.keywords||[]).map(function(k){ return normalize(k); }).filter(function(k){ return k && k.length>=7; }).sort(function(a,b){ return b.length-a.length; });
+    var fix=function(s){ var n=normalize(s); if(!n) return null;
+      for(var i=0;i<kws.length;i++){ var k=kws[i];
+        for(var len=k.length-1; len>=6; len--){ var p=k.slice(0,len); if(n.length>=len && n.slice(n.length-len)===p) return n.slice(0, n.length-len)+k; } }
+      return null; };
+    var fc=fix(t.client), fs=fix(t.summary);
+    if(fc==null && fs==null) return false;
+    return !!f.call(this, c, Object.assign({}, t, {client:fc!=null?fc:t.client, summary:fs!=null?fs:t.summary}));
+  }catch(e){ return false; }
+}; })(cmsOwnish);
+
+/* (2) 전표 줄 구분: 예적금 이자(상대계정 이자수익(예적금))가 장기금융상품 회수와 같은 전표에 섞여 '미수금'으로 읽힌 줄 → 이자수익
+       (GS 11-04 FI2026110400004 하나 81304 [굿어스] '당좌예금 해지 이자수익' 14,705) */
+slipRecat=(function(f){ return function(c, sl){ var n=f.apply(this, arguments);
+  try{ ((sl||{}).lines||[]).forEach(function(L){
+    if(L.kind==="in" && L.cat==="미수금" && !L.catManual && /이자수익/.test(String(L.memo||L.text||"")) && /이자수익\(예적금\)/.test(String(L.cpAccount||""))){
+      L.cat="이자수익"; L.catWhy="적요·상대계정 이자수익(예적금)"; n++; } }); }catch(e){}
+  return n; }; })(slipRecat);
+
+/* (3) 입금도 전표 줄별 구분(1:N합계 — CMS 1행 = 구분이 다른 전표 줄 여러 개) */
+matchSlipCms=(function(f){ return function(c, iso){
+  txnsOf(c, iso).forEach(function(t){ if(t.splitsSlipIn){ delete t.splits; delete t.splitsSlipIn; } });
+  var r=f.apply(this, arguments);
+  try{ txnsOf(c, iso).forEach(function(t){
+    if(t.kind!=="수입" || !t.slip || t.slip.type!=="1:N합계" || (t.splits && t.splits.length)) return;
+    var SL0=t.slip.lines||[]; if(SL0.length<2) return;
+    var cs=SL0.map(function(l){ return l.cat; }).filter(function(v,i0,a0){ return v && a0.indexOf(v)===i0; });
+    if(cs.length>1 && Math.abs(SL0.reduce(function(a0,l){ return a0+(+l.amt||0); },0)-(+t.deposit||0))<1){
+      t.splits=SL0.map(function(l){ return {cat:l.cat, amt:+l.amt||0, text:l.text||""}; }); t.splitsSlipIn=true; } }); }catch(e){}
+  return r; }; })(matchSlipCms);
+
+/* (4) 외화외상매출금 회수 전표: 전표 줄 원화가 매출 당시 장부가(외화외상매출금 대변)이고 관리항목 환율 × 외화금액과 크게 다르면
+       입금 원화 = 외화금액 × 환율(실제 입금 환율). 차액은 외환차손익(현금 아님).
+       (SN 11-04 씨티 438 SNET IT(BEIJING) USD 86,682.98 × 1,341.2 = 116,259,213 · 전표 130,820,544 · 차액 14,561,331) */
+function fxLineKrw(x){
+  var L=x||{}, fx=L.fx||{}, a=Math.round(+L.amt||0);
+  if(!(fx.amt>0) || !(fx.rate>0)) return a;
+  var calc=Math.round(fx.amt*fx.rate), cp=String((L.L&&L.L.cpAccount)||L.cpAccount||"");
+  if(/외화외상매출금/.test(cp) && Math.abs(a-calc)>Math.max(1000, calc*0.001)) return calc;
+  return a;
+}
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -12628,7 +12677,7 @@ function matchSlipCms(c, iso){
     var R2=cand(L,"n"); if(R2.length>=2 && R2.reduce(function(a,i){ return a+Math.round(smAmt(T[i])); },0)===Math.round(L.amt)) add(L, R2, "1:N합계");
   });
   /* ⑨ [v58] 같은 전표의 여러 줄 = CMS 1건 (07-31 국민 247484 한도미사용수수료 1,273,972 = 1,232,876 + 41,096) */
-  T.map(function(t,i){ return i; }).filter(function(i){ var t=T[i]; return !usedT[i] && (t.kind==="지출"||t.kind==="수입") && !t.fromSlip && !t.fromSheet; }).forEach(function(i){
+  T.map(function(t,i){ return i; }).filter(function(i){ var t=T[i]; return !usedT[i] && (t.kind==="지출"||t.kind==="수입"||(!!orphanMv[i] && t.kind==="자금이동(입금)")) && !t.fromSlip && !t.fromSheet; }).forEach(function(i){   // [v107] 짝 없는 자금이동 입금도(GS 11-04 하나 81304 2,014,705 = 당좌 해지 원금 2,000,000 + 이자 14,705) — 출금(차입금 상환+이자)은 종전대로
     var t=T[i], byV={};
     rest().forEach(function(L){ if(L.acct===t.acct && L.dir===smDir(t)) (byV[L.slipNo]=byV[L.slipNo]||[]).push(L); });
     var hit=Object.keys(byV).filter(function(v){ var g=byV[v]; return g.length>=2 && Math.abs(g.reduce(function(a,L){ return a+L.amt; },0)-smAmt(t))<0.5; });
@@ -12690,9 +12739,10 @@ function matchSlipCms(c, iso){
         if(!(t.fxConfirmed && !t.fxFromSlip)){
           t.fxSlip0={fxRate:t.fxRate==null?null:t.fxRate, fxKrw:t.fxKrw==null?null:t.fxKrw, fxConfirmed:!!t.fxConfirmed, fxInternal:(t.fxInternal==null?null:t.fxInternal)};
           var FL=r.fxLs||[L];   // [v58] 랏 여러 개
-          t.fxLots=FL.map(function(x){ return {rate:x.fx.rate||null, fx:x.fx.amt, krw:Math.round(x.amt)}; });
-          var fk=FL.reduce(function(a,x){ return a+Math.round(x.amt); },0), rates=FL.map(function(x){ return x.fx.rate; }).filter(function(x,j,a){ return a.indexOf(x)===j; });
+          t.fxLots=FL.map(function(x){ return {rate:x.fx.rate||null, fx:x.fx.amt, krw:fxLineKrw(x)}; });   // [v107] 외화외상매출금 회수 = 외화 × 입금 환율
+          var fk=FL.reduce(function(a,x){ return a+fxLineKrw(x); },0), fkBook=FL.reduce(function(a,x){ return a+Math.round(x.amt); },0), rates=FL.map(function(x){ return x.fx.rate; }).filter(function(x,j,a){ return a.indexOf(x)===j; });
           if(r.fxSplit){ var sh=(k===n-1) ? Math.round(L.amt)-r.acc : Math.round(smAmt(t)*(+L.fx.rate||0)); r.acc+=sh; fk=sh; t.fxLots=[{rate:L.fx.rate||null, fx:smAmt(t), krw:sh}]; }   // [v58] 줄 1개를 여러 CMS로 나눔
+          if(fk!==fkBook && !r.fxSplit){ s.lineAmt=fk; s.fxBookDiff=fkBook-fk; }   // [v107] 전표 장부가 − 입금 원화 = 외환차손익
           t.fxRate=rates.length===1?(rates[0]||null):null; t.fxKrw=fk; t.fxConfirmed=true; t.fxFromSlip=true; st.fxAuto++;   // 환율 = 관리항목명7, 원화 = 전표 금액(재계산 금지)
           if(r.krwOnly){ delete t.fxLots; t.fxRate=null; t.fxKrwSlipOnly=true; s.fxKrwOnly=true; }   // [v73] 전표 원화만 — 장부환율 미기재
           if(r.fxMove){ t.fxInternal=true; s.fxMove=true; st.fxMove=(st.fxMove||0)+1; }
