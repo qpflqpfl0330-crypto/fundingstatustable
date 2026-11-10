@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v107 · 2026-11-10</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v109 · 2026-11-10</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -11335,6 +11335,105 @@ function fxLineKrw(x){
   return a;
 }
 
+/* ===================== [v108] 법인카드 계정대체 — 재발급 묶음 · 적요 카드분 · 차이 사유 (화면) ===================== */
+/* 재발급 묶음 후보(renew)를 이번 계산용 카드 목록에 반영 — 이전 카드 행(기존 id)에 새 번호를 aliases로, 따로 생긴 재발급 행은 뺀다 */
+function cpEffMaster(master, hanas){
+  var M=JSON.parse(JSON.stringify(master||[])), links=[];
+  (hanas||[]).forEach(function(h){ var rn=h&&h.renew; if(!rn) return;
+    var to=M.filter(function(c){ return c.id===rn.toId; })[0]; if(!to) return;
+    var from=rn.fromId?M.filter(function(c){ return c.id===rn.fromId; })[0]:null;
+    var add=[rn.newNo].concat(from?[from.cardNo].concat(from.aliases||[]):[]);
+    to.aliases=(to.aliases||[]).slice();
+    add.forEach(function(n){ if(n && CP.dg(n)!==CP.dg(to.cardNo) && !to.aliases.some(function(a){ return CP.dg(a)===CP.dg(n); })) to.aliases.push(n); });
+    if(from) M=M.filter(function(c){ return c.id!==from.id; });
+    if(!links.some(function(l){ return l.toId===rn.toId && l.newNo===rn.newNo; })) links.push({newNo:rn.newNo, toId:rn.toId, fromId:rn.fromId||""});
+  });
+  return {master:M, links:links};
+}
+function cpLinkHtml(){
+  var L=CPS.links||[], master=cpMaster(CPS.co); if(!L.length) return "";
+  var can=!readOnly && fepCanSave();
+  return L.map(function(l,i){ var to=master.filter(function(c){ return c.id===l.toId; })[0], from=l.fromId?master.filter(function(c){ return c.id===l.fromId; })[0]:null; if(!to) return "";
+    return '<div class="banner warn cp-link"><span>'+esc(CP.maskCardNo(l.newNo))+'은 '+esc(CP.maskCardNo(to.cardNo))+'('+esc(to.rcLabel||to.label)+')의 재발급으로 보입니다'+
+      (from?' — 카드 목록에 따로 있는 '+esc(CP.maskCardNo(from.cardNo))+' 행을 '+esc(CP.maskCardNo(to.cardNo))+' 행으로 합칩니다':'')+'</span>'+
+      '<button class="btn sm" type="button" data-cplink="'+i+'"'+(can?'':' disabled title="보기 전용 — 이번 계산에만 임시로 묶었습니다"')+'>연결</button>'+
+      '<span class="mini">지금 금액은 한 카드로 묶어서 계산했습니다</span></div>'; }).join("");
+}
+/* [연결] — 이전 카드 행(기존 id 유지)의 aliases에 이전 번호를 넣고 대표번호를 새 번호로. 따로 있던 재발급 행은 지운다(지난달 저장값 id가 끊기지 않게) */
+function cpLinkCard(i){
+  var l=(CPS.links||[])[i]; if(!l) return;
+  if(readOnly || !fepCanSave()){ toast("보기 전용 — 카드 목록을 바꿀 수 없습니다(이번 계산에만 임시로 묶었습니다)"); return; }
+  var list=JSON.parse(JSON.stringify(cpMaster(CPS.co))), to=list.filter(function(c){ return c.id===l.toId; })[0]; if(!to) return;
+  var from=l.fromId?list.filter(function(c){ return c.id===l.fromId; })[0]:null, newNo=from?from.cardNo:l.newNo;
+  if(/\*/.test(newNo)){   // 머리 번호가 마스킹이면 전체 번호를 한 번 받는다(모르면 마스킹 번호를 이전 번호 목록에만 넣고 대표번호는 그대로)
+    var d0=CP.dg(newNo), v=window.prompt("재발급 카드 "+newNo+"의 전체 번호(16자리)를 입력하세요.\n모르면 비워 두세요 — 이번 달 명세서 번호로 묶기만 합니다.", "");
+    var d=CP.dg(v||"");
+    if(d.length===16 && d.slice(0,4)===d0.slice(0,4) && d.slice(-4)===d0.slice(-4)) newNo=CP.fmtCardNo(d);
+    else if(v){ toast("앞 4자리·뒤 4자리가 "+newNo+"와 다릅니다 — 다시 시도하세요"); return; }
+  }
+  to.aliases=(to.aliases||[]).filter(function(n){ return CP.dg(n)!==CP.dg(newNo); });
+  if(from) (from.aliases||[]).forEach(function(n){ if(CP.dg(n)!==CP.dg(to.cardNo) && !to.aliases.some(function(a){ return CP.dg(a)===CP.dg(n); })) to.aliases.push(n); });
+  if(!/\*/.test(newNo)){ if(!to.aliases.some(function(a){ return CP.dg(a)===CP.dg(to.cardNo); })) to.aliases.push(to.cardNo); to.cardNo=newNo; }
+  else if(!to.aliases.some(function(a){ return CP.dg(a)===CP.dg(newNo); })) to.aliases.push(newNo);
+  if(from) list=list.filter(function(c){ return c.id!==from.id; });
+  var doc={v:1, at:new Date().toISOString(), by:(AUTH.user&&AUTH.user.email)||"", cards:list};
+  fepDocSet("app/cardpay/"+CPS.co+"/master", doc).then(function(){
+    CPM[CPS.co]=doc.cards; CPM_META[CPS.co]={at:doc.at, by:doc.by};
+    try{ audit("cardpay_link", {co:CPS.co, menu:"fep", target:CP.maskCardNo(newNo)+" ← "+CP.maskCardNo(to.aliases[to.aliases.length-1]||"")}); }catch(e){}
+    toast("재발급 카드를 연결했습니다 — 카드 목록에 저장"); cpRecalc(); renderCardpay();
+  }).catch(function(e){ toast("저장 실패: "+(e&&e.message||e)); });
+}
+function cpUrow(u){ return esc(((u.date||"").slice(5)+" "+String(u.merchant||"").replace(/\s+/g," ")+(u.appr?" "+u.appr:"")).trim())+' '+fmt(u.amt); }
+/* F 조정 줄 — [적요 카드분 (계정별)] 버튼 → 아래 줄에 라인 목록(계정·출장명·금액·짝지은 원자료) */
+function cpCmHtml(r){
+  var P=(r.advParts||[]).filter(function(x){ return !x.cash; }), by={}, ord=[];
+  P.forEach(function(x){ var k=String(x.acct||"").replace(/^.*?미지급금\(([^)]*)\).*$/,"$1")||x.acct||"미지급금"; if(!(k in by)){ by[k]=0; ord.push(k); } by[k]+=x.amt; });
+  var brk=ord.map(function(k){ return k+" "+fmt(by[k]); }).join(" · "), on=!!(CPS.cmOpen||{})[r.c.id];
+  return '<button type="button" class="cp-linkb" data-cpcm="'+esc(r.c.id)+'" aria-expanded="'+on+'">'+(on?'▾ ':'▸ ')+'적요 카드분 '+fmt(r.adv)+(ord.length>1?' ('+esc(brk)+')':'')+(r.cash?' + 사원경비(현금·확인) '+fmt(r.cash):'')+'</button>';
+}
+/* 일치 ✕ 옆 [사유] 버튼 — 아래 줄에 '미매칭 원자료 − 적요 카드분' 차이 사유 */
+function cpWhyHtml(r){
+  var u=r.uncheck; if(!u || r.rcMatch!==false || !u.reasons.length) return "";
+  var on=!!(CPS.whyOpen||{})[r.c.id];
+  return '<button type="button" class="cp-linkb cp-whyb" data-cpwhy="'+esc(r.c.id)+'" aria-expanded="'+on+'">사유</button>';
+}
+function cpDetailRows(r){
+  var h="", u=r.uncheck, id=r.c.id;
+  if((CPS.cmOpen||{})[id]){ var pr=(u&&u.pairs)||[], P=r.advParts||[];
+    h+='<tr class="cp-sub cp-detail"><td></td><td colspan="11"><div class="cp-dl"><b>적요 카드분 라인</b>'+(P.length?P.map(function(x){ var p=pr.filter(function(q){ return q.line===x; })[0];
+      var s=p&&p.rows.length?(p.rows.length===1?cpUrow(p.rows[0]):p.rows.length+'건 합'+(p.base?'(이용원금)':'')+' — '+p.rows.map(cpUrow).join(", ")):(p?'<span class="cp-neg">짝지을 원자료 없음</span>':'');
+      if(p && p.extra && p.extra.length) s=(s?s+', ':'')+esc(p.extra.join(", "));
+      return '<div class="r"><span>'+esc(x.acct||"")+(x.cash?' <span class="chip in">추정 확인</span>':'')+' · '+esc(x.trip||x.memo)+(x.period?' ('+esc(x.period)+')':'')+(s?' ↔ '+s:'')+'</span><b>'+fmt(x.amt)+'</b></div>'; }).join(""):'<div>적요에 카드사·월이 적힌 라인이 없습니다</div>')+
+      '<div class="r t"><span>합계</span><b>'+fmt(r.adv+(r.cash||0))+'</b></div></div></td></tr>'; }
+  if((CPS.whyOpen||{})[id] && u && u.reasons.length){ var tot=u.reasons.reduce(function(a,x){ return a+x.amt; },0);
+    h+='<tr class="cp-sub cp-detail"><td></td><td colspan="11"><div class="cp-dl"><b>차액 사유 — 미매칭 원자료 '+fmt(u.sum)+' − 적요 카드분 '+fmt(u.F)+'</b>'+u.reasons.map(function(x){ return '<div class="r"><span>'+esc(x.t)+'</span><b>'+fmt(x.amt)+'</b></div>'; }).join("")+
+      '<div class="r t"><span>합계</span><b>'+fmt(tot)+'</b></div></div></td></tr>'; }
+  return h;
+}
+/* [v109] 가지급금 등 전표 종류 표시 */
+function cpModeLabel(mode){ return mode==="settle"?"가지급금 전표(정산형)":mode==="prepay"?"가지급금 전표(선지급형)":mode==="card"?"카드분 추가 전표":mode==="cash"?"사원경비(현금) 전표":"ERP 전표"; }
+/* [v109] 미지급금(사원경비) 현금 라인 = 카드 미반영분 추정 — 같은 금액의 미매칭 원자료가 있으면 후보로 띄우고, 사용자가 [확인]하면 그 카드 F에 반영(일치 처리) */
+function cpCashHtml(M){
+  if(!M || !(M.cashGuess||[]).length) return "";
+  var can=!readOnly;
+  return M.cashGuess.map(function(x,i){
+    if(x.confirmedTo){ var c=M.R[x.confirmedTo]; return '<div class="banner cp-link cp-cashok"><span><span class="chip in">확인</span> '+esc(x.holder)+' 미지급금(사원경비) 현금 '+fmt(x.amt)+' → '+esc(c?CP.ISSUER_NAME(c.c.issuer)+" "+CP.maskCardNo(c.shownNo||c.c.cardNo):x.confirmedTo)+' F에 반영</span><button class="btn sm" type="button" data-cashno="'+i+'"'+(can?'':' disabled')+'>확인 취소</button></div>'; }
+    if(!x.suggest) return "";
+    var c2=M.R[x.suggest];
+    return '<div class="banner warn cp-link"><span><span class="chip auto">추정</span> '+esc(x.holder)+' 미지급금(사원경비) 현금 '+fmt(x.amt)+' <span class="mini">('+esc(x.memo)+')</span> = '+esc(x.suggestDesc)+'</span>'+
+      '<button class="btn sm primary" type="button" data-cashok="'+i+'"'+(can?'':' disabled title="보기 전용"')+'>확인 — '+esc(c2?CP.ISSUER_NAME(c2.c.issuer):"")+' F에 반영</button></div>'; }).join("");
+}
+cpBind=(function(f){ return function(){ var r=f.apply(this, arguments);
+  $$("[data-cashok]").forEach(function(b){ b.onclick=function(){ var M=CPS.model, x=M&&M.cashGuess[+b.dataset.cashok]; if(!x||!x.suggest) return; cpSetMan("__cash", x.key, x.suggest); renderCardpay(); toast("확인 — 사원경비(현금) "+fmt(x.amt)+"원을 카드 F에 반영했습니다(저장하면 다음에도 유지)"); }; });
+  $$("[data-cashno]").forEach(function(b){ b.onclick=function(){ var M=CPS.model, x=M&&M.cashGuess[+b.dataset.cashno]; if(!x) return; cpSetMan("__cash", x.key, ""); renderCardpay(); }; });
+  return r; }; })(cpBind);
+cpBind=(function(f){ return function(){ var r=f.apply(this, arguments);
+  $$("[data-cplink]").forEach(function(b){ b.onclick=function(){ cpLinkCard(+b.dataset.cplink); }; });
+  $$("[data-cpcm]").forEach(function(b){ b.onclick=function(){ CPS.cmOpen=CPS.cmOpen||{}; CPS.cmOpen[b.dataset.cpcm]=!CPS.cmOpen[b.dataset.cpcm]; renderCardpay(); }; });
+  $$("[data-cpwhy]").forEach(function(b){ b.onclick=function(){ CPS.whyOpen=CPS.whyOpen||{}; CPS.whyOpen[b.dataset.cpwhy]=!CPS.whyOpen[b.dataset.cpwhy]; renderCardpay(); }; });
+  $$(".cp-cminc").forEach(function(cb){ cb.onchange=function(){ cpSetMan("__cm", cb.dataset.k, cb.checked?true:""); renderCardpay(); }; });
+  return r; }; })(cpBind);
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -17833,14 +17932,15 @@ var CP=(function(){
   function sortCards(list){ return list.slice().sort(function(a,b){ return (a.order||0)-(b.order||0); }); }
 
   /* 카드 찾기 — 전체 번호(숫자) 또는 마스킹 번호(앞 4 + 뒤 4) */
+  function cardNos(c){ return [c.cardNo].concat(c.aliases||[]).filter(function(n){ return !!S(n); }); }   // [v108] 재발급 묶음: 대표번호 + 이전 번호(aliases)
   function cardFinder(master){
-    var full={}; master.forEach(function(c){ full[dg(c.cardNo)]=c; });
+    var full={}; master.forEach(function(c){ cardNos(c).forEach(function(n){ var d=dg(n); if(d.length>=15 && !/\*/.test(n)) full[d]=c; }); });
     return function(raw){
       var s=S(raw), d=dg(s);
       if(!/\*/.test(s) && full[d]) return {card:full[d]};
       if(/\*/.test(s) || d.length<15){
         var m=s.replace(/[^0-9*]/g,""); var a=m.slice(0,4), z=m.replace(/\*/g,"").slice(-4); if(a.length<4||z.length<4) return null;
-        var hit=master.filter(function(c){ var x=dg(c.cardNo); return x.slice(0,4)===a && x.slice(-4)===z; });
+        var hit=master.filter(function(c){ return cardNos(c).some(function(n){ var x=dg(n); return x.slice(0,4)===a && x.slice(-4)===z; }); });
         if(hit.length===1) return {card:hit[0], masked:true};
         if(hit.length>1) return {ambiguous:hit, masked:true};
       }
@@ -17870,7 +17970,7 @@ var CP=(function(){
     for(var r=hdr+1;r<aoa.length;r++){ var row=aoa[r]||[]; if(!S(row[cN])) continue; total++;
       var f=find(row[cN]); if(!f||!f.card) continue;                                    // 카드 목록 밖 행은 버린다
       kept++; var o=out[f.card.id]||(out[f.card.id]={bill:0, member:S(row[cM]), bank:S(row[cB]), acct:S(row[cA]), product:S(row[cP]), n:0});
-      o.bill+=num(row[cBill]); o.n++;
+      o.bill+=num(row[cBill]); o.n++; if(!o.no) o.no=fmtCardNo(row[cN]);   // [v108] 명세서 머리 번호(표시 번호)
     }
     return {kind:"ezwork", asOf:/^\d{4}-\d{2}-\d{2}$/.test(S(sheetName))?S(sheetName):"", byCard:out, rows:total, kept:kept};
   }
@@ -17895,13 +17995,32 @@ var CP=(function(){
   }
   function firstVal(row){ for(var i=1;i<(row||[]).length;i++){ if(S(row[i])!=="") return row[i]; } return ""; }
   function parseHana(aoa, hdr, master){
-    var ix=colIx(aoa,hdr), find=cardFinder(master), masked=S(firstVal(aoa[0])), total=num(firstVal(aoa[1])), f=find(masked);
-    var cNo=ix("NO"), cAp=ix("승인번호"), cD=ix("이용일"), cMer=ix("가맹점명"), cBase=ix("이용원금"), cPay=ix("당월결제금액"), cDis=ix("할인금액"), rows=[], sum=0;
+    var ix=colIx(aoa,hdr), masked=S(firstVal(aoa[0])), total=num(firstVal(aoa[1]));
+    var cNo=ix("NO"), cAp=ix("승인번호"), cD=ix("이용일"), cMer=ix("가맹점명"), cBase=ix("이용원금"), cPay=ix("당월결제금액"), cDis=ix("할인금액"), cCard=ix("카드번호"), cCust=ix("고객명"), cKind=ix("이용구분"), cFee=ix("환가료"), rows=[], sum=0, custs={};
     for(var r=hdr+1;r<aoa.length;r++){ var row=aoa[r]||[]; if(!/^\d+$/.test(S(row[cNo]))) continue;
-      var o={appr:apprKey(row[cAp]), date:isoOf(row[cD]), merchant:S(row[cMer]), base:num(row[cBase]), pay:num(row[cPay]), disc:num(row[cDis])};
+      var o={appr:apprKey(row[cAp]), date:isoOf(row[cD]), merchant:S(row[cMer]), base:num(row[cBase]), pay:num(row[cPay]), disc:num(row[cDis]),
+        no:cCard>=0?maskCardNo(row[cCard]):"", kind:cKind>=0?S(row[cKind]):"", fee:cFee>=0?num(row[cFee]):0};   // [v108] 행 카드번호(마스킹)·이용구분·환가료 — 재발급 묶음·교차검증
+      if(cCust>=0 && S(row[cCust])) custs[S(row[cCust])]=1;
       sum+=o.pay; rows.push(o);
     }
-    return {kind:"hana", masked:masked, cardId:f&&f.card?f.card.id:"", ambiguous:f&&f.ambiguous?f.ambiguous.map(function(c){return c.id;}):null, total:total, rows:rows, sumPay:sum};
+    var h={kind:"hana", masked:masked, cardId:"", ambiguous:null, total:total, rows:rows, sumPay:sum, sameCust:Object.keys(custs).length<=1};   // 고객명은 같은 사람인지 판정에만 쓰고 보관하지 않는다
+    return hanaResolve(h, master);
+  }
+  /* [v108] 하나 이용내역 → 카드(재발급 묶음). 머리 번호와 다른 카드 목록 카드가 행에 섞여 있으면 재발급 묶음 후보(renew)
+     · 머리 번호가 카드 목록에 없음(9391) + 행에 1438 → {newNo:머리 번호, toId:1438 카드}
+     · 머리 번호가 따로 등록된 행(sn17 9391) + 행에 1438(sn02) → {newNo:sn17 번호, toId:sn02, fromId:sn17} — 연결할 때 sn02(기존 id)로 합친다 */
+  function hanaResolve(h, master){
+    var find=cardFinder(master), hf=find(h.masked), head=hf&&hf.card?hf.card:null, rowCards={};
+    (h.rows||[]).forEach(function(r){ if(!r.no) return; var f=find(r.no); if(f&&f.card) rowCards[f.card.id]=f.card; });
+    var ids=Object.keys(rowCards).filter(function(id){ return !head || id!==head.id; }), other=ids.length===1?rowCards[ids[0]]:null;
+    h.renew=null;
+    if(other && other.issuer==="하나" && h.sameCust!==false){
+      if(!head && !(hf&&hf.ambiguous)) h.renew={newNo:h.masked, toId:other.id, fromId:""};
+      else if(head && head.issuer===other.issuer && head.checkSrc===other.checkSrc && head.reclass===other.reclass) h.renew={newNo:head.cardNo, toId:other.id, fromId:head.id};
+    }
+    h.cardId=h.renew?h.renew.toId:(head?head.id:(ids.length===1?ids[0]:""));
+    h.ambiguous=hf&&hf.ambiguous?hf.ambiguous.map(function(c){ return c.id; }):null;
+    return h;
   }
   /* ERP 전표 엑셀출력 — 순번이 1로 다시 시작하는 지점에서 전표를 나눈다 */
   function parseErp(aoa, hdr){
@@ -17914,12 +18033,24 @@ var CP=(function(){
     }
     return slips.map(classifySlip);
   }
+  /* [v108] ERP 라인 단위 분류(classifyChairErpLine) — 한 엑셀출력 안에 카드전표·가지급금 전표가 섞이고, 가지급금 전표에도 미지급금(법인개인카드) 대변이 나온다
+     cardUse   차변 'YYYY년M월/법인카드/이름/…/승인번호' → 승인번호로 카드 매칭(E)
+     cardHeader 대변 2135160 'YYYY년M월/법인카드/…/'(승인번호 없음) → 카드전표 총액
+     cardMonth 대변 2135150·2135160, 적요에 카드사·월 표기 → 그 카드 F
+     otherCredit 그 밖의 대변 2135150·2135160 → 카드 금액 아님(참고 '카드사·월 표기 없음')
+     info      미지급금(사원경비)·가지급금·여비교통비 등 → 참고 */
+  var CARD_HDR_RE=/^\d{4}년\s*\d{1,2}월\s*\/\s*법인카드\s*\//;
+  var CARD_MONTH_RE=[/(삼성|하나|롯데|신한|농협)\s*카드\s*(\d{1,2})\s*월/, /(\d{1,2})\s*월\s*(삼성|하나|롯데|신한|농협)\s*카드/];   // "하나카드 10월" · "삼성카드10월" · "6월 삼성카드"
+  function cardMonthOf(memo){ var s=S(memo), m=s.match(CARD_MONTH_RE[0]); if(m) return {issuer:m[1], month:+m[2]}; m=s.match(CARD_MONTH_RE[1]); if(m) return {issuer:m[2], month:+m[1]}; return null; }
+  function tripOf(memo){ var t=S(memo).match(/([가-힣A-Za-z]+\s*[가-힣]*\s*해외출장비)\s*\(([\d.\s\-~]+)\)/); return t?{trip:t[1], period:t[2]}:{trip:"", period:""}; }
   function classifySlip(sl){
     var L=sl.lines, cr=L.filter(function(x){ return x.side==="C"; }), first=cr[0]||L[0]||{};
+    var hdrL=cr.filter(function(x){ return x.code==="2135160" && CARD_HDR_RE.test(x.memo); });
+    if(hdrL.length) first=hdrL[0];
     sl.manager=first.m3n||""; sl.managerCode=first.m3c||"";
-    if(cr.some(function(x){ return x.code==="2135160"; })){
+    if(hdrL.length){
       sl.type="card";
-      sl.credit=cr.filter(function(x){ return x.code==="2135160"; }).reduce(function(a,x){ return a+x.amt; },0);
+      sl.credit=hdrL.reduce(function(a,x){ return a+x.amt; },0);
       var deb=L.filter(function(x){ return x.side==="D"; }), groups={}, order=[], noAppr=[];
       deb.forEach(function(x){ var m=x.memo.match(/\/\s*(\d+)\s*$/), k=m?apprKey(m[1]):"";
         if(!k){ noAppr.push(x); return; }
@@ -17927,12 +18058,25 @@ var CP=(function(){
       sl.groups=order.map(function(k){ return groups[k]; }); sl.noAppr=noAppr;
       sl.debit=deb.reduce(function(a,x){ return a+x.amt; },0); sl.balanced=(sl.debit===sl.credit);
       var mm=(L[0]||{}).memo.match(/^(\d{4})년\s*(\d{1,2})월/); sl.useMonth=mm?mm[1]+"-"+("0"+mm[2]).slice(-2):"";
-    } else if(L.some(function(x){ return x.code==="1165220"; }) && cr.some(function(x){ return x.code==="2135150"; })){
+      return sl;
+    }
+    var cm=[], oc=[];
+    cr.forEach(function(x){ if(x.code!=="2135150" && x.code!=="2135160") return; var k=cardMonthOf(x.memo), tp=tripOf(x.memo);
+      if(k) cm.push({amt:x.amt, m4c:dg(x.m4c), memo:x.memo, cardId:"", code:x.code, acct:x.name, issuer:k.issuer, month:k.month, holder:x.m3n||"", trip:tp.trip, period:tp.period, key:x.code+"|"+x.amt+"|"+x.memo});
+      else oc.push({amt:x.amt, memo:x.memo, code:x.code, acct:x.name}); });   // 카드사·월 표기 없는 라인 — 카드번호는 보관하지 않는다
+    /* [v109] 미지급금(사원경비)(2135120) 대변 중 적요에 '현금'이 든 라인 = 카드 미반영분 추정 후보(cashGuess) — 사용자가 [확인]해야 카드 F에 반영 */
+    var cg=cr.filter(function(x){ return x.code==="2135120" && /현금/.test(x.memo); }).map(function(x){ var mm=S(x.memo).match(/(\d{4})년\s*(\d{1,2})월/);
+      return {amt:x.amt, memo:x.memo, holder:x.m3n||"", month:mm?+mm[2]:0, acct:x.name, key:"cash|"+x.amt+"|"+x.memo+"|"+(x.m3n||""), cash:true}; });
+    var hasAdv=L.some(function(x){ return x.code==="1165220"; });
+    if(cm.length || cg.length || (hasAdv && oc.length)){
       sl.type="advance";
-      sl.mode=L.some(function(x){ return x.code==="1165220" && x.side==="C"; })?"settle":"prepay";   // 정산형(가지급금 대변) / 선지급형(가지급금 차변)
-      sl.cardLines=cr.filter(function(x){ return x.code==="2135150"; }).map(function(x){ return {amt:x.amt, m4c:dg(x.m4c), memo:x.memo, cardId:""}; });
+      if(cm.length && cm[0].holder){ sl.manager=cm[0].holder; }
+      else if(cg.length && cg[0].holder){ sl.manager=cg[0].holder; }
+      else if((L[0]||{}).m3n){ sl.manager=L[0].m3n; }
+      sl.mode=hasAdv?(L.some(function(x){ return x.code==="1165220" && x.side==="C"; })?"settle":"prepay"):(cm.length?"card":"cash");   // 정산형(가지급금 대변) / 선지급형(가지급금 차변) / [v109] 카드분 추가 전표 / 사원경비(현금) 전표
+      sl.cardLines=cm; sl.otherCards=oc; sl.cashLines=cg;
       sl.expense=cr.filter(function(x){ return x.code==="2135120"; }).reduce(function(a,x){ return a+x.amt; },0);   // 미지급금(사원경비) — 카드 금액 아님
-      var t=(L[0]||{}).memo.match(/([가-힣A-Za-z]+\s*[가-힣]*\s*해외출장비)\s*\(([\d.\s\-~]+)\)/); sl.trip=t?t[1]:""; sl.period=t?t[2]:"";
+      var t=tripOf((L[0]||{}).memo); sl.trip=t.trip; sl.period=t.period;
       var items={}; L.filter(function(x){ return x.side==="D" && (x.code==="4316120"||x.code==="1165220"); }).forEach(function(x){ var k=(x.memo.split("-").pop()||"").trim()||x.name; items[k]=(items[k]||0)+x.amt; });
       sl.items=Object.keys(items).map(function(k){ return {k:k, amt:items[k]}; });
       sl.advanceCredit=cr.filter(function(x){ return x.code==="1165220"; }).reduce(function(a,x){ return a+x.amt; },0);
@@ -17971,13 +18115,76 @@ var CP=(function(){
   }
   /* 가지급금 전표의 미지급금(법인카드) 라인 → 카드 */
   function assignAdvance(sl, master){
-    var cards=master.filter(function(c){ return c.checkSrc==="erp:"+sl.manager; });
+    /* [v108] 적요 카드사 → 그 담당자의 chair 카드 중 같은 카드사 → 둘 이상이면 CD_MNGD4 숫자(이전 카드번호여도 재발급 묶음으로 찾음) */
     sl.cardLines.forEach(function(x){
-      var c=x.m4c?master.filter(function(m){ return dg(m.cardNo)===x.m4c; })[0]:null;
-      if(!c){ var iss=/삼성카드/.test(x.memo)?"삼성":/하나카드/.test(x.memo)?"하나":/롯데카드/.test(x.memo)?"롯데":""; var cs=cards.filter(function(m){ return m.issuer===iss; }); if(cs.length===1) c=cs[0]; }
+      var mgr=x.holder||sl.manager, mine=master.filter(function(c){ return c.checkSrc==="erp:"+mgr; });
+      var chair=mine.filter(function(c){ return c.reclass==="chair"; }), pool=(chair.length?chair:mine).filter(function(c){ return c.issuer===x.issuer; }), c=null;
+      if(pool.length===1) c=pool[0];
+      else if(x.m4c){ var hit=(pool.length?pool:master).filter(function(m){ return cardNos(m).some(function(n){ var d=dg(n); return d===x.m4c || (x.m4c.length>=4 && d.length>=4 && d.slice(-4)===x.m4c.slice(-4) && d.slice(0,4)===x.m4c.slice(0,4)); }); }); if(hit.length===1) c=hit[0]; }
       x.cardId=c?c.id:"";
     });
     return sl;
+  }
+
+  /* [v108] 표시 카드번호 = 명세서 머리 번호(하나 이용내역 A1 · Ez-Work) — 묶음 번호 중 앞 4·뒤 4가 같은 것(전체 번호 우선). 이전 번호 = 이번 달 원자료 행에 나온 다른 번호 */
+  function shownNoOf(c, h, ez){
+    var nos=cardNos(c), head=h?h.masked:(ez&&ez.no?ez.no:""), pick=null;
+    if(head){ var d=dg(head), a=d.slice(0,4), z=d.slice(-4); var hit=nos.filter(function(n){ var x=dg(n); return x.slice(0,4)===a && x.slice(-4)===z; });
+      pick=hit.filter(function(n){ return !/\*/.test(n); })[0]||hit[0]||null; }
+    if(!pick) pick=c.cardNo;
+    var pz=dg(pick).slice(-4), old=[];
+    if(h) (h.rows||[]).forEach(function(r){ var z=dg(r.no).slice(-4); if(z && z!==pz && old.indexOf(z)<0) old.push(z); });
+    return {no:pick, old:old};
+  }
+  /* [v108] 교차검증 '미매칭 원자료 = 적요 카드분'(종전 '해외매입 = 가지급금' 대체) — 경고만, 계산은 바꾸지 않는다
+     미매칭 원자료: 삼성 = 승인내역 중 ERP 카드전표에 없는 행 + 해외매입 행 · 하나 = 이용내역 중 ERP에 없는 행(당월결제금액)
+     짝: 같은 금액 1건 → 같은 합의 여러 건 → 해외 행 이용원금 합(차액 = 환가료). 남는 행·짝 없는 라인 = 차이 사유 */
+  function unmatchedCheck(rows, match, src, hanaBy, warn, cashPend){
+    var mBy={}; Object.keys(match).forEach(function(k){ match[k].rows.forEach(function(x){ if(x.cardId && x.status!=="none") (mBy[x.cardId]=mBy[x.cardId]||{})[x.appr]=1; }); });
+    var useM=src.useMonth||"", money=function(v){ return Number(v).toLocaleString("ko-KR"); };
+    rows.forEach(function(r){ var c=r.c; if(c.reclass!=="chair") return;
+      var mk=mBy[c.id]||{}, U=[];
+      if(c.issuer==="하나"){ var h=hanaBy[c.id]; if(!h) return;
+        h.rows.forEach(function(x){ if(x.appr && mk[x.appr]) return; if(!x.pay && !x.base) return; U.push({src:"하나", appr:x.appr, date:x.date, merchant:x.merchant, amt:x.pay, base:x.base, intl:/해외/.test(x.kind||"")}); }); }
+      else { if(!src.approval) return;
+        src.approval.rows.forEach(function(x){ if(x.cardId!==c.id || (x.appr && mk[x.appr])) return; U.push({src:"승인", appr:x.appr, date:x.date, merchant:x.merchant, amt:x.amt, base:x.amt, intl:false}); });
+        ((src.foreign&&src.foreign.rows)||[]).forEach(function(x){ if(x.cardId!==c.id) return; U.push({src:"해외", appr:x.appr, date:x.date, merchant:x.merchant, amt:x.amt, base:x.amt, intl:true}); }); }
+      var sum=U.reduce(function(a,x){ return a+x.amt; },0), F=r.adv+(r.cash||0), used={}, pairs=[], reasons=[], fees=[];
+      var free=function(f){ return U.map(function(x,i){ return i; }).filter(function(i){ return !used[i] && f(U[i]); }); };
+      (r.advParts||[]).slice().sort(function(a,b){ return b.amt-a.amt; }).forEach(function(Ln){
+        var one=free(function(x){ return x.amt===Ln.amt; });
+        if(one.length){ used[one[0]]=1; pairs.push({line:Ln, rows:[U[one[0]]]}); return; }
+        var C=free(function(x){ return x.amt>0; });
+        if(C.length && C.length<=24){ var ss=subsetSum(C.map(function(i){ return U[i].amt; }), Ln.amt);
+          if(ss.sol && !ss.amb){ var G=ss.sol.map(function(q){ return C[q]; }); G.forEach(function(i){ used[i]=1; }); pairs.push({line:Ln, rows:G.map(function(i){ return U[i]; })}); return; } }
+        var CI=free(function(x){ return x.intl && x.base>0; });
+        if(CI.length && CI.length<=24){ var tb=CI.reduce(function(a,i){ return a+U[i].base; },0), G2=null;
+          if(tb===Ln.amt) G2=CI; else { var s2=subsetSum(CI.map(function(i){ return U[i].base; }), Ln.amt); if(s2.sol && !s2.amb) G2=s2.sol.map(function(q){ return CI[q]; }); }
+          if(G2){ G2.forEach(function(i){ used[i]=1; }); var pa=G2.reduce(function(a,i){ return a+U[i].amt; },0); pairs.push({line:Ln, rows:G2.map(function(i){ return U[i]; }), base:true});
+            if(pa!==Ln.amt){ var fr={t:"해외 "+G2.length+"건 환가료 — 명세서는 환가료 포함 "+money(pa)+", 적요 카드분은 이용원금 "+money(Ln.amt), amt:pa-Ln.amt}; reasons.push(fr); fees.push({amt:pa-Ln.amt, reason:fr, desc:"해외 "+G2.length+"건 환가료 "+money(pa-Ln.amt)}); }
+            return; } }
+        /* [v109] 남은 차액끼리(환가료 · 남은 원자료, 음수 포함 3개까지) 합이 라인 금액과 같으면 짝 — 예: 하나카드 10월분 추가 5,295 = 환가료 5,495 + 09-05 철도 −200 */
+        var pool=fees.filter(function(f){ return !f.used; }).map(function(f){ return {fee:f, amt:f.amt}; }).concat(free(function(x){ return x.amt!==0; }).map(function(i){ return {i:i, amt:U[i].amt}; })).slice(0,30), hitC=null;
+        for(var a=0;a<pool.length && !hitC;a++){ if(pool[a].amt===Ln.amt){ hitC=[pool[a]]; break; }
+          for(var b=a+1;b<pool.length && !hitC;b++){ if(pool[a].amt+pool[b].amt===Ln.amt){ hitC=[pool[a],pool[b]]; break; }
+            for(var e=b+1;e<pool.length;e++) if(pool[a].amt+pool[b].amt+pool[e].amt===Ln.amt){ hitC=[pool[a],pool[b],pool[e]]; break; } } }
+        if(hitC){ var rr=[], dd=[]; hitC.forEach(function(p){ if(p.fee){ p.fee.used=true; reasons.splice(reasons.indexOf(p.fee.reason),1); dd.push(p.fee.desc); } else { used[p.i]=1; rr.push(U[p.i]); } });
+          pairs.push({line:Ln, rows:rr, extra:dd}); return; }
+        pairs.push({line:Ln, rows:[]}); reasons.push({t:"적요 카드분 "+(Ln.trip||Ln.memo)+" "+money(Ln.amt)+" — 짝지을 카드사 원자료 없음", amt:-Ln.amt});
+      });
+      var grp={}, order=[]; U.forEach(function(x,i){ if(used[i]) return; var k=x.appr?x.src+"|"+x.appr:"i"+i; if(!grp[k]){ grp[k]=[]; order.push(k); } grp[k].push(x); });
+      order.forEach(function(k){ var g=grp[k], a=g.reduce(function(s,x){ return s+x.amt; },0); if(!a) return;
+        var x0=g[0], pos=g.filter(function(x){ return x.base>0; }).reduce(function(s,x){ return s+x.base; },0), neg=g.filter(function(x){ return x.base<0; }).reduce(function(s,x){ return s-x.base; },0);
+        var t=(x0.date?x0.date.slice(5)+" ":"")+String(x0.merchant||"").replace(/\s+/g," ")+(x0.appr?" 승인 "+x0.appr:"")+(neg&&pos?" 순액(발매 "+money(pos)+" − 취소 "+money(neg)+")":"");
+        if(useM && x0.date && x0.date.slice(0,7)<useM) t+=a<0?" (전월 이용 취소분)":" (전월 이용분)";
+        /* [v109] 미지급금(사원경비) 현금 라인과 같은 금액이면 추정 후보(같은 담당자, 확인 전) */
+        var cp=(cashPend||[]).filter(function(x){ return !x.suggest && x.amt===a && (!x.holder || c.checkSrc==="erp:"+x.holder); })[0];
+        if(cp){ cp.suggest=c.id; cp.suggestDesc=ISSUER_NAME(c.issuer)+" "+maskCardNo(r.shownNo||c.cardNo)+" 미매칭 "+t+" "+money(a); t+=" · 추정: 미지급금(사원경비) 현금 "+money(cp.amt)+"과 같은 금액 — [확인]하면 반영"; }
+        reasons.push({t:t+" — ERP 카드전표 미반영", amt:a}); });
+      var diff=sum-F;
+      r.uncheck={src:c.issuer, sum:sum, F:F, diff:diff, reasons:reasons, pairs:pairs, n:U.length};
+      if(diff!==0) warn.push(ISSUER_NAME(c.issuer)+" "+maskCardNo(r.shownNo||c.cardNo)+" 미매칭 "+money(sum)+" − 적요 카드분 "+money(F)+" = "+money(diff)+" · 사유 "+reasons.length+"건");
+    });
   }
 
   /* ---------- 3-4·3-5. 금액 계산 ---------- */
@@ -17988,7 +18195,19 @@ var CP=(function(){
     var slips=(src.erpSlips||[]), cardSlips={}, advs=[], warn=[];
     slips.forEach(function(sl){ if(sl.type==="card"){ if(cardSlips[sl.manager]) warn.push("ERP "+sl.manager+" 카드 전표가 두 번 들어왔습니다 — 마지막 파일을 씁니다"); cardSlips[sl.manager]=sl; } else if(sl.type==="advance") advs.push(assignAdvance(sl, master)); });
     var match={}; Object.keys(cardSlips).forEach(function(k){ match[k]=matchErp(cardSlips[k], master, src); });
-    var adv={}; advs.forEach(function(sl){ sl.cardLines.forEach(function(x){ if(x.cardId) adv[x.cardId]=(adv[x.cardId]||0)+x.amt; else warn.push("가지급금 전표의 미지급금(법인카드) "+x.amt+"원 — 카드를 찾지 못했습니다"); }); });
+    /* [v108] F = 적요 카드분(cardMonth) 합계 — 계정(법인카드·법인개인카드) 무관. 적요 월 ≠ 이용월(결제월−1)이면 기본 제외 + [포함] */
+    var useMo=src.useMonth?+String(src.useMonth).slice(5,7):0, inc=(man&&man.__cm)||{}, advParts={};
+    var adv={}; advs.forEach(function(sl){ sl.cardLines.forEach(function(x){
+      x.monthOk=!useMo || x.month===useMo; x.included=x.monthOk || inc[x.key]===true;
+      if(!x.monthOk) warn.push("적요 월("+x.month+"월) ≠ 이용월("+useMo+"월): "+(x.trip||x.memo)+" "+x.amt.toLocaleString("ko-KR")+(x.included?" — 포함함":" — 기본 제외(가지급금 전표 목록에서 [포함])"));
+      if(!x.included) return;
+      if(x.cardId){ adv[x.cardId]=(adv[x.cardId]||0)+x.amt; (advParts[x.cardId]=advParts[x.cardId]||[]).push(x); }
+      else warn.push("적요 카드분 "+x.amt.toLocaleString("ko-KR")+"원("+(x.trip||x.memo)+") — 카드를 찾지 못했습니다"); }); });
+    /* [v109] 미지급금(사원경비) 현금 라인(cashGuess) — 사용자가 [확인]한 것만 그 카드 F에 반영(man.__cash[key] = 카드 id). 확인 전에는 추정 후보로만 보인다 */
+    var cashOk=(man&&man.__cash)||{}, cashAdd={}, cashPend=[], cashAll=[], ids0={}; master.forEach(function(c){ ids0[c.id]=1; });
+    advs.forEach(function(sl){ (sl.cashLines||[]).forEach(function(x){ x.monthOk=!useMo || !x.month || x.month===useMo; x.confirmedTo=ids0[cashOk[x.key]]?cashOk[x.key]:""; x.suggest=""; x.suggestDesc=""; cashAll.push(x);
+      if(x.confirmedTo){ cashAdd[x.confirmedTo]=(cashAdd[x.confirmedTo]||0)+x.amt; (advParts[x.confirmedTo]=advParts[x.confirmedTo]||[]).push(x); }
+      else if(x.monthOk) cashPend.push(x); }); });
     var hanaBy={}; (src.hana||[]).forEach(function(h){ if(h.cardId) hanaBy[h.cardId]=h; });
     var fx={}; ((src.foreign&&src.foreign.rows)||[]).forEach(function(r){ fx[r.cardId]=(fx[r.cardId]||0)+r.amt; });
     var dom={}; ((src.approval&&src.approval.rows)||[]).forEach(function(r){ dom[r.cardId]=(dom[r.cardId]||0)+r.amt; });
@@ -18002,14 +18221,14 @@ var CP=(function(){
       var mt=mgr&&match[mgr]?match[mgr]:null, matched=mt?(mt.byCard[c.id]||0):0;
       var G=num(m.G), Hh=num(m.H), E=0, F=0, rcVals=false;
       var ov=num(m.ov), pre=num(m.pre), can=num(m.can);
-      if(c.reclass==="chair"){ E=matched; F=(adv[c.id]||0)+ov-pre-can; rcVals=true; }
+      if(c.reclass==="chair"){ E=matched; F=(adv[c.id]||0)+(cashAdd[c.id]||0)+ov-pre-can; rcVals=true; }   // [v109] + 확인한 사원경비(현금)
       else if(c.reclass==="stmt"){ F=bill||0; rcVals=true; }
       else if(c.reclass==="erpMatch"){ F=matched; rcVals=true; }
       else if(c.reclass==="stmtMinusE"){ E=num(m.E); F=(bill||0)-E; rcVals=true; }
       else if(c.reclass==="verifyOnly"){ F=bill||0; }                         // 계정대체 검증표 확인용 — 요약·최종표에는 넣지 않는다
       var I=E+F+G+Hh;
       var check=null, checkNote="";
-      if(mgr){ if(!mt){ check=0; checkNote="ERP 전표 미업로드"; } else check=(c.reclass==="chair")?(matched+(adv[c.id]||0)+ov-pre-can):matched; }
+      if(mgr){ if(!mt){ check=0; checkNote="ERP 전표 미업로드"; } else check=(c.reclass==="chair")?(matched+(adv[c.id]||0)+(cashAdd[c.id]||0)+ov-pre-can):matched; }
       else if(c.checkSrc==="manual"){ check=(m.check!=null&&m.check!=="")?num(m.check):bill; }
       var diff=(bill!=null&&check!=null)?bill-check:null;
       var notes=[]; if(checkNote) notes.push(checkNote); if(billNote && c.billSrc!=="manual") notes.push(billNote);
@@ -18017,23 +18236,25 @@ var CP=(function(){
         var firstId=master.filter(function(x){ return x.checkSrc===c.checkSrc; })[0];                 // 미매칭은 담당자의 첫 카드 행에 한 번만 적는다
         if(mt.unmatched.length && firstId && firstId.id===c.id) notes.push("ERP 미매칭 "+mt.unmatched.length+"건 "+mt.unmatched.reduce(function(a,x){return a+x.erp;},0).toLocaleString("ko-KR")+"원"); }
       if(m.note) notes.push(String(m.note));
+      var shown=shownNoOf(c, hanaBy[c.id], ez&&ez[c.id]); if(shown.old.length) notes.push("구 "+shown.old.join("·"));   // [v108] 재발급 이전 번호
       var pdf=src.pdf&&src.pdf[c.id]?src.pdf[c.id]:null, stmtOk=m.stmtOk===true?true:(pdf&&bill!=null?pdf.total===bill:null);
       var inFinal=c.reclass!=="verifyOnly" && c.reclass!=="none" && I!==0;
       var stmtAmt=bill;                                                   // 명세서 금액(삼성=Ez-Work, 하나=이용내역, 그 외 수기/PDF)
       var rcMatch=stmtAmt==null?null:(I===stmtAmt);
       return {c:c, bill:bill, billNote:billNote, check:check, diff:diff, notes:notes, E:E, F:F, G:G, H:Hh, I:I, rcVals:rcVals, inFinal:inFinal, stmtAmt:stmtAmt, rcMatch:rcMatch,
-        matched:matched, adv:adv[c.id]||0, ov:ov, pre:pre, can:can, pdf:pdf, stmtOk:stmtOk, dom:dom[c.id]||0, fx:fx[c.id]||0};
+        matched:matched, adv:adv[c.id]||0, ov:ov, pre:pre, can:can, pdf:pdf, stmtOk:stmtOk, dom:dom[c.id]||0, fx:fx[c.id]||0, shownNo:shown.no, oldTail:shown.old, advParts:advParts[c.id]||[], cash:cashAdd[c.id]||0};
     });
     var R={}; rows.forEach(function(r){ R[r.c.id]=r; });
-    /* 해외 교차검증(삼성): 국내 승인 + 해외매입 = 청구, chair 는 해외매입 = 가지급금 F */
+    /* 해외 교차검증(삼성): 국내 승인 + 해외매입 = 청구. [v108] chair '해외매입 = 가지급금 F'는 삭제(출장 선결제가 국내 승인일 수 있음) → '미매칭 원자료 = 적요 카드분' */
     var xcheck=[]; rows.forEach(function(r){ if(r.c.issuer!=="삼성" || r.bill==null || !src.approval) return; if(!r.fx && !(r.c.reclass==="chair" && r.adv)) return;
-      var ok1=(r.dom+r.fx===r.bill), ok2=r.c.reclass==="chair"?(r.fx===r.adv):null;
-      xcheck.push({id:r.c.id, dom:r.dom, fx:r.fx, bill:r.bill, ok:ok1, adv:r.adv, okAdv:ok2});
-      if(!ok1) warn.push(maskCardNo(r.c.cardNo)+" 국내 승인 "+r.dom+" + 해외 "+r.fx+" ≠ 청구 "+r.bill);
-      if(ok2===false) warn.push(maskCardNo(r.c.cardNo)+" 해외매입 "+r.fx+" ≠ 가지급금 전표 "+r.adv); });
+      var ok1=(r.dom+r.fx===r.bill);
+      xcheck.push({id:r.c.id, dom:r.dom, fx:r.fx, bill:r.bill, ok:ok1});
+      if(!ok1) warn.push(maskCardNo(r.shownNo||r.c.cardNo)+" 국내 승인 "+r.dom+" + 해외 "+r.fx+" ≠ 청구 "+r.bill); });
+    unmatchedCheck(rows, match, src, hanaBy, warn, cashPend);
+    cashPend.forEach(function(x){ if(x.suggest) warn.push("추정 확인 필요: "+(x.holder||"")+" 미지급금(사원경비) 현금 "+x.amt.toLocaleString("ko-KR")+" = "+x.suggestDesc+" — 맞으면 [확인]"); });
     /* 회장님 총액 검증 */
     var chairChk=[]; Object.keys(match).forEach(function(k){ var cs=rows.filter(function(r){ return r.c.reclass==="chair" && r.c.checkSrc==="erp:"+k; }); if(!cs.length) return;
-      var e=cs.reduce(function(a,r){ return a+r.E; },0), f=cs.reduce(function(a,r){ return a+r.adv; },0), at=advs.filter(function(s){ return s.manager===k; }).reduce(function(a,s){ return a+s.cardLines.reduce(function(b,x){ return b+x.amt; },0); },0);
+      var e=cs.reduce(function(a,r){ return a+r.E; },0), f=cs.reduce(function(a,r){ return a+r.adv; },0), at=advs.reduce(function(a,s){ return a+s.cardLines.reduce(function(b,x){ return b+((x.holder||s.manager)===k && x.included!==false?x.amt:0); },0); },0);   // [v108] 적요 카드분(포함된 라인)
       chairChk.push({manager:k, erp:match[k].total, e:e, okE:e===match[k].total, advTotal:at, f:f, okF:f===at, cards:cs.map(function(r){ return {id:r.c.id, issuer:r.c.issuer, E:r.E, F:r.F}; })}); });
     var final=rows.filter(function(r){ return r.inFinal; });
     var sum=function(a,k){ return a.reduce(function(s,r){ return s+r[k]; },0); };
@@ -18044,7 +18265,7 @@ var CP=(function(){
     var payTotal=blocks.reduce(function(s,b){ return s+b.total; },0);
     var diffN=rows.filter(function(r){ return r.diff!=null && r.diff!==0; }).length;
     return {rows:rows, R:R, final:final, finalTot:{E:sum(final,"E"),F:sum(final,"F"),G:sum(final,"G"),H:sum(final,"H"),I:sum(final,"I")},
-      match:match, advs:advs, adv:adv, blocks:blocks, payTotal:payTotal, diffN:diffN, xcheck:xcheck, chairChk:chairChk, warn:warn};
+      match:match, advs:advs, adv:adv, blocks:blocks, payTotal:payTotal, diffN:diffN, xcheck:xcheck, chairChk:chairChk, warn:warn, cashGuess:cashAll};   // [v109]
   }
 
   /* ---------- 3-6. PDF 명세서 (첫 페이지 텍스트) ---------- */
@@ -18054,13 +18275,13 @@ var CP=(function(){
     if(/삼성카드/.test(flat) || /총이용금액은/.test(flat)){ out.issuer="삼성";
       m=flat.match(/총이용금액은([\d,]+)원/); if(m) out.total=num(m[1]);
       m=flat.match(/결제일(\d{4})\.(\d{1,2})\.(\d{1,2})/); if(m) out.payDate=m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2);
-      var h3=(flat.match(/법인(\d{3})(?!\d)/)||[])[1]||"", h4=((fn.match(/(\d{4})(?!.*\d{4})/)||[])[1])||"";
+      var fnN=fn.replace(/20\d{2}\s*[.\-_년]\s*\d{1,2}/g," "), h3=(flat.match(/법인(\d{3})(?!\d)/)||[])[1]||"", h4=((fnN.match(/(\d{4})(?!.*\d{4})/)||[])[1])||"";   // [v108] 파일명의 연월(2026.11)은 카드 뒤 4자리가 아니다
       out.hint=h4||h3; out.cands=master.filter(function(c){ var d=dg(c.cardNo); return c.issuer==="삼성" && ((h4 && d.slice(-4)===h4) || (!h4 && h3 && d.slice(-3)===h3)); });
     } else if(/하나카드/.test(flat) || /결제하실총금액/.test(flat)){ out.issuer="하나";
       m=flat.match(/결제하실총금액([\d,]+)/); if(m) out.total=num(m[1]);
       m=flat.match(/결제일(\d{4})\.(\d{1,2})\.(\d{1,2})/); if(m) out.payDate=m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2);
       m=flat.match(/(\d{4})-?\*{4}-?\*{4}-?(\d{4})/); out.hint=m?m[1]+"-****-****-"+m[2]:"";
-      out.cands=m?master.filter(function(c){ var d=dg(c.cardNo); return d.slice(0,4)===m[1] && d.slice(-4)===m[2]; }):[];
+      out.cands=m?master.filter(function(c){ return cardNos(c).some(function(n){ var d=dg(n); return d.slice(0,4)===m[1] && d.slice(-4)===m[2]; }); }):[];
     } else if(/롯데카드/.test(flat) || /이번달입금하실금액/.test(flat)){ out.issuer="롯데";
       m=flat.match(/이번달입금하실금액총?([\d,]+)원/); if(m) out.total=num(m[1]);
       m=flat.match(/결제일:?(\d{4})년(\d{1,2})월(\d{1,2})일/); if(m) out.payDate=m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2);
@@ -18104,7 +18325,7 @@ var CP=(function(){
     var n=rc.length, sumStart=3, sumTot=sumStart+n, vHead=sumTot+3, vStart=vHead+1, vTot=vStart+n, memoR=vTot+3, fHead=memoR+11, fStart=fHead+1, fTot=fStart+model.final.length;
     head(2);
     rc.forEach(function(r,i){ var R=sumStart+i, V=vStart+i, show=r.c.reclass!=="verifyOnly" && r.c.reclass!=="none";
-      A.set("B"+R,ST.sum.B,ISSUER_NAME(r.c.issuer)); A.set("C"+R,ST.sum.C,fmtCardNo(r.c.cardNo)); A.set("D"+R,ST.sum.D,lbl(r.c));
+      A.set("B"+R,ST.sum.B,ISSUER_NAME(r.c.issuer)); A.set("C"+R,ST.sum.C,fmtCardNo(r.shownNo||r.c.cardNo)); A.set("D"+R,ST.sum.D,lbl(r.c));
       var e=show?r.E:0, f=show?r.F:0, g=show?r.G:0, h=show?r.H:0;
       A.set("E"+R,ST.sum.E,{f:"$E"+V, v:r.c.reclass==="none"?0:r.E});
       A.set("F"+R,ST.sum.F,r.c.reclass==="verifyOnly"?null:{f:"$F"+V, v:f});
@@ -18118,7 +18339,7 @@ var CP=(function(){
     head(vHead); A.set("J"+vHead,13,null); A.set("K"+vHead,14,null);
     var vt={E:0,F:0,G:0,H:0,I:0};
     rc.forEach(function(r,i){ var R=vStart+i, c=r.c, sam=c.issuer==="삼성";
-      A.set("B"+R,ST.v.B,ISSUER_NAME(c.issuer)); A.set("C"+R,ST.v.C,fmtCardNo(c.cardNo)); A.set("D"+R,ST.v.D,lbl(c));
+      A.set("B"+R,ST.v.B,ISSUER_NAME(c.issuer)); A.set("C"+R,ST.v.C,fmtCardNo(r.shownNo||c.cardNo)); A.set("D"+R,ST.v.D,lbl(c));
       var E=c.reclass==="chair"||(c.reclass==="stmtMinusE"&&r.E)?r.E:null, F=(c.reclass==="none")?null:r.F;
       A.set("E"+R,ST.v.E,E); A.set("F"+R,ST.v.F,F); A.set("G"+R,ST.v.G,r.G||null); A.set("H"+R,ST.v.H,r.H||null);
       var I=(E||0)+(F||0)+(r.G||0)+(r.H||0); vt.E+=E||0; vt.F+=F||0; vt.G+=r.G||0; vt.H+=r.H||0; vt.I+=I;
@@ -18127,6 +18348,7 @@ var CP=(function(){
       var K=sam?null:(r.stmtAmt==null?null:r.stmtAmt); A.set("K"+R,sam?ST.v.K:ST.v.Kin,K);
       A.set("L"+R,ST.v.L,sam?{f:"I"+R+"=J"+R+"+K"+R, v:I===(+J||0)+(K||0)}:{f:"I"+R+"=K"+R, v:I===(K||0)});
       if(c.rcNote){ var nn=String(c.rcNote).split(/\s*·\s*/); A.set("M"+R,6,nn[0]||""); if(nn[1]) A.set("N"+R,6,nn[1]); }
+      else if(r.oldTail && r.oldTail.length) A.set("M"+R,6,"구 "+r.oldTail.join("·"));   // [v108] 재발급 이전 번호
       A.ht[R]=13.2; });
     A.set("B"+vTot,ST.tot,"합계"); A.set("C"+vTot,ST.tot,null); A.set("D"+vTot,ST.tot,null); A.merges.push("B"+vTot+":D"+vTot); A.ht[vTot]=13.2;
     "EFGHI".split("").forEach(function(c){ A.set(c+vTot,ST.totN,{f:"SUM("+c+vStart+":"+c+(vTot-1)+")", v:vt[c]}); });
@@ -18134,7 +18356,7 @@ var CP=(function(){
     "BCDE".split("").forEach(function(c){ A.set(c+memoR,ST.memo,c==="B"?memoTxt:null); }); A.merges.push("B"+memoR+":E"+memoR); A.ht[memoR]=52.95;
     head(fHead);
     model.final.forEach(function(r,i){ var R=fStart+i;
-      A.set("B"+R,ST.sum.B,ISSUER_NAME(r.c.issuer)); A.set("C"+R,ST.sum.C,fmtCardNo(r.c.cardNo)); A.set("D"+R,ST.sum.D,lbl(r.c));
+      A.set("B"+R,ST.sum.B,ISSUER_NAME(r.c.issuer)); A.set("C"+R,ST.sum.C,fmtCardNo(r.shownNo||r.c.cardNo)); A.set("D"+R,ST.sum.D,lbl(r.c));
       A.set("E"+R,ST.sum.E,r.E); A.set("F"+R,ST.sum.F,r.F); A.set("G"+R,ST.sum.G,r.G); A.set("H"+R,ST.sum.H,r.H); A.set("I"+R,ST.sum.I,r.I); A.ht[R]=13.2; });
     A.set("B"+fTot,ST.tot,"합계"); A.set("C"+fTot,ST.tot,null); A.set("D"+fTot,ST.tot,null); A.merges.push("B"+fTot+":D"+fTot); A.ht[fTot]=13.2;
     "EFGHI".split("").forEach(function(c){ A.set(c+fTot,ST.totN,{f:"SUM("+c+fStart+":"+c+(fTot-1)+")", v:model.finalTot[c]}); });
@@ -18151,7 +18373,7 @@ var CP=(function(){
     model.blocks.forEach(function(b){ var R=b.r;
       pc.forEach(function(c,i){ P.set(c+R,ST.hd,phd[i]); }); P.set("H"+R,ST.lbl,b.label); if(b.hidden) P.hidden[R]=1;
       b.rows.forEach(function(r,i){ var x=R+1+i, c=r.c, v=vpos[c.id];
-        P.set("B"+x,ST.pay.B,ISSUER_NAME(c.issuer)); P.set("C"+x,ST.pay.C,fmtCardNo(c.cardNo)); P.set("D"+x,ST.pay.D,c.rcLabel||c.label);
+        P.set("B"+x,ST.pay.B,ISSUER_NAME(c.issuer)); P.set("C"+x,ST.pay.C,fmtCardNo(r.shownNo||c.cardNo)); P.set("D"+x,ST.pay.D,c.rcLabel||c.label);
         P.set("E"+x,ST.pay.E,c.payBank); P.set("F"+x,ST.pay.F,String(c.payAcct||"")); P.set("G"+x,ST.pay.G,{f:"$G$"+v, v:r.bill||0});
         if(!(r.bill)) P.hidden[x]=1; });
       var t=R+1+b.rows.length; "BCDEF".split("").forEach(function(c){ P.set(c+t,ST.payTot,c==="B"?"합계":null); }); P.merges.push("B"+t+":F"+t);
@@ -18163,7 +18385,7 @@ var CP=(function(){
     groups.forEach(function(g){
       var gt={G:0,H:0,I:0};
       g.rows.forEach(function(r){ var x=vpos[r.c.id], c=r.c, sty=c.reclass==="verifyOnly"?ST.vo:ST.vr;
-        P.set("B"+x,sty.B,ISSUER_NAME(c.issuer)); P.set("C"+x,sty.C,fmtCardNo(c.cardNo)); P.set("D"+x,sty.D,c.label);
+        P.set("B"+x,sty.B,ISSUER_NAME(c.issuer)); P.set("C"+x,sty.C,fmtCardNo(r.shownNo||c.cardNo)); P.set("D"+x,sty.D,c.label);
         P.set("E"+x,sty.E,c.payBank||null); P.set("F"+x,sty.F,c.payAcct?String(c.payAcct):null);
         var G=r.bill!=null?r.bill:(c.billSrc==="ezwork"&&r.billNote==="내역없음"?(c.pay?0:"내역없음"):null), Hc=r.check;   // 지급 카드는 0(정본 IFERROR 0), 확인용 카드는 "내역없음"
         P.set("G"+x,sty.G,G); P.set("H"+x,(c.checkSrc==="manual"&&ST.vr===sty)?ST.vr.Hin:sty.H,Hc);
@@ -18198,6 +18420,7 @@ var CP=(function(){
 
   return {S:S, H:H, dg:dg, num:num, apprKey:apprKey, fmtCardNo:fmtCardNo, maskCardNo:maskCardNo, MASTER_DEFAULT:MASTER_DEFAULT, RECLASS:RECLASS, ISSUER_NAME:ISSUER_NAME,
     sortCards:sortCards, sniff:sniff, readSheet:readSheet, parseErp:parseErp, matchErp:matchErp, compute:compute, parseStatementText:parseStatementText,
+    cardFinder:cardFinder, cardNos:cardNos, hanaResolve:hanaResolve, cardMonthOf:cardMonthOf,   // [v108]
     buildSheets:buildSheets, buildXlsx:buildXlsx, MEMO_DEFAULT:MEMO_DEFAULT};
 })();
 
@@ -18267,23 +18490,35 @@ function cpReadOne(f, master){
     else if(r.kind==="hana"){
       if(!r.cardId){ done("hana","하나카드 이용내역 · "+r.masked+" — 카드 목록에서 카드를 찾지 못했습니다",true); return; }
       S.hana=S.hana.filter(function(h){ return h.cardId!==r.cardId; }).concat([r]);
-      done("hana","하나카드 이용내역 · "+r.masked+" · 결제합계 "+fmt(r.total)+" · "+r.rows.length+"건"+(r.sumPay!==r.total?" · ⚠ 행 합계 "+fmt(r.sumPay):"")); }
+      done("hana","하나카드 이용내역 · "+r.masked+" · 결제합계 "+fmt(r.total)+" · "+r.rows.length+"건"+(r.sumPay!==r.total?" · ⚠ 행 합계 "+fmt(r.sumPay):"")+(r.renew?" · 재발급 묶음 후보(금액 확인 탭 위 [연결])":"")); }
     else if(r.kind==="erp"){
       var info=[];
+      S.erpSlips=S.erpSlips.filter(function(x){ return !(x.type==="advance" && x.file===f.name); });   // [v108] 같은 파일을 다시 올릴 때만 지운다(한 파일 안의 가지급금 전표 여러 장은 모두 쓴다)
       r.slips.forEach(function(sl){ sl.file=f.name;
         if(sl.type==="card"){ S.erpSlips=S.erpSlips.filter(function(x){ return !(x.type==="card" && x.manager===sl.manager); }).concat([sl]);
           info.push("ERP "+sl.manager+" 카드전표 · 대변 "+fmt(sl.credit)+" · 승인번호 "+sl.groups.length+"개"+(sl.balanced?"":" · ⚠ 차변 "+fmt(sl.debit))); }
-        else if(sl.type==="advance"){ S.erpSlips=S.erpSlips.filter(function(x){ return !(x.type==="advance" && x.file===f.name); }).concat([sl]);
-          info.push("가지급금 전표("+(sl.mode==="settle"?"정산형":"선지급형")+") · 미지급금(법인카드) "+fmt(sl.cardLines.reduce(function(a,x){ return a+x.amt; },0))); }
+        else if(sl.type==="advance"){ S.erpSlips=S.erpSlips.concat([sl]);
+          info.push(cpModeLabel(sl.mode)+" · 적요 카드분 "+fmt(sl.cardLines.reduce(function(a,x){ return a+x.amt; },0))+(sl.otherCards&&sl.otherCards.length?" · 카드사·월 표기 없음 "+sl.otherCards.length+"건(제외)":"")+(sl.cashLines&&sl.cashLines.length?" · 사원경비(현금) "+fmt(sl.cashLines.reduce(function(a,x){ return a+x.amt; },0))+"(추정 후보)":"")); }
         else info.push("ERP 전표(카드·가지급금 전표 아님)"); });
       done("erp", info.join(" / "), !r.slips.some(function(s){ return s.type!=="other"; })); }
     else done("unknown","알 수 없는 파일 — 머리글로 종류를 찾지 못했습니다",true);
   }).catch(function(e){ done("unknown","읽기 실패: "+(e&&e.message||e),true); });
 }
 function cpRecalc(){
-  var master=cpMaster(CPS.co);
-  var pdf={}; CPS.pdfs.forEach(function(p){ if(p.cardId) pdf[p.cardId]={total:p.total, payDate:p.payDate, name:p.name}; });
-  var src={ezwork:CPS.src.ezwork, approval:CPS.src.approval, foreign:CPS.src.foreign, hana:CPS.src.hana, erpSlips:CPS.src.erpSlips, pdf:pdf};
+  var master0=cpMaster(CPS.co);
+  (CPS.src.hana||[]).forEach(function(h){ CP.hanaResolve(h, master0); });          // [v108] 카드 목록이 바뀌었을 수 있다 — 하나 이용내역을 다시 카드에 붙인다
+  var E=cpEffMaster(master0, CPS.src.hana||[]), master=E.master, to={}; CPS.links=E.links;   // 재발급 묶음 후보는 이번 계산에 임시로 묶는다([연결]하면 카드 목록에 저장)
+  E.links.forEach(function(l){ if(l.fromId) to[l.fromId]=l.toId; });
+  var rm=function(o){ if(!o || !Object.keys(to).length) return o; var x=Object.assign({}, o);
+    if(Array.isArray(o.rows)) x.rows=o.rows.map(function(r){ return to[r.cardId]?Object.assign({}, r, {cardId:to[r.cardId]}):r; });
+    if(Array.isArray(o.cancels)) x.cancels=o.cancels.map(function(r){ return to[r.cardId]?Object.assign({}, r, {cardId:to[r.cardId]}):r; });
+    if(o.byCard){ x.byCard={}; Object.keys(o.byCard).forEach(function(id){ var k=to[id]||id, v=o.byCard[id]; if(!x.byCard[k]) x.byCard[k]=Object.assign({}, v); else { x.byCard[k].bill+=v.bill; x.byCard[k].n+=v.n; } }); }
+    return x; };
+  var find=CP.cardFinder(master), pdf={};
+  CPS.pdfs.forEach(function(p){ var id=p.cardId?(to[p.cardId]||p.cardId):""; if(!id && p.hint && /\*/.test(p.hint)){ var f=find(p.hint); if(f&&f.card) id=f.card.id; }
+    if(id && id!==p.cardId && (!p.cardId || to[p.cardId] || !master.some(function(c){ return c.id===p.cardId; }))) p.cardId=id;   // 명세서 검증 표의 카드 선택도 같은 카드로
+    if(id) pdf[id]={total:p.total, payDate:p.payDate, name:p.name}; });
+  var src={ezwork:rm(CPS.src.ezwork), approval:rm(CPS.src.approval), foreign:rm(CPS.src.foreign), hana:CPS.src.hana, erpSlips:CPS.src.erpSlips, pdf:pdf, useMonth:cpUseMonth(CPS.month)};
   var any=CPS.files.some(function(f){ return f.kind!=="unknown" && f.kind!=="reading"; });
   CPS.model=any&&master.length?CP.compute(master, src, CPS.man):null;
 }
@@ -18327,7 +18562,7 @@ function renderCardpay(){
     return '<div class="filerow"'+(f.bad?' style="border-color:var(--out);color:var(--out)"':'')+'><span>'+esc(f.name)+'</span><span class="chip '+(f.bad?"out":f.kind==="reading"?"nv":"in")+'">'+esc(lab)+'</span><span class="mini">'+esc(f.info)+'</span></div>'; }).join("");
   /* 2. 금액 확인 */
   $$("#cpTabs button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.t===CPS.tab?"true":"false"); });
-  $("#cpWarn").innerHTML=M&&M.warn.length?'<div class="banner warn">'+M.warn.map(esc).join("<br>")+'</div>':'';
+  $("#cpWarn").innerHTML=cpLinkHtml()+cpCashHtml(M)+(M&&M.warn.filter(function(w){ return w.indexOf("추정 확인 필요")!==0; }).length?'<div class="banner warn">'+M.warn.filter(function(w){ return w.indexOf("추정 확인 필요")!==0; }).map(esc).join("<br>")+'</div>':'');   // [v108] 재발급 연결 배너 · [v109] 사원경비(현금) 추정 확인
   $("#cpBody").innerHTML=!M?'<div class="pad"><div class="empty">파일을 올리면 카드별 금액이 계산됩니다.</div></div>':CPS.tab==="pay"?cpPayHtml(M):CPS.tab==="match"?cpMatchHtml(M):cpRcHtml(M);
   /* 3. 명세서 검증 */
   $("#cpPdf").innerHTML=cpPdfHtml(master);
@@ -18347,27 +18582,31 @@ function cpRcHtml(M){
   rows.forEach(function(r){ var c=r.c, m=man[c.id]||{}, v=c.reclass!=="none";
     var stmt=c.billSrc==="manual"?cpIn(c.id,"bill",m.bill):cpMoney(r.stmtAmt);
     var dif=r.rcMatch===false&&r.stmtAmt!=null?' <span class="mini cp-neg">차액 '+fmt(r.I-r.stmtAmt)+'</span>':'';
-    h+='<tr class="'+(r.inFinal?"":"cp-dim")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(c.cardNo))+'</td><td>'+esc(c.rcLabel||c.label)+'</td><td><span class="chip nv">'+esc(CP.RECLASS[c.reclass]||c.reclass)+'</span></td>'+
+    h+='<tr class="'+(r.inFinal?"":"cp-dim")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(r.shownNo||c.cardNo))+(r.oldTail&&r.oldTail.length?' <span class="mini cp-old">구 '+esc(r.oldTail.join("·"))+'</span>':'')+'</td><td>'+esc(c.rcLabel||c.label)+'</td><td><span class="chip nv">'+esc(CP.RECLASS[c.reclass]||c.reclass)+'</span></td>'+
       '<td class="num">'+(c.reclass==="stmtMinusE"?cpIn(c.id,"E",m.E):v?fmt(r.E):'')+'</td><td class="num">'+(v||c.reclass==="verifyOnly"?fmt(r.F):'')+'</td>'+
-      '<td class="num">'+cpIn(c.id,"G",m.G,"sm")+'</td><td class="num">'+cpIn(c.id,"H",m.H,"sm")+'</td><td class="num"><b>'+fmt(r.I)+'</b></td><td class="num">'+stmt+'</td><td class="ctr">'+cpOk(r.rcMatch)+dif+'</td><td class="ctr">'+(r.inFinal?'<span class="chip in">O</span>':'')+'</td></tr>';
-    if(c.reclass==="chair") h+='<tr class="cp-sub"><td></td><td colspan="3" class="mini">F 조정 — 해외내역(사원경비) + · 선지급 − · 취소분 −</td><td></td><td class="num" colspan="3"><span class="mini">해외</span> '+cpIn(c.id,"ov",m.ov,"sm")+' <span class="mini">선지급</span> '+cpIn(c.id,"pre",m.pre,"sm")+' <span class="mini">취소</span> '+cpIn(c.id,"can",m.can,"sm")+'</td><td colspan="4" class="mini">가지급금 전표 '+fmt(r.adv)+(r.ov||r.pre||r.can?' · 조정 '+fmt(r.ov-r.pre-r.can):'')+'</td></tr>';
+      '<td class="num">'+cpIn(c.id,"G",m.G,"sm")+'</td><td class="num">'+cpIn(c.id,"H",m.H,"sm")+'</td><td class="num"><b>'+fmt(r.I)+'</b></td><td class="num">'+stmt+'</td><td class="ctr">'+cpOk(r.rcMatch)+dif+cpWhyHtml(r)+'</td><td class="ctr">'+(r.inFinal?'<span class="chip in">O</span>':'')+'</td></tr>';
+    if(c.reclass==="chair") h+='<tr class="cp-sub"><td></td><td colspan="3" class="mini">F 조정 — 해외내역(사원경비) + · 선지급 − · 취소분 −</td><td></td><td class="num" colspan="3"><span class="mini">해외</span> '+cpIn(c.id,"ov",m.ov,"sm")+' <span class="mini">선지급</span> '+cpIn(c.id,"pre",m.pre,"sm")+' <span class="mini">취소</span> '+cpIn(c.id,"can",m.can,"sm")+'</td><td colspan="4" class="mini">'+cpCmHtml(r)+(r.ov||r.pre||r.can?' · 조정 '+fmt(r.ov-r.pre-r.can):'')+'</td></tr>'+cpDetailRows(r);
   });
   h+='</tbody><tfoot><tr><td colspan="4" class="ctr"><b>최종표 합계 ('+M.final.length+'건)</b></td><td class="num"><b>'+fmt(M.finalTot.E)+'</b></td><td class="num"><b>'+fmt(M.finalTot.F)+'</b></td><td class="num">'+fmt(M.finalTot.G)+'</td><td class="num">'+fmt(M.finalTot.H)+'</td><td class="num"><b>'+fmt(M.finalTot.I)+'</b></td><td colspan="3"></td></tr></tfoot></table></div>';
   /* 회장님 분리 요약 */
   var lines=M.chairChk.map(function(k){ var ex=k.cards.map(function(x){ return CP.ISSUER_NAME(x.issuer).replace("카드","")+" "+fmt(x.E); }).join(" + ");
     var fx=k.cards.filter(function(x){ return M.R[x.id].adv; }).map(function(x){ return CP.ISSUER_NAME(x.issuer).replace("카드","")+" "+fmt(M.R[x.id].adv); }).join(" + ")||"0";
-    return '<div>ERP '+esc(k.manager)+' '+fmt(k.erp)+' = '+esc(ex)+' '+cpOk(k.okE)+'</div>'+(k.advTotal||k.f?'<div>가지급금 전표 미지급금(법인카드) '+fmt(k.advTotal)+' = '+esc(fx)+' '+cpOk(k.okF)+'</div>':''); }).join("");
-  var adv=M.advs.map(function(s){ return '<details class="cp-adv"><summary>가지급금 전표 · '+esc(s.mode==="settle"?"정산형":"선지급형")+' · '+esc(s.trip||"출장")+(s.period?' ('+esc(s.period)+')':'')+' · '+esc(s.file||"")+'</summary><div class="mini" style="padding:6px 2px">'+
-    s.cardLines.map(function(x){ var c=M.R[x.cardId]; return '미지급금(법인카드) '+(c?esc(CP.ISSUER_NAME(c.c.issuer)+" "+CP.maskCardNo(c.c.cardNo)):'<b class="cp-neg">카드 미확인</b>')+' '+fmt(x.amt); }).join("<br>")+
+    return '<div>ERP '+esc(k.manager)+' '+fmt(k.erp)+' = '+esc(ex)+' '+cpOk(k.okE)+'</div>'+(k.advTotal||k.f?'<div>적요 카드분 '+fmt(k.advTotal)+' = '+esc(fx)+' '+cpOk(k.okF)+'</div>':''); }).join("");
+  var adv=M.advs.map(function(s){ return '<details class="cp-adv"><summary>'+esc(cpModeLabel(s.mode))+' · '+esc(s.trip||"출장")+(s.period?' ('+esc(s.period)+')':'')+' · '+esc(s.file||"")+'</summary><div class="mini" style="padding:6px 2px">'+
+    s.cardLines.map(function(x){ var c=M.R[x.cardId]; return esc(x.acct||"미지급금(법인카드)")+' '+(c?esc(CP.ISSUER_NAME(c.c.issuer)+" "+CP.maskCardNo(c.shownNo||c.c.cardNo)):'<b class="cp-neg">카드 미확인</b>')+' '+fmt(x.amt)+
+      (x.monthOk===false?' <span class="chip auto">적요 '+x.month+'월 ≠ 이용월</span> <label class="mini"><input type="checkbox" class="cp-cminc" data-k="'+esc(x.key)+'"'+(x.included?" checked":"")+(readOnly?" disabled":"")+'> 포함</label>':''); }).join("<br>")+
+    ((s.otherCards||[]).length?'<br>'+s.otherCards.map(function(o){ return '<span class="cp-old">'+esc(o.acct)+' '+fmt(o.amt)+' — 카드사·월 표기 없음 · 카드 금액에 넣지 않음(참고)</span>'; }).join("<br>"):'')+
+    ((s.cashLines||[]).length?'<br>'+s.cashLines.map(function(x){ var c=x.confirmedTo?M.R[x.confirmedTo]:null; return esc(x.acct)+' '+esc(x.memo)+' '+fmt(x.amt)+' — '+(c?'<span class="chip in">확인 · '+esc(CP.ISSUER_NAME(c.c.issuer))+' F 반영</span>':x.suggest?'<span class="chip auto">추정</span> '+esc(x.suggestDesc):'<span class="cp-old">카드 미반영분 후보(같은 금액 원자료 없음)</span>'); }).join("<br>"):'')+
     (s.items.length?'<br>항목: '+s.items.map(function(i){ return esc(i.k)+' '+fmt(i.amt); }).join(" · "):'')+(s.expense?'<br>미지급금(사원경비) '+fmt(s.expense)+' — 카드 금액 아님(참고)':'')+'</div></details>'; }).join("");
-  var xc=M.xcheck.map(function(x){ var c=M.R[x.id].c; return '<div>'+esc(CP.maskCardNo(c.cardNo))+' 국내 승인 '+fmt(x.dom)+' + 해외 '+fmt(x.fx)+' = 청구 '+fmt(x.bill)+' '+cpOk(x.ok)+(x.okAdv!=null?' · 해외 = 가지급금 '+fmt(x.adv)+' '+cpOk(x.okAdv):'')+'</div>'; }).join("");
-  return h+'<div class="pad cp-notes">'+lines+adv+(xc?'<div class="mini" style="margin-top:6px"><b>해외 교차검증</b></div>'+xc:'')+'</div>';
+  var xc=M.xcheck.map(function(x){ var c=M.R[x.id].c; return '<div>'+esc(CP.maskCardNo(c.cardNo))+' 국내 승인 '+fmt(x.dom)+' + 해외 '+fmt(x.fx)+' = 청구 '+fmt(x.bill)+' '+cpOk(x.ok)+'</div>'; }).join("");
+  var uc=M.rows.filter(function(r){ return r.uncheck; }).map(function(r){ var u=r.uncheck; return '<div>'+esc(CP.ISSUER_NAME(r.c.issuer)+" "+CP.maskCardNo(r.shownNo||r.c.cardNo))+' 미매칭 원자료 '+fmt(u.sum)+' − 적요 카드분 '+fmt(u.F)+' = '+fmt(u.diff)+' '+cpOk(u.diff===0)+(u.diff?' <span class="mini">사유 '+u.reasons.length+'건</span>':'')+'</div>'; }).join("");   // [v108]
+  return h+'<div class="pad cp-notes">'+lines+adv+(xc?'<div class="mini" style="margin-top:6px"><b>해외 교차검증</b></div>'+xc:'')+(uc?'<div class="mini" style="margin-top:6px"><b>미매칭 원자료 = 적요 카드분</b></div>'+uc:'')+'</div>';
 }
 function cpPayHtml(M){
   var man=CPS.man, h='<div class="cp-blocks">';
   M.blocks.forEach(function(b){
     h+='<details class="cp-block"'+(b.hidden?'':' open')+'><summary><b>'+esc(b.label)+'</b><span class="cp-btot">'+fmt(b.total)+'</span>'+(b.hidden?' <span class="chip nv">0원 · 엑셀에서 숨김</span>':'')+'</summary><div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th class="ctr">카드사</th><th class="ctr">카드번호</th><th>회원명</th><th class="ctr">은행</th><th class="ctr">계좌번호</th><th class="num">청구금액</th></tr></thead><tbody>'+
-      b.rows.map(function(r){ var c=r.c, m=man[c.id]||{}; return '<tr class="'+(r.bill?"":"cp-dim")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(c.cardNo))+'</td><td>'+esc(c.rcLabel||c.label)+'</td><td class="ctr">'+esc(c.payBank||"")+'</td><td class="ctr">'+esc(c.payAcct||"")+'</td><td class="num">'+(c.billSrc==="manual"?cpIn(c.id,"bill",m.bill):cpMoney(r.bill))+(r.bill?'':' <span class="mini">숨김</span>')+'</td></tr>'; }).join("")+
+      b.rows.map(function(r){ var c=r.c, m=man[c.id]||{}; return '<tr class="'+(r.bill?"":"cp-dim")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(r.shownNo||c.cardNo))+'</td><td>'+esc(c.rcLabel||c.label)+'</td><td class="ctr">'+esc(c.payBank||"")+'</td><td class="ctr">'+esc(c.payAcct||"")+'</td><td class="num">'+(c.billSrc==="manual"?cpIn(c.id,"bill",m.bill):cpMoney(r.bill))+(r.bill?'':' <span class="mini">숨김</span>')+'</td></tr>'; }).join("")+
       '</tbody></table></div></details>';
   });
   h+='</div><div class="pad" style="padding-bottom:4px"><b>검증표</b> <span class="mini">청구금액 vs 확인금액 · 카드 목록 전체</span></div>';
@@ -18376,7 +18615,7 @@ function cpPayHtml(M){
     var bill=r.bill!=null?fmt(r.bill):(r.billNote?'<span class="mini">'+esc(r.billNote)+'</span>':c.billSrc==="manual"?'<span class="mini">수기 입력</span>':'—');
     var ck=c.checkSrc==="manual"?cpIn(c.id,"check",m.check!=null&&m.check!==""?m.check:r.check):cpMoney(r.check);
     var st=r.stmtOk===true?"O":r.stmtOk===false?"X":"";
-    h+='<tr class="'+(c.reclass==="verifyOnly"?"cp-own":"")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(c.cardNo))+'</td><td>'+esc(c.label)+'</td><td class="num">'+bill+'</td><td class="num">'+ck+'</td>'+
+    h+='<tr class="'+(c.reclass==="verifyOnly"?"cp-own":"")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(r.shownNo||c.cardNo))+'</td><td>'+esc(c.label)+'</td><td class="num">'+bill+'</td><td class="num">'+ck+'</td>'+
       '<td class="num'+(r.diff?' cp-neg':'')+'">'+(r.diff==null?'—':fmt(r.diff))+'</td><td class="ctr"><button type="button" class="cp-st" data-id="'+c.id+'" title="눌러서 O / X / 비움">'+(st||"·")+'</button>'+(r.pdf?' <span class="mini">PDF</span>':'')+'</td>'+
       '<td class="ctr">'+(r.inFinal?"O":c.reclass==="none"?"-":"")+'</td><td><span class="mini">'+esc(r.notes.filter(function(n){ return n!==m.note; }).join(" · "))+'</span> <input class="cp-note" data-id="'+c.id+'" value="'+esc(m.note||"")+'" placeholder="비고"'+(readOnly?" disabled":"")+'></td></tr>'; });
   return h+'</tbody></table></div>';
@@ -19038,6 +19277,14 @@ details.fep-excl>summary .sub{font-size:11.5px;color:var(--muted)}
 .cp-notes{display:flex;flex-direction:column;gap:3px;font-size:12.5px}
 .cp-adv{margin-top:6px;border:1px solid var(--rule);border-radius:8px;padding:6px 10px}
 .cp-adv summary{cursor:pointer;font-size:12.5px}
+.cp-linkb{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;text-align:left;text-decoration:underline dotted;text-underline-offset:2px}
+.cp-linkb:focus-visible{outline:2px solid var(--accent,#2563eb);outline-offset:2px}
+.cp-whyb{color:var(--out);font-size:12px;margin-left:4px}
+.cp-tbl tr.cp-detail td{background:var(--surface);white-space:normal}
+.cp-dl{display:flex;flex-direction:column;gap:2px;font-size:12px;line-height:1.5;max-width:900px}
+.cp-dl .r{display:flex;justify-content:space-between;gap:16px}.cp-dl .r b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.cp-dl .t{border-top:1px solid var(--rule);margin-top:3px;padding-top:3px}
+.cp-link{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .cp-blocks{display:flex;flex-direction:column;gap:8px;padding:12px 16px}
 .cp-block{border:1px solid var(--rule);border-radius:10px;overflow:hidden}
 .cp-block summary{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;background:var(--surface-2)}
