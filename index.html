@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v105 · 2026-11-09</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v106 · 2026-11-10</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4153,6 +4153,11 @@ function rcApply(c){
     unIn.slice().forEach(function(u){ var L=SL.filter(function(l){ return l.kind==="move-out" && l.acct && l.acct!==u.acct && !hasRow[l.acct] && Math.abs((+l.amount||0)-(+u.deposit||0))<1 && rcBalBefore(c,l.acct)>=(+u.deposit||0)-1; })[0]; if(!L) return;   // 잔액이 없는 계좌에서는 만들지 않음
       syn(r,{date:d, acct:L.acct, kind:"자금이동(출금)", cat:"자금이동", withdraw:Math.round(+u.deposit||0), summary:"[자동] 전표 자금이동("+(L.voucher||"")+") — 이 계좌 CMS 없음", rcWhy:"전표 "+(L.voucher||"")}); st.r5++;
       unIn=unIn.filter(function(x){ return x!==u; }); });
+    /* [v106] R5-c2 해지 계좌(그날 CMS 없음) — 전표 자금이동(출금) 금액 = 직전 잔액(전액 이동)이고, 상대 계좌 CMS 입금이 그보다 이자만큼 큰 경우
+       (예: GS 11-05 하나 11852 [굿어스] MMT 해지 1,535,198,371 + 이자 640,659 → 하나 16004 1,535,839,030) → 이자수익 + 원리금 자금이동, 해지 계좌 마감 0 */
+    unIn.slice().forEach(function(u){ var A=+u.deposit||0; if(A<1) return;
+      var L=SL.filter(function(l){ var P=+l.amount||0, B0=rcBalBefore(c,l.acct); return l.kind==="move-out" && l.acct && l.acct!==u.acct && !hasRow[l.acct] && P>=1 && Math.abs(B0-P)<1 && A-P>=1 && A-P<=P*RC_INT_MAX; })[0]; if(!L) return;
+      if(mkMature(L.acct, A, "전표 "+(L.voucher||"")+" 해지 원금 "+fmt(Math.round(+L.amount||0))+" + 이자 → "+u.acct+" (이 계좌 CMS 없음)")){ unIn=unIn.filter(function(x){ return x!==u; }); hasRow[L.acct]=1; } });
     unOut.slice().forEach(function(o){ var L=SL.filter(function(l){ return l.kind==="move-in" && l.acct && l.acct!==o.acct && !hasRow[l.acct] && Math.abs((+l.amount||0)-(+o.withdraw||0))<1; })[0]; if(!L) return;
       syn(r,{date:d, acct:L.acct, kind:"자금이동(입금)", cat:"자금이동", deposit:Math.round(+o.withdraw||0), summary:"[자동] 전표 자금이동("+(L.voucher||"")+") — 이 계좌 CMS 없음", rcWhy:"전표 "+(L.voucher||"")}); st.r5++;
       unOut=unOut.filter(function(x){ return x!==o; }); });
@@ -6134,6 +6139,9 @@ function ilboGapWhere(c, rg){
     if(Math.abs(g)>=1){ var tx=txnsOf(c,d), why=[];
       if(tx.some(function(t){ return fxNeedsRate(t,(dayRec(c,d)||{}).source); })) why.push("외화 원화 미확정");
       if(Math.round(s.mvIn-s.mvOut)) why.push("자금이동 짝 없음 "+fmt(Math.round(s.mvIn-s.mvOut)));
+      var gm=gapMissingDays(c, d), gj=gapJumps(c, d);   // [v106] 빠진 영업일 · 계좌 직전 잔액 점프
+      if(gm.length) why.push(gm.map(function(x){ return x.slice(5); }).join("·")+" CMS 없음");
+      if(gj.length) why.push(gj.slice(0,3).join("·")+(gj.length>3?" 외 "+(gj.length-3)+"계좌":"")+" — 직전 CMS 이후 빠진 거래");
       if(!why.length) why.push("CMS 없는 계좌 잔액 변동");
       L.push({d:d, g:g, why:why.join("·")}); } });
   if(!L.length) return " — 미확정 외화 환율·미반영 거래 확인";
@@ -11260,6 +11268,23 @@ function cashSlipItems(c, d){
   return out;
 }
 function cashSlipMemo(it){ return (it.summary||"")+(it.fromSlip && it.status==="미결"?" (전표 미결)":""); }
+
+/* ===================== [v106] 항등식 차이 원인 안내 — 빠진 영업일 CMS · 계좌 직전 잔액 점프 ===================== */
+/* 예: GS 11-05 하나 87152 CMS 첫 거래 전 잔액 2,189,099,273 ↔ 대시보드 전일 마감 1,393,939,934(차이 795,159,339)
+       = 11-03 GS 본 계좌 CMS 빠짐(그날은 [굿어스] 이관 계좌 4건만) · 11-04 CMS 없음 */
+function gapJumps(c, d){
+  var out=[], st=coState(c), ch=(st.chain||{})[d]||{}, seen={};
+  txnsOf(c, d).forEach(function(t){ if(seen[t.acct] || t.rcSyn || t.fromSlip || !t.hasAfter || t.after==null) return; seen[t.acct]=1;
+    var g=ch[t.acct]; if(!g || g.open==null) return;
+    var before=Math.round((+t.after||0)-(+t.deposit||0)+(+t.withdraw||0)), j=before-Math.round(+g.open||0);
+    if(Math.abs(j)>=1) out.push(t.acct+" 직전 잔액 차이 "+fmt(j)); });
+  return out;
+}
+function gapMissingDays(c, d){
+  var miss=[], x=calPrevBiz(d), g=0;
+  while(x && !c.days[x] && g++<10){ miss.push(x); x=calPrevBiz(x); }
+  return miss.reverse();
+}
 
 function enter(){
   AUTH.entered=true;
