@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v109 · 2026-11-10</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v110 · 2026-11-10</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -11433,6 +11433,31 @@ cpBind=(function(f){ return function(){ var r=f.apply(this, arguments);
   $$("[data-cpwhy]").forEach(function(b){ b.onclick=function(){ CPS.whyOpen=CPS.whyOpen||{}; CPS.whyOpen[b.dataset.cpwhy]=!CPS.whyOpen[b.dataset.cpwhy]; renderCardpay(); }; });
   $$(".cp-cminc").forEach(function(cb){ cb.onchange=function(){ cpSetMan("__cm", cb.dataset.k, cb.checked?true:""); renderCardpay(); }; });
   return r; }; })(cpBind);
+/* ===================== [v110] 신한·롯데 — 건별반제 확인금액 · 카드 정보 · 실제 출금일 ===================== */
+/* 저장된 카드 목록(app/cardpay/SN/master)에 반제항목이 없으면 사용자 지정값을 채운다(사용자 요청 2026-11-10). 화면에서 [저장]하면 카드 목록에 남는다 */
+var CP_PATCH110={SN:{
+  "376260029177223":{checkSrc:"banje", banjeItem:"롯데카드(일반)"},
+  "376260029177215":{checkSrc:"banje", banjeItem:"롯데카드(항공)"},
+  "5525764212930842":{checkSrc:"banje", banjeItem:"신한카드_인지세납부", payDay:15, payBank:"신한은행", payAcct:"140-003-590348"},
+  "5525764213896620":{checkSrc:"banje", banjeItem:"신한카드(일반)", label:"신한카드(일반)", payDay:15, payBank:"신한은행", payAcct:"140-003-590348"}
+}};
+function cpMasterPatch110(co, list){
+  var P=CP_PATCH110[co]; if(!P || !Array.isArray(list)) return list;
+  list.forEach(function(c){ var p=P[CP.dg(c.cardNo)]; if(p && !Object.prototype.hasOwnProperty.call(c,"banjeItem")) Object.keys(p).forEach(function(k){ c[k]=p[k]; }); });
+  return list;
+}
+cpMasterLoad=(function(f){ return function(co){ return f.apply(this, arguments).then(function(l){ cpMasterPatch110(co, CPM[co]); return CPM[co]; }); }; })(cpMasterLoad);
+/* 지급 블록 제목 옆 실제 출금일 — 결제일이 주말·공휴일이면 익영업일(화면 표시만, 엑셀 양식 문구는 그대로) */
+function cpPayDateHtml(b){
+  var d0=+b.payDay||0; if(!d0 || !/^\d{4}-\d{2}$/.test(CPS.month||"")) return "";
+  var y=+CPS.month.slice(0,4), m=+CPS.month.slice(5,7), last=new Date(y, m, 0).getDate(), iso=CPS.month+"-"+("0"+Math.min(d0,last)).slice(-2), d=iso, g=0;
+  while(!isBizDay(d) && g++<15) d=isoAdd(d,1);
+  var dow="일월화수목금토".charAt(new Date(+d.slice(0,4), +d.slice(5,7)-1, +d.slice(8,10)).getDay());
+  return ' <span class="mini">· '+d.slice(5)+'('+dow+') 출금'+(d!==iso?' — '+(+iso.slice(8))+'일 휴일 → 익영업일':'')+'</span>';
+}
+cpBind=(function(f){ return function(){ var r=f.apply(this, arguments);
+  $$(".cp-bjuse").forEach(function(b){ b.onclick=function(){ cpSetMan(b.dataset.id, "bill", +b.dataset.v); renderCardpay(); toast("건별반제 합계 "+fmt(+b.dataset.v)+"원을 청구금액으로 입력했습니다 — 명세서 금액과 같은지 확인하세요"); }; });
+  return r; }; })(cpBind);
 
 function enter(){
   AUTH.entered=true;
@@ -17920,10 +17945,10 @@ var CP=(function(){
     {id:"sn09", issuer:"삼성", cardNo:"4009-0702-1223-8857", label:"구매공용카드", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"stmtMinusE", billSrc:"ezwork",  checkSrc:"manual", order:9,  vgroup:2, payOrder:4,  rcRow:true},
     {id:"sn10", issuer:"삼성", cardNo:"3791-841079-04554", label:"항공권전용", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"ezwork",  checkSrc:"none",   order:10, vgroup:2, payOrder:5,  rcRow:false},
     {id:"sn11", issuer:"삼성", cardNo:"9410-8528-1119-2600", label:"통신료전용", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:false, reclass:"none",       billSrc:"ezwork",  checkSrc:"none",   order:11, vgroup:2, payOrder:93, rcRow:false, note:"별도 처리"},
-    {id:"sn12", issuer:"롯데", cardNo:"3762-600291-77223", label:"전사공용카드", payDay:27, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"manual", order:12, vgroup:3, payOrder:40, rcRow:false},
-    {id:"sn13", issuer:"롯데", cardNo:"3762-600291-77215", label:"항공권전용", payDay:27, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"manual", order:13, vgroup:3, payOrder:41, rcRow:false},
-    {id:"sn14", issuer:"신한", cardNo:"5525-7642-1293-0842", label:"재무팀 인지세", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"none",   order:14, vgroup:4, payOrder:20, rcRow:false},
-    {id:"sn15", issuer:"신한", cardNo:"5525-7642-1389-6620", label:"경영관리팀", payDay:15, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"none",   order:15, vgroup:4, payOrder:21, rcRow:false},
+    {id:"sn12", issuer:"롯데", cardNo:"3762-600291-77223", label:"전사공용카드", payDay:27, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"banje", banjeItem:"롯데카드(일반)", order:12, vgroup:3, payOrder:40, rcRow:false},
+    {id:"sn13", issuer:"롯데", cardNo:"3762-600291-77215", label:"항공권전용", payDay:27, payBank:"하나은행", payAcct:HANA_ACCT, pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"banje", banjeItem:"롯데카드(항공)", order:13, vgroup:3, payOrder:41, rcRow:false},
+    {id:"sn14", issuer:"신한", cardNo:"5525-7642-1293-0842", label:"재무팀 인지세", payDay:15, payBank:"신한은행", payAcct:"140-003-590348", pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"banje", banjeItem:"신한카드_인지세납부",   order:14, vgroup:4, payOrder:20, rcRow:false},
+    {id:"sn15", issuer:"신한", cardNo:"5525-7642-1389-6620", label:"신한카드(일반)", payDay:15, payBank:"신한은행", payAcct:"140-003-590348", pay:true,  reclass:"none",       billSrc:"manual",  checkSrc:"banje", banjeItem:"신한카드(일반)",   order:15, vgroup:4, payOrder:21, rcRow:false},   // [v110] 신한 출금 15일(휴일이면 익영업일) · 신한은행 140-003-590348 · 확인금액 = 건별반제(미지급금(법인카드)) 반제항목 합계
     {id:"sn16", issuer:"농협", cardNo:"4079-1677-0566-5516", label:"에스넷시스템(공통)", payDay:15, payBank:"농협은행", payAcct:"301-0372-9001-91", pay:true, reclass:"none", billSrc:"manual", checkSrc:"manual", order:16, vgroup:5, payOrder:10, rcRow:true, rcNote:"계정대체x · 연회비전표"}
   ], GU:[], GD:[], GS:[] };
   MASTER_DEFAULT.SN.forEach(function(c){ c.co="SN"; });
@@ -17956,6 +17981,7 @@ var CP=(function(){
       if(has(["조직명","카드번호","회원명","청구금액","어카운트"])) return {kind:"ezwork", hdr:r};
       if(has(["카드번호","승인일자","승인시각","승인금액","승인번호","승인취소여부"])) return {kind:"approval", hdr:r};
       if(has(["카드번호","매입일자","이용통화","접수금액(USD)","적용환율"])) return {kind:"foreign", hdr:r};
+      if(has(["회계일자","적요","전표금액","반제금액","잔액","반제항목"])) return {kind:"banje", hdr:r};   // [v110] 건별반제정리현황(미지급금(법인카드))
       if(has(["순번","차대","계정코드","계정명","적요명","금액","CD_MNGD3","NM_MNGD3","CD_MNGD4"])) return {kind:"erp", hdr:r};
       if(has(["승인번호","당월결제금액"]) && H((aoa[0]||[])[0])==="카드번호" && H((aoa[1]||[])[0])==="결제합계금액") return {kind:"hana", hdr:r};
     }
@@ -18091,6 +18117,7 @@ var CP=(function(){
     if(k.kind==="approval") return parseApproval(aoa,k.hdr,master);
     if(k.kind==="foreign") return parseForeign(aoa,k.hdr,master);
     if(k.kind==="hana") return parseHana(aoa,k.hdr,master);
+    if(k.kind==="banje") return parseBanje(aoa,k.hdr,master);   // [v110]
     if(k.kind==="erp"){ var sl=parseErp(aoa,k.hdr); return {kind:"erp", slips:sl}; }
     return {kind:"unknown"};
   }
@@ -18187,6 +18214,23 @@ var CP=(function(){
     });
   }
 
+  /* [v110] 건별반제정리현황(미지급금(법인카드) 계정) — 카드 목록의 반제항목(banjeItem)에 해당하는 행만 남긴다(카드번호·다른 반제항목 행은 버림)
+     신한·롯데처럼 명세서가 이미지 PDF인 카드의 확인금액 = 이용월 회계일자 행의 전표금액 합계(예: 신한카드(일반) 82,545,000 + 44,965,500 = 127,510,500) */
+  function parseBanje(aoa, hdr, master){
+    var ix=colIx(aoa,hdr), items={}, rows=[], total=0, kept=0, by={};
+    master.forEach(function(c){ if(S(c.banjeItem)) items[S(c.banjeItem)]=1; });
+    var cI=ix("반제항목"), cD=ix("회계일자"), cA=ix("전표금액"), cM=ix("적요"), cR=ix("잔액");
+    for(var r=hdr+1;r<aoa.length;r++){ var row=aoa[r]||[]; if(!S(row[cI]) && !S(row[cD])) continue; total++;
+      var it=S(row[cI]); if(!items[it]) continue;
+      kept++; rows.push({item:it, date:isoOf(row[cD]), amt:num(row[cA]), memo:S(row[cM]), open:num(row[cR])}); by[it]=(by[it]||0)+1; }
+    return {kind:"banje", rows:rows, total:total, kept:kept, by:by};
+  }
+  function banjeOf(bj, c, useM){
+    if(!bj || !S(c.banjeItem)) return null;
+    var rs=bj.rows.filter(function(r){ return r.item===S(c.banjeItem); }), inM=rs.filter(function(r){ return !useM || !r.date || r.date.slice(0,7)===useM; });
+    return {sum:inM.reduce(function(a,r){ return a+r.amt; },0), n:inM.length, out:rs.length-inM.length, rows:inM};
+  }
+
   /* ---------- 3-4·3-5. 금액 계산 ---------- */
   /* src = {ezwork, approval, foreign, hana:[...], erp:{slips:[...]}, pdf:{cardId:{total,...}}}
      man = {cardId:{bill, check, E, G, H, ov, pre, can, stmtOk}} (수기 입력) */
@@ -18230,11 +18274,15 @@ var CP=(function(){
       var check=null, checkNote="";
       if(mgr){ if(!mt){ check=0; checkNote="ERP 전표 미업로드"; } else check=(c.reclass==="chair")?(matched+(adv[c.id]||0)+(cashAdd[c.id]||0)+ov-pre-can):matched; }
       else if(c.checkSrc==="manual"){ check=(m.check!=null&&m.check!=="")?num(m.check):bill; }
+      else if(c.checkSrc==="banje"){ var bjx=banjeOf(src.banje, c, src.useMonth);   // [v110] 확인금액 = 건별반제 반제항목 합계(수기 입력이 있으면 수기)
+        if(m.check!=null&&m.check!=="") check=num(m.check); else if(bjx) check=bjx.sum; else { check=null; checkNote=src.banje?"건별반제에 '"+S(c.banjeItem||"반제항목 미설정")+"' 없음":"건별반제 미업로드"; }
+        if(bjx && bjx.n) var bjNote="건별반제 "+S(c.banjeItem)+" "+bjx.n+"건 "+bjx.sum.toLocaleString("ko-KR")+(bjx.out?" · 이용월 밖 "+bjx.out+"건 제외":""); }
       var diff=(bill!=null&&check!=null)?bill-check:null;
       var notes=[]; if(checkNote) notes.push(checkNote); if(billNote && c.billSrc!=="manual") notes.push(billNote);
       if(mt){ var mis=mt.mismatch.filter(function(x){ return x.cardId===c.id; }); if(mis.length) notes.push("승인번호 금액 불일치 "+mis.length+"건");
         var firstId=master.filter(function(x){ return x.checkSrc===c.checkSrc; })[0];                 // 미매칭은 담당자의 첫 카드 행에 한 번만 적는다
         if(mt.unmatched.length && firstId && firstId.id===c.id) notes.push("ERP 미매칭 "+mt.unmatched.length+"건 "+mt.unmatched.reduce(function(a,x){return a+x.erp;},0).toLocaleString("ko-KR")+"원"); }
+      if(bjNote) notes.push(bjNote);   // [v110]
       if(m.note) notes.push(String(m.note));
       var shown=shownNoOf(c, hanaBy[c.id], ez&&ez[c.id]); if(shown.old.length) notes.push("구 "+shown.old.join("·"));   // [v108] 재발급 이전 번호
       var pdf=src.pdf&&src.pdf[c.id]?src.pdf[c.id]:null, stmtOk=m.stmtOk===true?true:(pdf&&bill!=null?pdf.total===bill:null);
@@ -18474,7 +18522,7 @@ function cpReadOne(f, master){
     if(/\.pdf$/i.test(f.name)){
       return cpPdfText(ab).then(function(text){
         var r=CP.parseStatementText(text, f.name, master);
-        if(!r.issuer || r.total==null){ done("unknown","PDF에서 카드사·총액을 찾지 못했습니다 (삼성·하나·롯데만 지원)",true); return; }
+        if(!r.issuer || r.total==null){ done("unknown", !String(text||"").replace(/\s/g,"")?"이미지로 된 PDF(인쇄 → PDF 저장)라 글자를 읽을 수 없습니다 — 청구금액을 직접 입력하세요(신한·롯데는 건별반제 합계로 확인)":"PDF에서 카드사·총액을 찾지 못했습니다 (삼성·하나·롯데만 지원)",true); return; }   // [v110]
         CPS.pdfs=CPS.pdfs.filter(function(x){ return x.name!==f.name; }).concat([{name:f.name, issuer:r.issuer, total:r.total, payDate:r.payDate, hint:r.hint, cardId:r.cardId, cands:r.cands}]);
         done("pdf", r.issuer+"카드 · 총액 "+fmt(r.total)+(r.cardId?"":" · 카드 선택 필요"));
       });
@@ -18486,6 +18534,7 @@ function cpReadOne(f, master){
     if(r.kind==="ezwork"){ S.ezwork=r; done("ezwork","통합이용청구명세서 · "+(r.asOf||"기준일 미상")+" · "+r.rows+"행 중 카드 목록 "+r.kept+"행");
       if(r.asOf && !CPS.monthTouched && CPS.month!==r.asOf.slice(0,7)){ CPS.month=r.asOf.slice(0,7); CPS.loadedKey=""; } }
     else if(r.kind==="approval"){ S.approval=r; done("approval","승인내역 · "+fmt(r.total)+"행 중 카드 목록 "+r.rows.length+"행"+(r.cancels.length?" · 취소 "+r.cancels.length+"건":"")); }
+    else if(r.kind==="banje"){ S.banje=r; done("banje","건별반제정리(미지급금(법인카드)) · "+fmt(r.total)+"행 중 카드 목록 반제항목 "+r.kept+"행"+(Object.keys(r.by).length?" ("+Object.keys(r.by).map(function(k){ return k+" "+r.by[k]+"건"; }).join(" · ")+")":""), !r.kept); }   // [v110]
     else if(r.kind==="foreign"){ S.foreign=r; done("foreign","해외매입내역 · "+fmt(r.total)+"행 중 카드 목록 "+r.rows.length+"행"); }
     else if(r.kind==="hana"){
       if(!r.cardId){ done("hana","하나카드 이용내역 · "+r.masked+" — 카드 목록에서 카드를 찾지 못했습니다",true); return; }
@@ -18518,7 +18567,7 @@ function cpRecalc(){
   CPS.pdfs.forEach(function(p){ var id=p.cardId?(to[p.cardId]||p.cardId):""; if(!id && p.hint && /\*/.test(p.hint)){ var f=find(p.hint); if(f&&f.card) id=f.card.id; }
     if(id && id!==p.cardId && (!p.cardId || to[p.cardId] || !master.some(function(c){ return c.id===p.cardId; }))) p.cardId=id;   // 명세서 검증 표의 카드 선택도 같은 카드로
     if(id) pdf[id]={total:p.total, payDate:p.payDate, name:p.name}; });
-  var src={ezwork:rm(CPS.src.ezwork), approval:rm(CPS.src.approval), foreign:rm(CPS.src.foreign), hana:CPS.src.hana, erpSlips:CPS.src.erpSlips, pdf:pdf, useMonth:cpUseMonth(CPS.month)};
+  var src={ezwork:rm(CPS.src.ezwork), approval:rm(CPS.src.approval), foreign:rm(CPS.src.foreign), hana:CPS.src.hana, erpSlips:CPS.src.erpSlips, banje:CPS.src.banje, pdf:pdf, useMonth:cpUseMonth(CPS.month)};
   var any=CPS.files.some(function(f){ return f.kind!=="unknown" && f.kind!=="reading"; });
   CPS.model=any&&master.length?CP.compute(master, src, CPS.man):null;
 }
@@ -18534,6 +18583,7 @@ function cpChecklist(){
     add("erp:"+x,"ERP "+x,need,S.erpSlips.some(function(s){ return s.type==="card" && s.manager===x; })); });
   if(m.some(function(c){ return c.reclass==="chair"; })) add("adv","가지급금 전표",true,S.erpSlips.some(function(s){ return s.type==="advance"; })||CPS.advNone);
   add("foreign","해외매입내역",false,!!S.foreign);
+  if(m.some(function(c){ return c.checkSrc==="banje"; })) add("banje","건별반제(미지급금(법인카드))",false,!!S.banje);   // [v110] 신한·롯데 확인금액
   var pdfN=CPS.pdfs.filter(function(p){ return p.cardId; }).length;
   add("pdf","명세서 PDF "+pdfN+"/"+m.length,false,pdfN>0);
   return L;
@@ -18558,7 +18608,7 @@ function renderCardpay(){
   $("#cpCheck").innerHTML=chk.map(function(x){ var cls=x.have?"in":(x.need?(anyFile?"out":"nv"):"nv");
     return '<span class="chip '+cls+' cp-ck" title="'+(x.need?"필수":"선택")+'">'+(x.have?"✓ ":"")+esc(x.t)+(x.need?"":" (선택)")+
       (x.k==="adv"&&!x.have?' <button type="button" class="cp-none" id="btnCpAdvNone">이번 달 없음</button>':'')+(x.k==="adv"&&CPS.advNone?' <button type="button" class="cp-none" id="btnCpAdvUndo">되돌리기</button>':'')+'</span>'; }).join("");
-  $("#cpFiles").innerHTML=CPS.files.map(function(f){ var lab={ezwork:"청구명세서",approval:"승인내역",foreign:"해외매입",hana:"하나 이용내역",erp:"ERP 전표",pdf:"PDF",unknown:"알 수 없음",reading:"읽는 중"}[f.kind]||f.kind;
+  $("#cpFiles").innerHTML=CPS.files.map(function(f){ var lab={ezwork:"청구명세서",approval:"승인내역",foreign:"해외매입",hana:"하나 이용내역",erp:"ERP 전표",banje:"건별반제",pdf:"PDF",unknown:"알 수 없음",reading:"읽는 중"}[f.kind]||f.kind;
     return '<div class="filerow"'+(f.bad?' style="border-color:var(--out);color:var(--out)"':'')+'><span>'+esc(f.name)+'</span><span class="chip '+(f.bad?"out":f.kind==="reading"?"nv":"in")+'">'+esc(lab)+'</span><span class="mini">'+esc(f.info)+'</span></div>'; }).join("");
   /* 2. 금액 확인 */
   $$("#cpTabs button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.t===CPS.tab?"true":"false"); });
@@ -18605,14 +18655,14 @@ function cpRcHtml(M){
 function cpPayHtml(M){
   var man=CPS.man, h='<div class="cp-blocks">';
   M.blocks.forEach(function(b){
-    h+='<details class="cp-block"'+(b.hidden?'':' open')+'><summary><b>'+esc(b.label)+'</b><span class="cp-btot">'+fmt(b.total)+'</span>'+(b.hidden?' <span class="chip nv">0원 · 엑셀에서 숨김</span>':'')+'</summary><div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th class="ctr">카드사</th><th class="ctr">카드번호</th><th>회원명</th><th class="ctr">은행</th><th class="ctr">계좌번호</th><th class="num">청구금액</th></tr></thead><tbody>'+
+    h+='<details class="cp-block"'+(b.hidden?'':' open')+'><summary><b>'+esc(b.label)+'</b>'+cpPayDateHtml(b)+'<span class="cp-btot">'+fmt(b.total)+'</span>'+(b.hidden?' <span class="chip nv">0원 · 엑셀에서 숨김</span>':'')+'</summary><div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th class="ctr">카드사</th><th class="ctr">카드번호</th><th>회원명</th><th class="ctr">은행</th><th class="ctr">계좌번호</th><th class="num">청구금액</th></tr></thead><tbody>'+
       b.rows.map(function(r){ var c=r.c, m=man[c.id]||{}; return '<tr class="'+(r.bill?"":"cp-dim")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(r.shownNo||c.cardNo))+'</td><td>'+esc(c.rcLabel||c.label)+'</td><td class="ctr">'+esc(c.payBank||"")+'</td><td class="ctr">'+esc(c.payAcct||"")+'</td><td class="num">'+(c.billSrc==="manual"?cpIn(c.id,"bill",m.bill):cpMoney(r.bill))+(r.bill?'':' <span class="mini">숨김</span>')+'</td></tr>'; }).join("")+
       '</tbody></table></div></details>';
   });
   h+='</div><div class="pad" style="padding-bottom:4px"><b>검증표</b> <span class="mini">청구금액 vs 확인금액 · 카드 목록 전체</span></div>';
   h+='<div class="scroll"><table class="tbl card-tbl cp-tbl"><thead><tr><th class="ctr">카드사</th><th class="ctr">카드번호</th><th>회원명</th><th class="num">청구금액</th><th class="num">확인금액</th><th class="num">차이금액</th><th class="ctr">명세서확인</th><th class="ctr">계정대체</th><th>비고</th></tr></thead><tbody>';
   M.rows.forEach(function(r){ var c=r.c, m=man[c.id]||{};
-    var bill=r.bill!=null?fmt(r.bill):(r.billNote?'<span class="mini">'+esc(r.billNote)+'</span>':c.billSrc==="manual"?'<span class="mini">수기 입력</span>':'—');
+    var bill=r.bill!=null?fmt(r.bill):(r.billNote?'<span class="mini">'+esc(r.billNote)+'</span>':c.billSrc==="manual"?('<span class="mini">수기 입력</span>'+(c.checkSrc==="banje"&&r.check?' <button class="btn sm cp-bjuse" data-id="'+esc(c.id)+'" data-v="'+r.check+'" type="button"'+(readOnly?" disabled":"")+'>건별반제 합계로</button>':'')):'—');
     var ck=c.checkSrc==="manual"?cpIn(c.id,"check",m.check!=null&&m.check!==""?m.check:r.check):cpMoney(r.check);
     var st=r.stmtOk===true?"O":r.stmtOk===false?"X":"";
     h+='<tr class="'+(c.reclass==="verifyOnly"?"cp-own":"")+'"><td class="ctr">'+esc(CP.ISSUER_NAME(c.issuer))+'</td><td class="ctr">'+esc(CP.maskCardNo(r.shownNo||c.cardNo))+'</td><td>'+esc(c.label)+'</td><td class="num">'+bill+'</td><td class="num">'+ck+'</td>'+
@@ -18707,7 +18757,7 @@ bindCardpay();
 
 /* ---------- 설정 → 법인카드 계정대체 카드 목록 ---------- */
 var CPM_COLS=[["issuer","카드사","sel:삼성,하나,롯데,신한,농협,현대,KB국민,BC,우리"],["cardNo","카드번호","text"],["label","구분(라벨)","text"],["rcLabel","계정대체 표기","text"],["payDay","결제일","num"],["payBank","결제은행","text"],["payAcct","결제계좌","acct"],
-  ["pay","지급전표","chk"],["reclass","계정대체 규칙","sel:chair,stmt,erpMatch,stmtMinusE,verifyOnly,none"],["billSrc","청구금액 출처","sel:ezwork,hanaXls,manual"],["checkSrc","확인금액 출처","text"],["rcRow","계정대체 표 행","chk"],["vgroup","검증 묶음","num"],["payOrder","결제 순서","num"],["rcNote","계정대체 비고","text"],["note","메모","text"]];
+  ["pay","지급전표","chk"],["reclass","계정대체 규칙","sel:chair,stmt,erpMatch,stmtMinusE,verifyOnly,none"],["billSrc","청구금액 출처","sel:ezwork,hanaXls,manual"],["checkSrc","확인금액 출처","text"],["banjeItem","건별반제 반제항목","text"],["rcRow","계정대체 표 행","chk"],["vgroup","검증 묶음","num"],["payOrder","결제 순서","num"],["rcNote","계정대체 비고","text"],["note","메모","text"]];
 function renderCpMaster(){
   var box=$("#cpmBody"); if(!box) return;
   var co1=CPMS.co, list=CPMS.draft||(CPMS.draft=JSON.parse(JSON.stringify(cpMaster(co1)))), ro=readOnly;
@@ -18742,7 +18792,8 @@ function bindCpMaster(){
   $("#btnCpmSave").onclick=function(){
     var list=CPMS.draft||[], bad=[], seen={};
     list.forEach(function(r,i){ var d=CP.dg(r.cardNo); if(d.length<15) bad.push((i+1)+"행 카드번호"); if(seen[d]) bad.push((i+1)+"행 카드번호 중복"); seen[d]=1; if(!r.label) bad.push((i+1)+"행 구분");
-      if(r.checkSrc && !/^(manual|none|erp:.+)$/.test(r.checkSrc)) bad.push((i+1)+"행 확인금액 출처(manual · none · erp:담당자명)"); });
+      if(r.checkSrc && !/^(manual|none|banje|erp:.+)$/.test(r.checkSrc)) bad.push((i+1)+"행 확인금액 출처(manual · none · banje · erp:담당자명)");
+      if(r.checkSrc==="banje" && !String(r.banjeItem||"").trim()) bad.push((i+1)+"행 건별반제 반제항목"); });
     if(bad.length){ CPMS.msg="저장 안 됨 — "+bad.join(", "); renderCpMaster(); return; }
     var doc={v:1, at:new Date().toISOString(), by:(AUTH.user&&AUTH.user.email)||"", cards:JSON.parse(JSON.stringify(list))};
     fepDocSet("app/cardpay/"+CPMS.co+"/master", doc).then(function(){ CPM[CPMS.co]=doc.cards; CPM_META[CPMS.co]={at:doc.at, by:doc.by}; CPMS.draft=null; CPMS.dirty=false; CPMS.msg="저장했습니다";
