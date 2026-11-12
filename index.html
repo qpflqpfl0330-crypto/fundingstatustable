@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v112 · 2026-11-12</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v113 · 2026-11-12</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -13216,6 +13216,11 @@ function ilboModel(c, iso){
       if(!x) x=chAgg[lab]={open:r.open, in:0, out:0, mvIn:0, mvOut:0, close:r.close, cmsAfter:null};
       x.in+=r.in||0; x.out+=r.out||0; x.mvIn+=r.mvIn||0; x.mvOut+=r.mvOut||0; x.close=r.close;
       if(r.cmsAfter!=null) x.cmsAfter=r.cmsAfter; }); });
+  /* [v113] 기간 안에 그 계좌의 CMS 기록이 없으면(예: GS 2026-11-11 CMS 거래 없음 확인 → 그날 기록 자체가 없음) 계좌가 0으로 나오던 문제.
+     직전 기록일 마감을 기초·기말로 그대로 이어 쓴다(입출금·이동 0) — 일자별 보고·대시보드 시재와 같은 기준 */
+  (function(){ var d0=rdays[0]||prev, pd=st.dates.filter(function(d){ return d<d0; }).pop(), base=pd?st.chain[pd]:null; if(!base) return;
+    Object.keys(base).forEach(function(lab){ if(chAgg[lab]) return; var b=base[lab]; if(!b) return; var cl=+b.close||0;
+      chAgg[lab]={open:cl, in:0, out:0, mvIn:0, mvOut:0, close:cl, cmsAfter:null, carryFrom:pd}; }); })();
   var ch=chAgg;
   xferIlboChain(c, rdays, ch);   // [v88] 이관 계좌: 전일시재 0 · 입금 = 승계액
   var krw=effAccounts(c).filter(function(a){
