@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v111 · 2026-11-10</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v112 · 2026-11-12</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -8263,6 +8263,7 @@ function handleFiles(files){
         if(arp){
           var c6=detectCompany(arp.unit)||guessCoFromName(f.name)||(curCo!=="ALL"?co(curCo):null);
           if(!c6){ log.insertAdjacentHTML("beforeend",'<div class="filerow" style="border-color:var(--warn)"><span>'+esc(f.name)+'</span><span class="chip auto">법인 미판별</span></div>'); return; }
+          if(c6.id==="GU"){ log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip auto">매출채권 · 저장 안 함</span><span class="mini">굿어스 채권은 굿어스스마트솔루션으로 이관</span></div>'); return; }   // [v112]
           result.ar[c6.id]=(result.ar[c6.id]||[]).filter(function(x){ return x.kind!==arp.kind; }).concat([arp]);
           log.insertAdjacentHTML("beforeend",'<div class="filerow"><span>'+esc(f.name)+'</span><span class="chip in">매출채권 · '+esc(arp.kind)+'</span><span class="mini">'+esc(c6.name)+' · 전체 '+arp.all+'건 중 미결 '+arp.rows.length+'건 · 잔액 '+fmt(arp.sumBal)+'원 · '+arp.asOf+' 기준</span></div>');
           return;
@@ -9156,7 +9157,8 @@ renderBondView=function(){
   var r0=ruleCos.map(function(c){ return c.arRules; }).filter(Boolean)[0];
   var hasGU=scopeCos().some(function(c){ return c.id==="GU"; });
   $("#arRuleMeta").className="pad mini ar-rulemeta"+(missing.length?" need":"");
-  $("#arRuleMeta").innerHTML = missing.length
+  $("#arRuleMeta").innerHTML = !ruleCos.length ? '<b>굿어스</b> 채권은 굿어스스마트솔루션으로 이관되어 표시하지 않습니다(2026-11-12 삭제) — 솔루션 탭에서 확인하세요'   // [v112]
+    : missing.length
     ? '<b>수금규칙이 아직 없어요</b> — '+esc(missing.map(function(c){ return c.short; }).join("·"))+' 규칙 문서(「매출처별 수금(입금) 규칙 정리」 .md)를 올리면 예상입금일·주간 입금 예정이 계산돼요. '+
       '<button type="button" class="btn sm primary" id="arRuleUp2">수금규칙 올리기</button>'+(r0?' <span>· 등록된 규칙: '+esc(rm.join(" · "))+'</span>':'')
     : '<b>수금규칙</b> '+esc(rm.join(" · "))+' · '+esc(r0.file||"")+(r0.asOf?' (분석일 '+esc(r0.asOf)+')':'')+' · '+esc(String(r0.at||"").slice(0,10))+(r0.by?' '+esc(r0.by):'')+(hasGU?' · 굿어스는 종료 법인이라 예상입금일 계산 안 함':'');
@@ -11536,6 +11538,31 @@ function cpPdfAutoCard(master){
   });
 }
 
+/* ===================== [v112] 굿어스(GU) 매출채권 삭제 — 남은 채권은 굿어스스마트솔루션으로 이관(사용자 결정 2026-11-12) ===================== */
+/* 저장된 굿어스 채권(co/GU/ar/* · 법인 정보 arMeta · 회수계획 arPlan · 예상입금일 수정 arExp · 수금규칙 arRules)을 불러온 직후 지우고 저장한다.
+   - 지운 문서는 다음 저장 때 저장소에서도 삭제된다(v85 미수금 삭제와 같은 방식: buildAll 뒤 메모리에서 빼고 save → 빠진 문서 delete).
+   - 이후 굿어스 건별반제정리현황을 올려도 매출채권관리에 저장하지 않는다(안내 문구만). 자금일보·자금수지 등 다른 굿어스 자료는 그대로.
+   - 삭제 전 원본(2026-10-06 기준 103건 · 잔액 2,725,421,181)은 사용자에게 백업 파일로 전달. */
+function arPurgeGU(){
+  var c=(D.companies||[]).filter(function(x){ return x.id==="GU"; })[0]; if(!c) return 0;
+  var n=0, bal=0;
+  Object.keys(c.ar||{}).forEach(function(d){ (c.ar[d]||[]).forEach(function(x){ n++; bal+=(+x.bal||0); }); });
+  var other=(c.arMeta&&Object.keys(c.arMeta).length?1:0)+(c.arPlan&&Object.keys(c.arPlan).length?1:0)+(c.arExp&&Object.keys(c.arExp).length?1:0)+(c.arRules?1:0);
+  if(!n && !other) return 0;
+  c.ar={}; delete c.arMeta; delete c.arPlan; delete c.arExp; delete c.arRules;
+  if(typeof AR_EXP!=="undefined") AR_EXP={};
+  try{ audit("ar_purge", {menu:"ar", co:"GU", target:"굿어스 매출채권 삭제(솔루션 이관)", detail:{rows:n, bal:Math.round(bal)}}); }catch(e){}
+  return n||other;
+}
+/* 굿어스 채권은 저장하지 않는다(업로드·데이터 업로드 탭 모두 commitAr를 거친다) */
+commitAr=(function(f){ return function(c, pack){ if(c && c.id==="GU") return; return f.apply(this, arguments); }; })(commitAr);
+/* 화면 목록에서도 굿어스 제외(혹시 다른 기기에서 옛 자료가 남아 있어도 보이지 않게) */
+arRows=(function(f){ return function(){ return f.apply(this, arguments).filter(function(r){ return !r.c || r.c.id!=="GU"; }); }; })(arRows);
+renderBondView=(function(f){ return function(){ var r=f.apply(this, arguments);
+  try{ if(curCo==="GU"){ var s=$("#arSub"); if(s) s.textContent="굿어스 채권은 굿어스스마트솔루션으로 이관되어 표시하지 않습니다(2026-11-12 삭제)"; } }catch(e){}
+  return r; }; })(renderBondView);
+renderAr=renderBondView;
+
 function enter(){
   AUTH.entered=true;
   $("#lock").hidden=true; $("#app").hidden=false; applyTheme();
@@ -11574,7 +11601,7 @@ function loadData(){
       if(loaded){ D=loaded; snapInfo0();   // [v84.1] 보정 전 값
         var pre={}; (D.companies||[]).forEach(function(c){ pre[c.id]=infoSig(c); });
         migrate(); restrictCos(); lastDocs={}; buildAll(); watchRemote(); enter();
-        if(arPurgeMisu() && !readOnly) save();   // [v85] 미수금 채권·메타·회수계획 삭제(사용자 요청 2026-10-20)
+        if((arPurgeMisu()+arPurgeGU()) && !readOnly) save();   // [v85] 미수금 채권·메타·회수계획 삭제(사용자 요청 2026-10-20) · [v112] 굿어스 채권 삭제(솔루션 이관, 2026-11-12)
         if(AUTH.isAdmin && !readOnly){   // [v84.1] 보정으로 바뀐 법인 정보만 저장(관리자만 — 팀원은 DB가 관리자 전용 값을 되돌림)
           var ch=(D.companies||[]).filter(function(c){ return pre[c.id]!==undefined && pre[c.id]!==infoSig(c); });
           if(ch.length){ ch.forEach(function(c){ delete lastDocs["co/"+c.id+"/info/main"]; }); save(); }
@@ -14221,6 +14248,7 @@ function arFiles(files){
     var c=detectCompany(pk.unit)||guessCoFromName(f.name)||(curCo!=="ALL"?co(curCo):null);
     if(!c){ msgs.push(f.name+": 법인 판별 실패"); return; }
     if(pk.kind==="미수금"){ msgs.push(f.name+": 미수금은 매출채권관리에서 제외 — 저장하지 않음"); return; }   // [v85]
+    if(c.id==="GU"){ msgs.push(f.name+": 굿어스 채권은 굿어스스마트솔루션으로 이관 — 저장하지 않음"); return; }   // [v112]
     commitAr(c, pk); n++; msgs.push(c.short+" "+pk.kind+" 미결 "+pk.rows.length+"건 · 잔액 "+fmt(pk.sumBal)+"원");
   }); }); }, Promise.resolve()).then(function(){ invalidate(); return save(); }).then(function(){ toast(msgs.join(" / ")||"반영할 파일이 없습니다"); renderAr(); });
 }
