@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v113 · 2026-11-12</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v114 · 2026-11-13</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4161,6 +4161,32 @@ function rcApply(c){
     unOut.slice().forEach(function(o){ var L=SL.filter(function(l){ return l.kind==="move-in" && l.acct && l.acct!==o.acct && !hasRow[l.acct] && Math.abs((+l.amount||0)-(+o.withdraw||0))<1; })[0]; if(!L) return;
       syn(r,{date:d, acct:L.acct, kind:"자금이동(입금)", cat:"자금이동", deposit:Math.round(+o.withdraw||0), summary:"[자동] 전표 자금이동("+(L.voucher||"")+") — 이 계좌 CMS 없음", rcWhy:"전표 "+(L.voucher||"")}); st.r5++;
       unOut=unOut.filter(function(x){ return x!==o; }); });
+    /* [v114] R5-c3 그날 CMS 행이 없는 계좌(해지·CMS 미수신)의 이체 — 같은 전표에 이 계좌 출금 줄(O)과 다른 자사 계좌 입금 줄(A)이 있고, 그 계좌에 같은 금액 CMS 입금이 있으면 자금이동.
+       O − A = 이체수수료(운영경비 지출), 이 계좌의 같은 날 입금 줄 = 이자수익 등. 보고서 마감(없으면 0 = 전액 이체)과 1원까지 맞을 때만 만든다.
+       예: GS 11-05 우리 987 [굿어스] 41,443,663 + 이자 262 − 이체 41,439,925(→ 하나 87152, CMS는 '굿어스주식회사' 이자수익으로 잡혀 있었음) − 수수료 4,000 = 0 (전표 FI2026110500006) */
+    (function(){ var rep0=(r.repAccts && r.asOf===d)?r.repAccts:null, isOut=function(l){ return l.kind==="out"||l.kind==="move-out"; }, isIn=function(l){ return l.kind==="in"||l.kind==="move-in"; };
+      var labs=[]; SL.forEach(function(l){ if(isOut(l) && l.acct && !hasRow[l.acct] && acctBy[l.acct] && acctBy[l.acct].group!=="외화" && labs.indexOf(l.acct)<0) labs.push(l.acct); });
+      labs.forEach(function(lab){ if(hasRow[lab]) return;
+        var was=Math.round(rcBalBefore(c, lab)); if(was<1) return;
+        var outs=SL.filter(function(l){ return l.acct===lab && isOut(l); }), ins0=SL.filter(function(l){ return l.acct===lab && isIn(l); });
+        var O=outs.reduce(function(s,l){ return s+Math.round(+l.amount||0); },0), I=ins0.reduce(function(s,l){ return s+Math.round(+l.amount||0); },0);
+        var target=rep0 && (lab in rep0) ? Math.round(+rep0[lab]||0) : 0;
+        if(O<1 || Math.abs(was+I-O-target)>=1) return;
+        var vs=outs.map(function(l){ return l.voucher; }).filter(Boolean);
+        var PL=SL.filter(function(l){ return vs.indexOf(l.voucher)>=0 && l.acct && l.acct!==lab && isIn(l); }); if(!PL.length) return;
+        var pac=PL[0].acct; if(PL.some(function(l){ return l.acct!==pac; })) return;
+        var A=PL.reduce(function(s,l){ return s+Math.round(+l.amount||0); },0), F=O-A; if(F<0 || F>50000) return;
+        var u=T.filter(function(x){ return x.acct===pac && !x.rcDup && Math.abs((+x.deposit||0)-A)<1 && (x.kind==="수입" || (x.kind==="자금이동(입금)" && unIn.indexOf(x)>=0)); })[0]; if(!u) return;
+        var why="전표 "+vs.join("·")+" "+lab+" 이체 "+fmt(A)+" → "+pac+(F?" · 수수료 "+fmt(F):"")+" (이 계좌 CMS 없음)";
+        if(u.kind==="수입"){ rcSet(u,"자금이동(입금)","자금이동",why); st.r4++; } else unIn=unIn.filter(function(x){ return x!==u; });
+        var rows=[];
+        ins0.forEach(function(l){ var a=Math.round(+l.amount||0); if(a<1) return; var intr=l.cat==="이자수익" || /이자/.test(String(l.memo||""));
+          rows.push(syn(r,{date:d, acct:lab, kind:intr?"수입":(l.kind==="move-in"?"자금이동(입금)":"수입"), cat:intr?"이자수익":(l.kind==="move-in"?"자금이동":(l.cat||"기타")), deposit:a, summary:"[자동] "+(String(l.memo||"").slice(0,30)||"전표 입금"), rcWhy:why})); if(intr) st.int+=a; });
+        rows.push(syn(r,{date:d, acct:lab, kind:"자금이동(출금)", cat:"자금이동", withdraw:A, summary:"[자동] 해지·이체 → "+pac, rcWhy:why}));
+        if(F>=1) rows.push(syn(r,{date:d, acct:lab, kind:"지출", cat:"운영경비", withdraw:F, summary:"[자동] 이체수수료", rcWhy:why}));
+        var lr=rows[rows.length-1]; lr.hasAfter=true; lr.after=target;
+        hasRow[lab]=1; st.r5++; });
+    })();
     /* R5-b 보고서 잔액 변동(CMS가 오지 않는 계좌: 정기예금·선물·협력대금·미등록)으로 남은 짝 맞추기 */
     var rep=(r.repAccts && r.asOf===d)?r.repAccts:null;
     if(rep){
@@ -6143,6 +6169,7 @@ function ilboGapWhere(c, rg){
       var gm=gapMissingDays(c, d), gj=gapJumps(c, d);   // [v106] 빠진 영업일 · 계좌 직전 잔액 점프
       if(gm.length) why.push(gm.map(function(x){ return x.slice(5); }).join("·")+" CMS 없음");
       if(gj.length) why.push(gj.slice(0,3).join("·")+(gj.length>3?" 외 "+(gj.length-3)+"계좌":"")+" — 직전 CMS 이후 빠진 거래");
+      var grn=typeof gapRepNote==="function"?gapRepNote(c, d):""; if(grn) why.push(grn);   // [v114]
       if(!why.length) why.push("CMS 없는 계좌 잔액 변동");
       L.push({d:d, g:g, why:why.join("·")}); } });
   if(!L.length) return " — 미확정 외화 환율·미반영 거래 확인";
@@ -11562,6 +11589,33 @@ renderBondView=(function(f){ return function(){ var r=f.apply(this, arguments);
   try{ if(curCo==="GU"){ var s=$("#arSub"); if(s) s.textContent="굿어스 채권은 굿어스스마트솔루션으로 이관되어 표시하지 않습니다(2026-11-12 삭제)"; } }catch(e){}
   return r; }; })(renderBondView);
 renderAr=renderBondView;
+
+/* ===================== [v114] 항등식 차이 원인 안내 보완 — CMS 없는 날(보고서만) 잔액 점프 · 전 영업일 CMS가 보고서 마감과 다름 ===================== */
+/* 예: GS 11-10 CMS를 11:32에 받아 그 뒤 16:15 쓸어담기(하나 17604·82004 → 87152)와 입금 18,634,820이 빠짐 → 11-11(CMS 거래 없음 · 보고서만) 마감이
+       보고서 값으로 바뀌면서 '기초+수지차 ≠ 기말 −18,634,820'. 예전에는 'CMS 없는 계좌 잔액 변동'으로만 나와 어디가 문제인지 알 수 없었다. */
+var _gapJumps114=gapJumps;
+gapJumps=function(c, d){ var out=_gapJumps114.apply(this, arguments);
+  try{ if(out.length) return out;
+    var st=coState(c), ds=(st.dates||[]).slice(), i=ds.indexOf(d), p=i>0?ds[i-1]:null; if(!p) return out;
+    var ch=(st.chain||{})[d]||{}, pc=(st.chain||{})[p]||{}, own={}, fxL={};
+    effAccounts(c).forEach(function(a){ if(a.group==="외화") fxL[a.label]=1; });
+    txnsOf(c, d).forEach(function(t){ if(!t.rcSyn && !t.fromSlip) own[t.acct]=1; });
+    Object.keys(ch).forEach(function(lab){ if(own[lab] || fxL[lab]) return; var a=pc[lab], b=ch[lab]; if(!a || !b) return;
+      var j=Math.round((+b.close||0)-(+a.close||0)); if(Math.abs(j)>=1) out.push(lab+" "+fmt(j)); });
+    out.sort(function(x,y){ return Math.abs(+String(y).replace(/[^\d-]/g,"").slice(-15))-Math.abs(+String(x).replace(/[^\d-]/g,"").slice(-15)); });
+  }catch(e){}
+  return out; };
+/* 차이 난 날 d의 직전 기록일 p가 CMS 날이고 그날 보고서 마감(repAccts)이 있는데 CMS 마지막 거래후잔액과 다르면 — p CMS가 하루치 전부가 아니다 */
+function gapRepNote(c, d){
+  try{ var st=coState(c), ds=(st.dates||[]).slice(), i=ds.indexOf(d), p=i>0?ds[i-1]:null, pr=p&&c.days[p]; if(!pr || pr.source!=="cms" || !pr.repAccts || pr.asOf!==p) return "";
+    var pc=(st.chain||{})[p]||{}, rows={}, lastAt="";
+    (pr.txns||[]).forEach(function(t){ if(t.rcSyn || t.fromSlip || (t.ccy&&t.ccy!=="KRW")) return; rows[t.acct]=1; var m=/(\d{2}):(\d{2}):\d{2}/.exec(String(t.at||"")); if(m && m[0]>lastAt) lastAt=m[0]; });
+    var bad=Object.keys(rows).filter(function(lab){ return (lab in pr.repAccts) && pc[lab] && Math.abs(Math.round(+pc[lab].close||0)-Math.round(+pr.repAccts[lab]||0))>=1; });
+    if(!bad.length) return "";
+    var sum=bad.reduce(function(s,lab){ return s+Math.round(+pr.repAccts[lab]||0)-Math.round(+pc[lab].close||0); },0);
+    return p.slice(5)+" CMS"+(lastAt?"(마지막 거래 "+lastAt.slice(0,5)+")":"")+"가 그날 보고서 마감과 다름 "+bad.length+"계좌 합 "+fmt(sum)+" — "+p.slice(5)+" 하루치 CMS를 다시 올려주세요";
+  }catch(e){ return ""; }
+}
 
 function enter(){
   AUTH.entered=true;
