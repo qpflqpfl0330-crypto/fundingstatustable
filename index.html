@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v117 · 2026-11-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v118 · 2026-11-16</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -16813,8 +16813,34 @@ var FER=(function(){
   }
   /* [v43] 외화 지급을 원화 계좌에서 출금한 건(OTT·당발송금 · 수수료 제외) */
   function fxFromKrw(m){ return m.cms.spend.list.filter(function(t){ var s=S(t.summary); return !t.fer.isFx && (+t.withdraw||0)>0 && (/^OTT\d/i.test(s)||has(s,"당발송금")||has(s,"해외송금")) && !has(s,"수수료"); }); }
+  /* [v118] 원화 차이 풀이 — 집행금액(ⅱ) − 계획(ⅰ) = (전표 − 계획) − (전표 − CMS) + 타행이체 수수료
+     ① 전표 − 계획: 계획서에 없던 출금 · 출금 취소(음수 줄) · 회계일자 뒤에 쓴 전표 중 합이 정확히 맞는 줄
+     ② 전표 − CMS: 전표는 있는데 CMS 출금이 없는 줄(아직 미출금) — 같은 금액 1줄, 없으면 줄 조합
+     예: SN 2026-11-16 −124,356,780 = 현금인출 +5,000,000(FI2026111700002) · 숙박료 일부취소 −1,846,280(FI2026111600019) · 신한법인카드 미출금 −127,510,500(FI2026111600005) */
+  function vDate(L){ var x=/(20\d{6})/.exec(S(L.voucher)); return x?x[1].slice(0,4)+"-"+x[1].slice(4,6)+"-"+x[1].slice(6,8):""; }
+  function subsetPick(arr, target, max){ var n=Math.min(arr.length, max||14), found=null, cnt=0;
+    for(var mask=1; mask<(1<<n); mask++){ var s0=0; for(var i=0;i<n;i++) if(mask&(1<<i)) s0+=arr[i].v;
+      if(s0===target){ cnt++; if(!found){ found=[]; for(var j=0;j<n;j++) if(mask&(1<<j)) found.push(arr[j]); } if(cnt>1) return null; } }   // 조합이 둘 이상이면 고르지 않는다
+    return found; }
+  function erpMemo(L){ return S(String(L.memo).replace(/^[^()]{0,20}\)\s*/,"").replace(/\s*\([^()]*취소[^()]*\)\s*$/,"")); }
+  function erpBank(L){ return S(L.bank).replace(/^주식회사\s*/,"").replace(/\s.*$/,"").replace(/은행(\(주\))?$/,""); }
+  function explainKrw(m, planKrw){
+    var E=m.erp.spend, Ls=E.list.filter(function(L){ return L.amount; }), fee=Math.round(m.fee.total||0);
+    var dk=Math.round(m.cms.spend.amt-planKrw), dPE=Math.round(E.amt-planKrw), dEC=Math.round(E.amt-(m.cms.spend.amt-fee)), out=[], left=dk;
+    var line=function(L, v, why){ var bk=erpBank(L), mm=erpMemo(L); return "- "+(bk && mm.indexOf(bk)!==0?bk+" ":"")+mm+" "+fmt(Math.abs(v))+"원 — "+why+(L.voucher?" ("+L.voucher+")":""); };
+    if(!m.hasErp) return {ok:false, lines:[], left:dk};
+    if(dPE){ var sp=Ls.filter(function(L){ return L.amount<0 || L.fer.g==="현금" || (vDate(L) && L.date && vDate(L)>L.date); }).map(function(L){ return {v:Math.round(L.amount), L:L}; });
+      var pk=subsetPick(sp, dPE, 14);
+      if(pk) pk.forEach(function(x){ out.push(line(x.L, x.v, x.v<0?"출금 취소로 계획보다 덜 출금":(x.L.fer.g==="현금"?"계획서에 없던 현금인출":"계획서 작성 뒤 추가된 출금"))); left-=x.v; }); }
+    if(dEC>0){ var cd=Ls.filter(function(L){ return L.amount>0; }).map(function(L){ return {v:Math.round(L.amount), L:L}; });
+      var one=cd.filter(function(x){ return x.v===dEC; }), pk2=one.length===1?one:(one.length?null:subsetPick(cd.slice().sort(function(a,b){ return a.v-b.v; }), dEC, 14));
+      if(pk2) pk2.forEach(function(x){ out.push(line(x.L, x.v, "아직 출금 안 됨(CMS 출금 없음)")); left+=x.v; }); }
+    if(fee) m.fee.items.forEach(function(it){ if(it.amount>0){ var b=S(it.bank).replace(/은행$/,""); out.push("- "+(b?b+"은행 ":"")+"타행이체 시 수수료 "+fmt(it.amount)+"원"); left-=Math.round(it.amount); } });
+    return {ok:left===0 && out.length>0, lines:out, left:left};
+  }
   function suggestNote(m, diff, fx, plan){
     if(!diff || !m.hasCms) return "";
+    if(!fx && plan && plan.krw>0){ var X=explainKrw(m, plan.krw); if(X.ok) return X.lines.join("\n"); }   // [v118] 차이를 전부 설명하면 그 줄만
     var ad=Math.abs(diff), seen={}, out=[];
     var fk=fxFromKrw(m), usd=(plan&&plan.fx>0&&!m.cms.fxXfer.amt)?plan.fx:0;
     if(fx){ if(diff<0 && fk.length) fk.forEach(function(t){ out.push("- "+(S(t.bank).replace(/은행$/,"")||"")+"은행 외화지급 건 원화계좌에서 출금 진행 "+fmt(+t.withdraw||0)+"원"+(fk.length===1&&usd?" ($"+fmtFx(usd)+")":"")+" — 원화 결과에 포함"); }); }
@@ -16825,6 +16851,7 @@ var FER=(function(){
       if(!hit) return; var line="- "+noteLabel(m,t,fx)+" "+(fx?"$"+fmtFx(v):fmt(v)+"원");
       if(!seen[line]){ seen[line]=1; out.push(line); } });
     if(!fx) m.fee.items.forEach(function(it){ if(it.amount>0){ var b=S(it.bank).replace(/은행$/,""); out.push("- "+(b?b+"은행 ":"")+"타행이체 시 수수료 "+fmt(it.amount)+"원"); } });
+    if(X && X.lines.length){ var fl=X.lines.filter(function(l){ return l.indexOf("타행이체 시 수수료")<0; }); out=fl.concat(out.filter(function(l){ return fl.indexOf(l)<0; })); out.push("- 설명 안 된 차액 "+fmt(X.left)+"원"); }   // [v118] 일부만 설명되면 설명된 줄 + 기존 후보 + 남은 차액
     return out.join("\n");
   }
 
