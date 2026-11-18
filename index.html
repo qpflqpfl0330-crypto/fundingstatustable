@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v118 · 2026-11-16</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v119 · 2026-11-18</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4231,6 +4231,33 @@ function rcApply(c){
         }
       }
     }
+    /* [v119] R5-e 그날 CMS가 없는 계좌(해지 등) 마무리 — 앞 규칙이 전표 줄 일부만 자동 행으로 만들었을 때(예: 자금이동만),
+       남은 전표 줄(이자 입금·수수료 출금 등)로 보고서 마감(없으면 0 = 전액 정리)까지 1원 단위로 맞으면 그 줄들도 자동 행으로 만든다.
+       예: GS 2026-11-17 산업 022 [굿어스] 해지 — 잔액 4,000 + 이자 4 − 수수료 600 − 하나 16004로 이동 3,404 = 0 (전표 FI2026111700006). 전에는 이동 3,404만 잡혀 596 차이 */
+    (function(){ var rep1=(r.repAccts && r.asOf===d)?r.repAccts:null, cmsAc={}, synBy={};
+      T.forEach(function(t){ cmsAc[t.acct]=1; });
+      r.txns.forEach(function(t){ if(t.rcSyn && t.date===d) (synBy[t.acct]||(synBy[t.acct]=[])).push(t); });
+      var labs=Object.keys(synBy); SL.forEach(function(l){ if(l.acct && !cmsAc[l.acct] && labs.indexOf(l.acct)<0) labs.push(l.acct); });   // 자동 행이 아직 없는 계좌도(전표 줄만 있는 해지 계좌)
+      labs.forEach(function(lab){ if(cmsAc[lab] || !acctBy[lab] || acctBy[lab].group==="외화") return; synBy[lab]=synBy[lab]||[];
+        var was=Math.round(rcBalBefore(c, lab)), net=synBy[lab].reduce(function(s,t){ return s+Math.round(+t.deposit||0)-Math.round(+t.withdraw||0); },0);
+        var tgt=rep1 && (lab in rep1) ? Math.round(+rep1[lab]||0) : null;
+        var Ls=SL.filter(function(l){ return l.acct===lab && /^(in|out|move-in|move-out)$/.test(String(l.kind||"")) && Math.round(+l.amount||0)>0; }).map(function(l){ return {l:l, v:(/out$/.test(l.kind)?-1:1)*Math.round(+l.amount||0)}; });
+        var used=synBy[lab].map(function(t){ return Math.round(+t.deposit||0)-Math.round(+t.withdraw||0); });
+        var left=Ls.filter(function(x){ var k=used.indexOf(x.v); if(k>=0){ used.splice(k,1); return false; } return true; });   // 이미 자동 행이 된 줄(같은 방향·금액)은 뺀다
+        if(!left.length || left.length>12) return;
+        if(!synBy[lab].length && (tgt==null || hasRow[lab])) return;   // 자동 행이 없는 계좌는 보고서 마감이 있을 때만
+        var gap=tgt!=null ? tgt-(was+net) : null, pick=null, n=left.length;
+        for(var mk=1; mk<(1<<n); mk++){ var sm=0, sel=[]; for(var i=0;i<n;i++) if(mk&(1<<i)){ sm+=left[i].v; sel.push(left[i]); }
+          if(gap!=null ? sm===gap : (was+net+sm===0)){ if(pick){ pick=null; break; } pick=sel; } }   // 조합이 둘 이상이면 만들지 않는다
+        if(!pick || (gap!=null && gap===0)) return;
+        var why="전표 "+pick.map(function(x){ return x.l.voucher||""; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; }).join("·")+" 남은 줄 — 이 계좌 CMS 없음, "+(tgt!=null?"보고서 마감 "+fmt(tgt):"잔액 0(전액 정리)")+"까지";
+        var last=null;
+        pick.forEach(function(x){ var l=x.l, a=Math.abs(x.v), intr=l.cat==="이자수익" || /이자/.test(String(l.memo||""));
+          if(x.v>0){ last=syn(r,{date:d, acct:lab, kind:intr?"수입":(l.kind==="move-in"?"자금이동(입금)":"수입"), cat:intr?"이자수익":(l.kind==="move-in"?"자금이동":(l.cat||"기타")), deposit:a, summary:"[자동] "+(String(l.memo||"").slice(0,30)||"전표 입금"), rcWhy:why}); if(intr) st.int+=a; }
+          else last=syn(r,{date:d, acct:lab, kind:l.kind==="move-out"?"자금이동(출금)":"지출", cat:l.kind==="move-out"?"자금이동":(l.cat||"운영경비"), withdraw:a, summary:"[자동] "+(String(l.memo||"").slice(0,30)||"전표 출금"), rcWhy:why}); });
+        if(last){ last.hasAfter=true; last.after=tgt!=null?tgt:0; }
+        st.r5++; });
+    })();
     /* R1 자사명 앞 출금 · 받은 자사 계좌 없음 → 같은 날 같은 계좌 전표 출금 줄(합이 같은 것)로 지출 나눔 */
     var catOf=function(l){ var x=String(l.rawMemo||l.memo||"")+" "+String(l.fund||""); if(/상환/.test(x) && !/이자|수수료/.test(x)) return "상환"; if(/이자|수수료/.test(x) && /대출|차입|상환/.test(x)) return "이자비용"; return l.cat||"기타"; };
     var findSub=function(L, w){ var n=Math.min(L.length,14); for(var m=1;m<(1<<n);m++){ var s=0, sel=[]; for(var i=0;i<n;i++) if(m&(1<<i)){ s+=Math.round(L[i].amount); sel.push(L[i]); } if(s===w) return sel; } return null; };
