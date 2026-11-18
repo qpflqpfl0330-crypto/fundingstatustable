@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v119 · 2026-11-18</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v120 · 2026-11-19</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -14236,7 +14236,7 @@ const DEFAULT_ROWS = { v: 1, rows: [
   { id: 'krw_apauto', sec: 'krw', label: '외상매입금(자동결제)', order: 120, erp: ['외상매입금(자동결제)'], builtin: true },
   { id: 'krw_dep', sec: 'krw', label: '예수금', order: 130, erp: [], sys: ['보통예금(인사팀·4대보험·세금 등)'], rule: '인사팀 예수금', builtin: true },
   { id: 'krw_int', sec: 'krw', label: '이자비용(지급이자)', order: 140, erp: ['이자비용(지급이자)'], builtin: true },
-  { id: 'krw_grant', sec: 'krw', label: '국고보조금(현금)', order: 150, erp: ['국고보조금(현금)'], builtin: true },
+  { id: 'krw_grant', sec: 'krw', label: '국고보조금(현금)', order: 150, erp: ['국고보조금(현금)'], sys: ['보통예금(적요 [국책])'], rule: '국책', builtin: true },
   { id: 'krw_gift', sec: 'krw', label: '경조금', order: 160, erp: ['경조금'], sys: ['제)복리후생비(경조금)', '판)복리후생비(경조금)'], rule: '경조금', builtin: true },
   { id: 'krw_dep2', sec: 'krw', label: '예수금(기타)', order: 165, erp: [], sys: ['적요에 오입금이 있는 전표'], rule: '오입금', builtin: true },
   { id: 'krw_pre', sec: 'krw', label: '선급금', order: 170, erp: [], sys: ['선급금(기타)'], rule: '선급금(기타)', builtin: true },
@@ -14468,6 +14468,18 @@ function extractRows(aoa, corpLabel) {
       const orig = slipRows.filter(r => r.debit > 0 && r.acc !== '보통예금').map(r => ({ acc: r.acc, 금액: r.debit, 적요: r.memo }));
       bankCrLines.forEach(b => {
         rowsOut.push({ 회계단위: b.unit, 회계일자: parseDate(b.dateRaw), 계정명: rowLabel('krw_dep2'), block: rowLabel('krw_dep2'), rowId: 'krw_dep2', 적요: cp ? cp.memo : b.memo, 금액: b.credit, ruleApplied: '오입금', slip, orig });
+      });
+      return;
+    }
+
+    // [v120] 규칙 · 국책 → 국고보조금(현금) — 전표 어느 라인이든 적요에 '국책'이 있고 보통예금 대변이 있으면
+    //        상대계정(국고보조금(현금)·선수금(수금)·잡이익·이자수익 등)과 무관하게 국고보조금(현금) 행 하나.
+    //        금액·건수 = 보통예금 대변 라인, 지출내역서 적요 = 보통예금 라인 적요(사용자 결정 2026-11-19 · 양식 메모 '국책 관련 보통예금 지급액 → 국고보조금(현금)').
+    //        예: SN FI2026111900001 — 국고보조금 318,428 + 선수금(수금) 5줄 38,627 − 잡이익 5,790 − 이자수익 87 = 보통예금 351,178 → 국고보조금(현금) 351,178 · 1건
+    if (bankCrLines.length && slipRows.some(r => r.memo.includes('국책'))) {
+      const orig = slipRows.filter(r => r.acc !== '보통예금' && (r.debit > 0 || r.credit > 0)).map(r => ({ acc: r.acc, 금액: r.debit > 0 ? r.debit : -r.credit, 적요: r.memo }));
+      bankCrLines.forEach(b => {
+        rowsOut.push({ 회계단위: b.unit, 회계일자: parseDate(b.dateRaw), 계정명: rowLabel('krw_grant'), block: rowLabel('krw_grant'), rowId: 'krw_grant', 적요: b.memo, 금액: b.credit, ruleApplied: '국책', slip, orig });
       });
       return;
     }
