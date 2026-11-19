@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v120 · 2026-11-19</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v122 · 2026-11-19</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -7758,20 +7758,23 @@ function renderSettings(){
   var target = c || D.companies[0];
   // 계좌
   $("#acctSub").textContent=(curCo==="ALL"?"※ 법인 탭에서 법인을 선택하면 해당 법인 계좌만 편집합니다 · ":"")+target.name+" · "+target.accounts.length+"개";
-  $("#acctTbl").innerHTML='<thead><tr><th>순서</th><th>은행</th><th>계좌번호</th><th>표기</th><th>구분</th><th>비고</th><th></th></tr></thead><tbody>'+
+  $("#acctTbl").innerHTML='<thead><tr><th>순서</th><th>은행</th><th>계좌번호</th><th>표기</th><th>구분</th><th>비고</th><th title="해지일 다음 날부터 자금일보 예적금 현황표에서 뺍니다(잔액·거래 0일 때)">해지일</th><th></th></tr></thead><tbody>'+
     target.accounts.slice().sort(function(a,b){return a.order-b.order}).map(function(a){
       var idx=target.accounts.indexOf(a);
-      return '<tr><td><input class="cellsel num" type="number" data-ai="'+idx+'" data-f="order" value="'+(a.order||0)+'" style="width:56px"></td>'+
+      return '<tr'+(a.closeDate && a.closeDate<todayISO()?' style="opacity:.55" title="'+esc(a.closeDate)+' 해지"':'')+'><td><input class="cellsel num" type="number" data-ai="'+idx+'" data-f="order" value="'+(a.order||0)+'" style="width:56px"></td>'+
         '<td><input class="cellsel" data-ai="'+idx+'" data-f="bank" value="'+esc(a.bank)+'" style="width:76px"></td>'+
         '<td><input class="cellsel" data-ai="'+idx+'" data-f="num" value="'+esc(a.num)+'" style="width:150px"></td>'+
         '<td><input class="cellsel" data-ai="'+idx+'" data-f="label" value="'+esc(a.label)+'" style="width:110px"></td>'+
         '<td><select class="cellsel" data-ai="'+idx+'" data-f="group">'+["원화","국고","외화"].map(function(g){return '<option'+(g===a.group?' selected':'')+'>'+g+'</option>'}).join("")+'</select></td>'+
         '<td><input class="cellsel" data-ai="'+idx+'" data-f="note" value="'+esc(a.note||"")+'" style="width:200px"></td>'+
+        '<td><input class="cellsel" type="date" data-ai="'+idx+'" data-f="closeDate" value="'+esc(a.closeDate||"")+'" style="width:130px"></td>'+
         '<td><button class="btn sm" data-adel="'+idx+'">삭제</button></td></tr>';
     }).join("")+'</tbody>';
   $$("#acctTbl [data-ai]").forEach(function(el){ el.onchange=function(){ var f=el.dataset.f, a=target.accounts[+el.dataset.ai];
     if(f==="label"){ var old=a.label; if(!acctLabelChange(target, a, el.value)){ el.value=a.label; return; }   // [v89] 표기 바꾸면 저장 자료도 새 표기로
       invalidate(); save().then(function(){ toast("계좌 표기 저장됨 — "+old+" → "+a.label+" (저장된 거래·잔액 자료도 함께 바꿈)"); render(); }); return; }
+    if(f==="closeDate"){ if(el.value) a.closeDate=el.value; else delete a.closeDate;   // [v122] 해지일
+      invalidate(); save().then(function(){ toast(a.closeDate ? a.label+" 해지일 "+a.closeDate+" — 다음 날부터 예적금 현황표에서 뺍니다(잔액·거래 0일 때)" : a.label+" 해지일 지움"); renderSettings(); }); return; }
     a[f]= f==="order"?(+el.value||0):el.value; invalidate(); save().then(function(){toast("계좌 저장됨")}); }; });
   $$("#acctTbl [data-adel]").forEach(function(b){ b.onclick=function(){ target.accounts.splice(+b.dataset.adel,1); invalidate(); save().then(function(){renderSettings();toast("계좌 삭제됨")}); }; });
 
@@ -10755,6 +10758,21 @@ function depHideRows(c, iso, rows){
 }
 ilboModel=(function(f){ return function(c, iso){ var m=f.apply(this, arguments);
   try{ if(m && m.krwRows) m.krwRows=depHideRows(c, m.prevEnd||iso, m.krwRows); }catch(e){} return m; }; })(ilboModel);
+/* [v122] 계좌 해지일(설정 → 계좌 목록) — 전일 실적 기간 시작일(m.prev)이 해지일보다 뒤면 그 계좌 줄을 뺀다.
+   해지일이 기간 안이면(해지 당일 이자·수수료·이동) 그대로 보인다. 잔액·거래가 0일 때만 빼고, 남아 있으면 줄을 두고 검증 줄로 알린다
+   (빼면 원화 소계 ≠ 시재가 되므로 — 금액 조정 금지). 소계는 이미 계산된 값 그대로(0인 줄만 빠짐). */
+function acctClosedRows(c, from, rows, chk){
+  var zero=function(x){ return ["open","in","out","mvIn","mvOut","close"].every(function(k){ return Math.abs(+x[k]||0)<0.5; }); };
+  var left=[];
+  var out=(rows||[]).filter(function(x){ var a=acctOf(c, x.label); if(!a){ var d=digitsOnly(x.num); a=d ? (c.accounts||[]).filter(function(b){ return digitsOnly(b.num)===d; })[0] : null; }
+    if(!a || !a.closeDate || !(from>a.closeDate)) return true;
+    if(zero(x)) return false;
+    left.push(x.bank+" "+x.num+"("+a.closeDate+" 해지 · 잔액 "+fmt(Math.round(+x.close||0))+"원)"); return true; });
+  if(left.length && chk) chk.push({ok:false, msg:"해지일이 지난 계좌에 잔액·거래가 남아 있어 예적금 현황표에 그대로 둠: "+left.join(", ")+" — 해지일 또는 그날 CMS·전표를 확인해 주세요"});
+  return out;
+}
+ilboModel=(function(f){ return function(c, iso){ var m=f.apply(this, arguments);
+  try{ if(m && m.krwRows) m.krwRows=acctClosedRows(c, m.prev||iso, m.krwRows, m.checks); }catch(e){} return m; }; })(ilboModel);
 /* 자금일보 화면 안내(화면 전용) — 가입기간인데 잔액 0 · 만기 지났는데 잔액 남음 */
 function depIssues(c, iso){
   var st=coState(c), ds=st.dates.filter(function(d){ return d<=iso; }), d=ds[ds.length-1], ch=d?st.chain[d]:null, out=[];
@@ -13003,6 +13021,11 @@ function fxAccountRows(c, prev, openDet, closeDet){
   if(!tpl) tpl=reg.map(function(a){ return {label:a.label, ccy:"USD"}; });
   var bankOf=function(label){ var a=acctOf(c,label); return a?a.bank:String(label).split(" ")[0]; };
   var rows=tpl.map(function(t){ var a=acctOf(c,t.label); return {label:t.label, bank:bankOf(t.label), num:a?a.num:t.label, ccy:t.ccy, oAmt:0,oKrw:0,cAmt:0,cKrw:0}; });
+  /* [v121] 이관 계좌가 계좌 목록(tpl)에도 있으면 그 행을 이관 행으로 표시 — 승계 랏이 같은 계좌 행을 하나 더 만들지 않게(GS 하나 73032 중복) */
+  var XL=(typeof xferAccts==="function") ? xferAccts(c).filter(function(x){ return x.acc.group==="외화"; }) : [];
+  rows.forEach(function(r){ var a=acctOf(c,r.label), d=a?digitsOnly(a.num):"";
+    var hit=XL.filter(function(x){ return x.acc.label===r.label || (d && digitsOnly(x.acc.num)===d); })[0];
+    if(hit){ r.xferAcct=hit.acc.label; if(!a) r.num=hit.acc.num||r.num; } });
   function put(det, ka, kk){
     (det||[]).forEach(function(d){
       var xa=d.xfer ? xferFxAcct(c, d.bank, d.ccy||"USD") : null;   // [v90] 합병 승계 랏 → 이관 계좌 행
