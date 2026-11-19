@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v122 · 2026-11-19</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v123 · 2026-11-19</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -5389,9 +5389,13 @@ function renderLoans(){
   });
   var lendRows="", lendTot=sc.lendBal;
   sc.lendItems.forEach(function(it){ var c=it.c, d=it.d, bal=it.bal;
-    lendRows+='<tr><td><span class="chip nv" style="color:'+c.color+'">'+esc(c.short)+'</span></td><td>'+esc(d.partner)+'</td>'+
-      '<td class="num mini">'+esc(d.start||"")+' ~ '+esc(d.end||"")+'</td><td class="num" title="'+fmt(d.amount)+'원">'+eok(d.amount)+'</td>'+
-      '<td class="num" title="'+fmt(it.v.repaid)+'원">'+eok(it.v.repaid)+'</td><td class="num" title="'+fmt(bal)+'원">'+eok(bal)+'</td><td class="num">'+(it.v.rate*100).toFixed(3)+'%</td><td class="mini">'+esc(d.method||"")+'</td></tr>';
+    /* [v123] 기준일 잔액 0(전액 회수)인 대여는 대시보드에서 뺀다 — 기준일이 속한 달에 회수가 있었으면 그 달만 흐리게 '회수 완료'로 표시.
+       금융 → 대여현황·엑셀 대여현황은 이력 확인용이라 그대로 둔다. 값은 같은 lendAt(기준일까지 대여·회수 이력) */
+    var lastMv=(d.moves||[]).filter(function(m){ return m.date && m.date<=iso; }).map(function(m){ return m.date; }).sort().pop()||"";
+    var done=bal<1; if(done && !(lastMv && lastMv>=iso.slice(0,7)+"-01")) return;
+    lendRows+='<tr'+(done?' style="opacity:.45" title="'+esc(lastMv)+' 전액 회수"':'')+'><td><span class="chip nv" style="color:'+c.color+'">'+esc(c.short)+'</span></td><td>'+esc(d.partner)+(done?' <span class="chip nv">회수 완료</span>':'')+'</td>'+
+      '<td class="num mini" colspan="2">'+esc(d.start||"")+' ~ '+esc(d.end||"")+'</td><td class="num" title="'+fmt(d.amount)+'원">'+eok(d.amount)+'</td>'+
+      '<td class="num" title="'+fmt(it.v.repaid)+'원">'+eok(it.v.repaid)+'</td><td class="num" title="'+fmt(bal)+'원">'+eok(bal)+'</td><td class="num">'+(it.v.rate*100).toFixed(3)+'%</td><td class="mini" colspan="2">'+esc(d.method||"")+'</td></tr>';   // [v123] 머리글(약정~만기·이자 수취 2칸)과 칸 수 맞춤
   });
   $("#loanTbl").innerHTML='<thead><tr><th>법인</th><th>구분</th><th>은행</th><th>약정 ~ 만기</th><th style="text-align:right">한도</th><th style="text-align:right">차입잔액</th><th style="text-align:right">추가가능</th><th style="text-align:right">이자율</th><th style="text-align:right">월 예상이자<span class="mini" style="display:block;font-weight:400">백만원</span></th><th>이자 납부</th></tr></thead><tbody>'+
     (rows||'<tr><td colspan="10" class="mini" style="padding:20px;text-align:center">약정 없음</td></tr>')+
@@ -6707,7 +6711,7 @@ function wcEvents(from, to){
           title:c.short+" "+(d.partner||"대여")+" 대여이자 수취", amt:e.net, inflow:true,
           memo:"계산기간 "+e.from+" ~ "+e.to+" ("+e.days+"일)", checklist:["입금 확인","이자수익 전표"], rule:intPayRule(d).txt});
       });
-      if(d.end && d.end>=from && d.end<=to) out.push({key:"auto-lend-end|"+c.id+"|"+(d.id||d.partner), date:d.end, cat:"interest", auto:true, co:c.id,
+      if(d.end && d.end>=from && d.end<=to && lendAt(d,d.end).bal>=1) out.push({key:"auto-lend-end|"+c.id+"|"+(d.id||d.partner), date:d.end, cat:"interest", auto:true, co:c.id,
         title:c.short+" "+(d.partner||"대여")+" 대여 만기", memo:"잔액 "+fmt(lendAt(d,d.end).bal), checklist:["회수 또는 연장 결정","약정서 갱신"]});
     });
     /* 자동: 한도미사용수수료 — (한도 − 사용액) × 수수료율 × 일수 ÷ 365, 이자와 같은 계산기간·납부일(계획서 AD열).
