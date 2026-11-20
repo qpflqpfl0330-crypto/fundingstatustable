@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v123 · 2026-11-19</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v124 · 2026-11-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -21487,11 +21487,12 @@ window.__INT_CMAPS = Object.freeze({"Adobe-Japan1-UCS2":"BOBSQ29weXJpZ2h0IDE5OTA
       if (pendingOcr.length) { setProg('미확인 글리프 ' + pendingOcr.length + '행 OCR 보정 중…', 0.9); await ocrFixCells(ex, pendingOcr); }
       S.images = ex.images; S.mode = ex.mode; S.info = ex.info;
       S.rows = P.finalize(ex.raws);
+      S.rows.forEach((r, i) => { r.ocrNotes = (ex.raws[i] && ex.raws[i].ocrNotes) || []; }); noteRows(S.rows);   // [v124] OCR 칸 사유
       const det = P.detectCompany(ex.info); S.detectInfo = det; S.detected = det.co;
       if (det.co) S.co = det.co;
       setCo(S.co);
       const modeTxt = { text: '텍스트 레이어', image: '원본 이미지 글리프 판독', ocr: 'OCR 판독(검증 필수)' }[S.mode] || S.mode;
-      setProg('완료 — ' + S.rows.length + '건 추출 (' + modeTxt + ')', null);
+      setProg('완료 — ' + S.rows.length + '건 추출 (' + modeTxt + ')' + (S.mode === 'ocr' ? ' · 글자 층·원본 글꼴이 없는 PDF(브라우저 인쇄본 등)라 OCR로 읽었습니다 — 하나은행에서 받은 원본 PDF를 올리면 글리프 판독으로 더 정확합니다' : ''), null);
       $('#mmt-step2').classList.remove('locked'); $('#mmt-step3').classList.remove('locked');
       if (!S.rows.length) modal('지급내역을 찾지 못했습니다', '<p>PDF에서 지급내역 행을 인식하지 못했습니다. [＋ 행 추가]로 직접 입력할 수 있습니다.</p>', [{ t: '확인' }]);
       renderRows(); rebuild();
@@ -21517,67 +21518,330 @@ window.__INT_CMAPS = Object.freeze({"Adobe-Japan1-UCS2":"BOBSQ29weXJpZ2h0IDE5OTA
   }
   const WL = { y: '0123456789', m: '0123456789', d: '0123456789', period: '0123456789~', rate: '0123456789.', taxRate: '0123456789.', pay: '0123456789,', incTax: '0123456789,', corp: '0123456789,', local: '0123456789,' };
   const FIELDMAP = { y: 'payDate', m: 'payDate', d: 'payDate', period: 'start', rate: 'rate', taxRate: 'taxRate', pay: 'pay', incTax: 'incomeTax', corp: 'corpTax', local: 'localTax' };
-  async function ocrCell(img, col, band, field, scale) {
+  /* ---------- [v124] OCR 폴백 다수결 판독 ----------
+     종전(v31): 칸마다 crop → ×4 확대 → binPad → psm 7 한 번. 원본 그림 숫자가 이미 약 30px인데 ×4(약 120px)로 키워
+     '776,355'를 '7,763'으로 읽는 등 환경·배율에 따라 결과가 흔들렸다(GS_MMT.pdf 2번 행).
+     바꾼 것: 칸 안 텍스트 줄마다 이진·회색조 × 배율 × psm 8가지로 읽고 숫자열 다수결(3표 이상·최다 단독)로 정한다.
+     연결요소로 센 숫자 글자 수와 판독 숫자 수가 같은 판독만 투표 · 구두점은 글자 모양으로 자리, 의미는 항목 형식(금액 쉼표·이율 소수점).
+     다수결이 안 되면 값을 비우고 '판독 불확실'(error) — 임의 보정 없음.
+     아래 함수는 int-core(기타 이자수익전표)에서 그대로 옮겼다(출처 주석). IntParser를 호출하지 않는다 — 두 모듈은 서로 의존하지 않는다. */
+  const VOTE_KIND = { y: 'int', m: 'int', d: 'int', period: 'date', rate: 'dec', taxRate: 'dec', pay: 'num', incTax: 'num', corp: 'num', local: 'num' };
+  const VOTE_NAME = { y: '연', m: '월', d: '일', period: '대상기간', rate: '이율', taxRate: '세율', pay: '지급액', incTax: '소득세', corp: '법인세', local: '지방소득세' };
+  async function tessRead(im, wl, psm) {
     const w = await getTess();
-    let g = P.Img.crop(img, col.x0 + 1, band.top + 1, col.x1, band.bot);
-    g = P.Img.scale(g, scale); g = P.Img.binPad(g, 170, 16);
-    if (!g) return '';
-    await w.setParameters({ tessedit_char_whitelist: WL[field], tessedit_pageseg_mode: field === 'period' ? '6' : '7' });
-    const r = await w.recognize(grayToCanvas(g));
-    return r.data.text.trim();
+    await w.setParameters({ tessedit_char_whitelist: wl, tessedit_pageseg_mode: String(psm) });
+    const r = await w.recognize(grayToCanvas(im));
+    return String(r.data.text || '').trim();
   }
+  /* int-core cellCrop 이식 · v124 — 경계선 1px 안쪽까지 자르고, 가장자리에 남은 표 선(세로·가로로 60% 이상 어두운 열·행)만 지운다 */
+  function cellCrop(img, cell, scale) {
+    const raw = P.Img.crop(img, cell.x0 + 1, cell.top + 1, cell.x1, cell.bot);
+    const vals = Array.from(raw.d).sort((a, b) => a - b); const bg = vals[Math.floor(vals.length * 0.9)] || 255; const thr = Math.min(185, bg - 55);
+    const edge = Math.max(3, Math.round(scale * 2.5));
+    for (let x = 0; x < raw.w; x++) { if (x >= edge && x < raw.w - edge) continue; let n = 0; for (let y = 0; y < raw.h; y++) if (raw.d[y * raw.w + x] < thr) n++; if (n >= raw.h * 0.6) for (let y = 0; y < raw.h; y++) raw.d[y * raw.w + x] = 255; }
+    for (let y = 0; y < raw.h; y++) { if (y >= edge && y < raw.h - edge) continue; let n = 0; for (let x = 0; x < raw.w; x++) if (raw.d[y * raw.w + x] < thr) n++; if (n >= raw.w * 0.6) for (let x = 0; x < raw.w; x++) raw.d[y * raw.w + x] = 255; }
+    return raw;
+  }
+  /* int-core cellLineImgs 이식 · v124 — 셀 안 텍스트 줄 이미지(이진, 여백 없음 + 회색조). 칸 안 짧은 구분선은 제외 */
+  function lineImgsOf(raw, scale) {
+    const vals = Array.from(raw.d).sort((a, b) => a - b); const bg = vals[Math.floor(vals.length * 0.9)] || 255; const thr = Math.min(185, bg - 55);
+    const dark = (x, y) => raw.d[y * raw.w + x] < thr;
+    const rowN = []; for (let y = 0; y < raw.h; y++) { let n = 0; for (let x = 0; x < raw.w; x++) if (dark(x, y)) n++; rowN.push(n >= raw.w * 0.7 ? 0 : n); }
+    const spans = []; let st = -1, gap = 0;
+    for (let y = 0; y <= raw.h; y++) { const on = y < raw.h && rowN[y] > 0; if (on) { if (st < 0) st = y; gap = 0; } else if (st >= 0) { gap++; if (gap >= Math.max(2, Math.round(scale)) || y === raw.h) { spans.push([st, y - gap]); st = -1; gap = 0; } } }
+    const out = [];
+    spans.forEach(([a, b]) => {
+      if (b - a + 1 < Math.max(3, Math.round(scale * 1.2))) return;
+      let x0 = raw.w, x1 = -1; for (let y = a; y <= b; y++) for (let x = 0; x < raw.w; x++) if (dark(x, y)) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+      if (x1 < 0) return;
+      const w = x1 - x0 + 1, h = b - a + 1, d = new Uint8ClampedArray(w * h), gd = new Uint8ClampedArray(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { d[y * w + x] = dark(x + x0, y + a) ? 0 : 255; const v = raw.d[(y + a) * raw.w + x + x0]; gd[y * w + x] = Math.min(255, Math.round(v * 255 / Math.max(1, bg))); }
+      out.push({ w, h, d, gray: { w, h, d: gd } });
+    });
+    return out;
+  }
+  /* 칸 → 텍스트 줄. 배율은 줄 글자 높이 기준 — 숫자가 작을 때만 키운다(int-core ocrReady 규칙 · 원본 300dpi 그림처럼 이미 크면 ×1) */
+  const OCR_MIN_H = 30;
+  function cellLines(img, cell, scale) {
+    let raw = cellCrop(img, cell, scale), L = lineImgsOf(raw, scale);
+    const H0 = L.length ? Math.max(...L.map(li => li.h)) : 0;
+    let pf = 1; while (H0 && H0 * pf < OCR_MIN_H && pf < 4) pf++;
+    if (pf > 1) { raw = P.Img.scale(raw, pf); L = lineImgsOf(raw, scale * pf); }
+    return { L, H: L.length ? Math.max(...L.map(li => li.h)) : 0, pf };
+  }
+  /* int-core components 이식 · v124 — 연결요소(8방향), 세로로 겹치는 조각은 한 글자로 */
+  function components(bin) {
+    const { w, h, d } = bin, lab = new Int32Array(w * h).fill(-1), comps = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (d[y * w + x] !== 0 || lab[y * w + x] >= 0) continue;
+      const id = comps.length, st = [y * w + x]; lab[y * w + x] = id; let x0 = x, x1 = x, y0 = y, y1 = y, n = 0;
+      while (st.length) {
+        const p = st.pop(); n++; const py = (p / w) | 0, px = p - py * w;
+        if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= w || qy >= h) continue; const q = qy * w + qx; if (d[q] === 0 && lab[q] < 0) { lab[q] = id; st.push(q); } }
+      }
+      comps.push({ ids: [id], x0, x1, y0, y1, n });
+    }
+    comps.sort((p, q) => p.x0 - q.x0);
+    const out = [];
+    comps.forEach(c => { const o = out[out.length - 1]; const ov = o ? Math.min(o.x1, c.x1) - Math.max(o.x0, c.x0) + 1 : -1;
+      if (o && ov >= 0.5 * Math.min(o.x1 - o.x0 + 1, c.x1 - c.x0 + 1)) { o.ids = o.ids.concat(c.ids); o.x0 = Math.min(o.x0, c.x0); o.x1 = Math.max(o.x1, c.x1); o.y0 = Math.min(o.y0, c.y0); o.y1 = Math.max(o.y1, c.y1); o.n += c.n; }
+      else out.push(Object.assign({}, c)); });
+    const res = out.filter(c => c.n >= 3); res.lab = lab; return res;
+  }
+  /* int-core glyphVec·vdist 이식 · v124 — 숫자 글자 모양 벡터(12×18 칸 채움 비율), 같은 문서 안 동점 판독을 가르는 데만 쓴다 */
+  function glyphVec(bin, lab, c) {
+    const GW = 12, GH = 18, v = new Float32Array(GW * GH), set = new Set(c.ids), bw = c.x1 - c.x0 + 1, bh = c.y1 - c.y0 + 1;
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+      const ya = c.y0 + Math.floor(gy * bh / GH), yb = Math.max(ya, c.y0 + Math.ceil((gy + 1) * bh / GH) - 1);
+      const xa = c.x0 + Math.floor(gx * bw / GW), xb = Math.max(xa, c.x0 + Math.ceil((gx + 1) * bw / GW) - 1);
+      let on = 0, n = 0; for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) { n++; if (set.has(lab[y * bin.w + x])) on++; }
+      v[gy * GW + gx] = n ? on / n : 0;
+    }
+    return v;
+  }
+  function vdist(a, b) { let t = 0; for (let i = 0; i < a.length; i++) t += Math.abs(a[i] - b[i]); return t / a.length; }
+  /* int-core lineGlyphs 이식 · v124 — 줄 이미지 → 글자 종류 'd'(숫자 높이) · 'sep'(아래쪽 작은 점) · 'dash'(가운데 가로획) · '?' */
+  function lineGlyphs(li, H) {
+    const comps = components(li); if (!comps.length) return [];
+    const tallTop = comps.filter(c => c.y1 - c.y0 + 1 >= H * 0.65).map(c => c.y0);
+    const top = tallTop.length ? Math.min(...tallTop) : Math.min(...comps.map(c => c.y0)) - H * 0.35;
+    return comps.map(c => {
+      const w = c.x1 - c.x0 + 1, h = c.y1 - c.y0 + 1, cy = (c.y0 + c.y1) / 2;
+      let k = '?';
+      if (h >= H * 0.65) k = 'd';
+      else if (h < H * 0.5 && w >= H * 0.3 && cy > top + H * 0.2 && cy < top + H * 0.8) k = 'dash';
+      else if (h < H * 0.55 && w < H * 0.5 && cy > top + H * 0.55) k = 'sep';
+      return { k, vec: k === 'd' ? glyphVec(li, comps.lab, c) : null };
+    });
+  }
+  /* int-core OCR_VARIANTS·padImg·ocrVoteLine 이식 · v124 */
+  const OCR_VARIANTS = [{ g: 0, f: 1, psm: 7 }, { g: 0, f: 1, psm: 8 }, { g: 0, f: 2, psm: 7 }, { g: 0, f: 2, psm: 13 }, { g: 0, f: 1.5, psm: 7 }, { g: 1, f: 1, psm: 7 }, { g: 1, f: 2, psm: 7 }, { g: 1, f: 2, psm: 13 }];
+  function padImg(im, pad) { const w = im.w + pad * 2, h = im.h + pad * 2, d = new Uint8ClampedArray(w * h).fill(255); for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) d[(y + pad) * w + x + pad] = im.d[y * im.w + x]; return { w, h, d }; }
+  async function ocrVoteLine(li, H, wl) {
+    const reads = [];
+    for (const v of OCR_VARIANTS) {
+      const src = v.g ? li.gray : li;
+      const im = padImg(v.f === 1 ? src : P.Img.scale(src, v.f), Math.round(14 * v.f));
+      reads.push(String(await tessRead(im, wl, v.psm)).replace(/\s+/g, ''));
+    }
+    const gl = lineGlyphs(li, H), kinds = gl.map(g => g.k), nd = kinds.filter(k => k === 'd').length, segOk = nd > 0 && kinds.indexOf('?') < 0;
+    const pick = list => { const cnt = {}; list.forEach(dg => { if (dg) cnt[dg] = (cnt[dg] || 0) + 1; }); const e = Object.entries(cnt).sort((a, b) => b[1] - a[1]); return e.length && e[0][1] >= 3 && (e.length === 1 || e[0][1] > e[1][1]) ? e[0][0] : null; };
+    const dgs = reads.map(t => t.replace(/[^\d]/g, ''));
+    // 글자 분할이 깨끗하면 숫자 개수가 맞는 판독만 투표, 안 되면 전체로
+    const win = (segOk && pick(dgs.filter(d => d.length === nd))) || pick(dgs);
+    return { reads, dgs, win, kinds, gl, nd, segOk, cand: segOk ? dgs.filter(d => d.length === nd) : [] };
+  }
+  /* 칸 묶음 다수결(int-core ocrDataCells 이식 · v124). specs: [{key, f, img, cell, scale}]
+     1차: 줄마다 다수결. 2차: 동점인 글자 자리만, 같은 문서에서 만장일치로 확정된 숫자 모양과 비교해 가른다(사유 '7/1→7').
+     결과: {text, cands:[{dg, n}], amb, tie, err} — 다수결 실패 칸은 text '' · amb에 후보 */
+  async function voteCells(specs, prog) {
+    const work = [];
+    let k = 0;
+    for (const sp of specs) {
+      k++; if (prog) prog(sp, k, specs.length);
+      sp.L = []; sp.err = '';
+      try {
+        const { L, H } = cellLines(sp.img, sp.cell, sp.scale);
+        for (const li of L) {
+          const gl = lineGlyphs(li, H), k0 = gl.map(g => g.k);
+          if (k0.length && k0.every(q => q === 'dash' || q === 'sep')) { sp.L.push({ fixed: k0.map(q => (q === 'dash' ? '-' : '.')).join('') }); continue; }
+          const v = await ocrVoteLine(li, H, '0123456789.,-~'); sp.L.push(v); work.push(v);   // int-core와 같은 화이트리스트
+        }
+      } catch (e) { sp.err = 'OCR 오류: ' + (e && e.message ? e.message : String(e)); sp.L = []; }
+    }
+    const bank = {}; // 확신 글자 모양: 숫자 → [vec]
+    work.forEach(v => { if (v.win && v.segOk && v.win.length === v.nd && v.cand.length >= 5 && v.cand.every(c => c === v.win)) { let i = 0; v.gl.forEach(g => { if (g.k === 'd') (bank[v.win[i++]] = bank[v.win[i - 1]] || []).push(g.vec); }); } });
+    work.forEach(v => {
+      if (v.win || !v.segOk || v.cand.length < 3) return;
+      const dgl = v.gl.filter(g => g.k === 'd'); let out = ''; const note = [];
+      for (let i = 0; i < v.nd; i++) {
+        const cs = {}; v.cand.forEach(c => { cs[c[i]] = (cs[c[i]] || 0) + 1; });
+        const keys = Object.keys(cs);
+        if (keys.length === 1) { out += keys[0]; continue; }
+        const sc = keys.map(q => ({ k: q, d: (bank[q] || []).reduce((m, vec) => Math.min(m, vdist(vec, dgl[i].vec)), 9) })).sort((a, b) => a.d - b.d);
+        if (sc[0].d < 0.08 && (sc.length < 2 || sc[1].d > sc[0].d * 1.6)) { out += sc[0].k; note.push(keys.join('/') + '→' + sc[0].k); }
+        else { out = null; break; }
+      }
+      if (out) { v.win = out; v.tie = note.join(', '); }
+    });
+    const res = {};
+    specs.forEach(sp => {
+      const kind = VOTE_KIND[sp.f], sepCh = kind === 'num' ? ',' : '.', texts = [], amb = [], tie = [], cnt = {};
+      sp.L.forEach(v => {
+        if (v.fixed != null) { texts.push(v.fixed); return; }
+        v.dgs.forEach(dg => { if (dg) cnt[dg] = (cnt[dg] || 0) + 1; });
+        if (!v.win) { texts.push('?'); amb.push(v.reads.filter(Boolean).join(' / ') || '판독값 없음'); return; }
+        if (v.tie) tie.push(v.tie);
+        if (v.segOk && v.nd === v.win.length) { let i = 0, t = ''; v.kinds.forEach(q => { t += q === 'd' ? v.win[i++] : (q === 'sep' ? sepCh : '-'); }); texts.push(t); }
+        else {
+          const same = v.reads.filter(t => t.replace(/[^\d]/g, '') === v.win);
+          const c2 = {}; same.forEach(t => { c2[t] = (c2[t] || 0) + 1; }); const best = (Object.entries(c2).sort((a, b) => b[1] - a[1])[0] || [v.win])[0];
+          const t = best.replace(/[.,]/g, sepCh).replace(/~/g, '-');
+          if (kind === 'dec' && v.win.length > 1 && t.indexOf('.') < 0) { texts.push('?'); amb.push('소수점 확인 불가: ' + v.reads.join(' / ')); }
+          else texts.push(t);
+        }
+      });
+      const bad = !!sp.err || texts.indexOf('?') >= 0;
+      res[sp.key] = { text: bad ? '' : texts.join(kind === 'date' ? '\n' : ''), lines: texts, blank: !sp.err && !sp.L.length,
+        cands: Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([dg, n]) => ({ dg, n })),
+        amb: sp.err || amb.join(' · '), tie: tie.join(' · '), bad };
+    });
+    return res;
+  }
+  /* 다수결 결과 → 원시 행 값 + OCR 칸 사유(raw.ocrNotes: 화면 검증 줄에 덧붙임 · 사용자가 칸을 고치면 지움) */
+  function applyVote(raw, f, v) {
+    const fld = FIELDMAP[f]; raw.ocrNotes = raw.ocrNotes || [];
+    if (v.bad) {
+      const cs = v.cands.slice(0, 4).map(c => VOTE_KIND[f] === 'num' ? Number(c.dg).toLocaleString('ko-KR') : c.dg).join(' / ');
+      raw.ocrNotes.push({ level: f === 'incTax' ? 'warn' : 'error', field: fld, msg: VOTE_NAME[f] + ' 판독 불확실 — 후보: ' + (cs || '없음') + (v.amb && /OCR 오류|소수점/.test(v.amb) ? ' (' + v.amb + ')' : '') });
+    } else if (v.tie) raw.ocrNotes.push({ level: 'warn', field: fld, msg: VOTE_NAME[f] + ' 동점 판독을 같은 문서 글자 모양으로 결정 (' + v.tie + ')' });
+    return v.text;
+  }
+  /* 검산으로 후보 고르기(값을 만들지 않고 고르기만) — validate와 같은 허용오차.
+     다수결 1위 조합이 법인세·지방소득세 검산을 통과하면 그대로. 아니면 세 칸 후보(1위 + 2표 이상 받은 다른 판독) 조합 중
+     두 검산을 모두 통과하는 조합이 정확히 하나일 때만 그 조합으로 바꾸고 warn. 없거나 둘 이상이면 그대로(검증 error · 다운로드 차단).
+     법인세·세율로 지급액을 역산하거나 후보에 없는 값을 만들지 않는다(규칙서 §0-2). */
+  function taxPass(pay, corp, local, taxRate, days) {
+    if (![pay, corp, local, taxRate].every(Number.isFinite)) return false;
+    const tol = 10 * Math.max(1, Number.isFinite(days) ? days : 1) + 10;
+    const d1 = pay * taxRate / 100 - corp, d2 = corp * 0.1 - local;
+    return d1 > -1 && d1 < tol && d2 > -1 && d2 < tol && pay - corp - local > 0;
+  }
+  function pickByCheck(raw, votes) {
+    const F = [['pay', 'pay'], ['corp', 'corpTax'], ['local', 'localTax']];
+    const pt = raw.periodTokens || [], days = pt.length >= 2 ? U.days(pt[pt.length - 2], pt[pt.length - 1]) : NaN, tr = U.dec(raw.taxRate);
+    const cur = F.map(([f, k]) => U.int(raw[k]));
+    if (taxPass(cur[0], cur[1], cur[2], tr, days)) return;
+    const lists = F.map(([f, k], i) => { const v = votes[f]; if (!v) return Number.isFinite(cur[i]) ? [cur[i]] : [];
+      const out = []; if (Number.isFinite(cur[i])) out.push(cur[i]);
+      v.cands.forEach(c => { const n = parseInt(c.dg, 10); if (c.n >= 2 && Number.isFinite(n) && out.indexOf(n) < 0) out.push(n); });
+      return out.slice(0, 5); });
+    if (lists.some(l => !l.length)) return;
+    const ok = [];
+    lists[0].forEach(a => lists[1].forEach(b => lists[2].forEach(c => { if (taxPass(a, b, c, tr, days)) ok.push([a, b, c]); })));
+    if (ok.length !== 1) return;
+    raw.ocrNotes = raw.ocrNotes || [];
+    F.forEach(([f, k], i) => {
+      if (ok[0][i] === cur[i]) return;
+      raw.ocrNotes = raw.ocrNotes.filter(n => !(n.field === k && n.level === 'error'));
+      raw.ocrNotes.push({ level: 'warn', field: k, msg: '검산으로 후보 선택 (다수결 1위 ' + (Number.isFinite(cur[i]) ? cur[i].toLocaleString('ko-KR') : '없음') + ' → 후보 ' + ok[0][i].toLocaleString('ko-KR') + ')' });
+      raw[k] = ok[0][i].toLocaleString('ko-KR');
+    });
+  }
+  const cellOf = (col, band) => ({ x0: col.x0, x1: col.x1, top: band.top, bot: band.bot });
   async function ocrFixCells(ex, rows) {
-    try {
-      for (const r of rows) {
-        const img = ex.images[r.imgIdx];
-        for (const gi of r.glyphIssues) {
-          const t = await ocrCell(img, r.cols[gi.col], r.band, gi.field, 4);
-          if (gi.field === 'y' || gi.field === 'm' || gi.field === 'd') {
-            const parts = { y: r.payDate.slice(0, 4), m: r.payDate.slice(4, 6), d: r.payDate.slice(6, 8) }; parts[gi.field] = U.digits(t);
-            r.payDate = parts.y + parts.m.padStart(2, '0') + parts.d.padStart(2, '0');
-          } else if (gi.field === 'period') r.periodTokens = t.match(/\d{8}/g) || [];
-          else r[{ rate: 'rate', taxRate: 'taxRate', pay: 'pay', incTax: 'incomeTax', corp: 'corpTax', local: 'localTax' }[gi.field]] = t;
-          r.ocrFields.push(FIELDMAP[gi.field]);
+    let loadErr = '';
+    try { await getTess(); } catch (e) { loadErr = 'OCR 오류: ' + (e && e.message ? e.message : String(e)); }
+    for (const r of rows) {
+      const img = ex.images[r.imgIdx];
+      const specs = r.glyphIssues.map(gi => ({ key: gi.field, f: gi.field, img, cell: cellOf(r.cols[gi.col], r.band), scale: 1 }));
+      let res = {};
+      if (loadErr) specs.forEach(sp => { res[sp.key] = { text: '', bad: true, cands: [], amb: loadErr, tie: '' }; });
+      else try { res = await voteCells(specs, (sp, k, n) => setProg('미확인 글리프 OCR 보정 중… ' + (rows.indexOf(r) + 1) + '/' + rows.length + '행 · ' + VOTE_NAME[sp.f], 0.9)); }
+      catch (e) { specs.forEach(sp => { res[sp.key] = { text: '', bad: true, cands: [], amb: 'OCR 오류: ' + (e && e.message ? e.message : String(e)), tie: '' }; }); }   // 조용히 넘기지 않는다 — 칸 error
+      const votes = {};
+      for (const gi of r.glyphIssues) {
+        const v = res[gi.field]; const t = applyVote(r, gi.field, v);
+        if (gi.field === 'y' || gi.field === 'm' || gi.field === 'd') {
+          const parts = { y: r.payDate.slice(0, 4), m: r.payDate.slice(4, 6), d: r.payDate.slice(6, 8) }; parts[gi.field] = U.digits(t);
+          r.payDate = parts.y + parts.m.padStart(2, '0') + parts.d.padStart(2, '0');
+        } else if (gi.field === 'period') r.periodTokens = U.digits(t).length ? (t.match(/\d{8}/g) || []) : [];
+        else { r[{ rate: 'rate', taxRate: 'taxRate', pay: 'pay', incTax: 'incomeTax', corp: 'corpTax', local: 'localTax' }[gi.field]] = t; votes[gi.field] = v; }
+        r.ocrFields.push(FIELDMAP[gi.field]);
+      }
+      pickByCheck(r, votes);
+    }
+  }
+  /* 소득자 정보(사업자번호·계좌번호) — 표 위쪽 박스의 칸을 숫자 화이트리스트로 여러 번 읽어 형식 맞는 번호를 모은다.
+     등록 법인 번호와 정확히 같을 때만 법인으로 잡히므로(detectCompany) 오독은 '특정 못 함'으로 남는다. */
+  async function ocrHeaderInfo(img, tableTop, scale) {
+    const hl = P.Img.hLines(img).filter(h => h.c < tableTop), biz = new Set(), acct = new Set(), raw = [];
+    for (let i = 1; i < hl.length; i++) {
+      const top = hl[i - 1].b + 1, bot = hl[i].a - 1; if (bot - top < 12) continue;
+      const ins = Math.max(2, Math.round((bot - top) * 0.06)), vl = P.Img.vLines(img, top + ins, bot - ins);
+      const xs = [0, ...vl.map(v => v.c), img.w];
+      for (let j = 1; j < xs.length; j++) {
+        if (xs[j] - xs[j - 1] < 40) continue;
+        const { L } = cellLines(img, { x0: Math.round(xs[j - 1]) + 1, x1: Math.round(xs[j]) - 1, top, bot }, scale);
+        for (const li of L) {
+          if (li.w < li.h * 4) continue;   // 짧은 글자(번호 아님)
+          for (const v of [{ f: 1, psm: 7 }, { f: 2, psm: 7 }, { f: 1, psm: 8 }]) {
+            const im = padImg(v.f === 1 ? li : P.Img.scale(li, v.f), Math.round(14 * v.f));
+            const t = String(await tessRead(im, '0123456789-', v.psm)).replace(/\s+/g, ''); raw.push(t);
+            (t.match(/\d{3}-\d{2}-\d{5}/g) || []).forEach(b => { if (U.digits(b) !== '1208504063') biz.add(b); });
+            (t.match(/\d{3}-\d{6}-\d{5}/g) || []).forEach(a => acct.add(a));
+          }
         }
       }
-    } catch (e) { console.warn(e); rows.forEach(r => r.glyphIssues.forEach(gi => r.ocrFields.push(FIELDMAP[gi.field]))); }
+    }
+    return { bizNos: [...biz], accts: [...acct], raw };
   }
-  // 글리프 판독이 불가한 경우(다른 폰트/양식): 원본 이미지(없으면 4배 렌더링) → 표 탐지 → 셀 단위 OCR
+  // 글리프 판독이 불가한 경우(다른 폰트/양식·브라우저 인쇄본): 원본 이미지(없으면 4배 렌더링) → 표 탐지 → 칸 줄별 다수결 OCR
   async function ocrWholeDoc(doc, ex) {
+    await getTess();   // 로드 실패는 여기서 바로 오류(조용히 '행 없음'으로 끝나지 않게)
     ex.mode = 'ocr'; ex.images = []; ex.raws = [];
+    const units = [];
     for (const pg of doc.pages) {
       const srcs = [];
-      if (pg.images.length) pg.images.forEach(img => srcs.push({ img, scale: 4 })); // 원본 비트맵 ×4 (실측 최적)
+      if (pg.images.length) pg.images.forEach(img => srcs.push({ img, scale: 4 })); // 원본 비트맵 — 배율은 줄 글자 높이로 정함(cellLines)
       else {
         const vp = pg.page.getViewport({ scale: 4 });
         const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
         const ctx = c.getContext('2d', { willReadFrequently: true });
         ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
         await pg.page.render({ canvasContext: ctx, viewport: vp }).promise;
-        srcs.push({ img: P.Img.toGray(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height), scale: 2 });
+        srcs.push({ img: P.Img.toGray(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height), scale: 4 });
       }
       for (const { img, scale } of srcs) {
         const idx = ex.images.length; ex.images.push(img);
         const det = P.Img.detectRows(img);
         if (det.cols.length < 17) continue;
-        for (const band of det.rows) {
-          setProg('OCR 판독 중… (' + pg.pageNo + '페이지, ' + (ex.raws.length + 1) + '번째 행)', 0.88);
-          const get = async (ci, f) => ocrCell(img, det.cols[ci], band, f, scale);
-          const yr = U.digits(await get(0, 'y'));
-          if (!/^20\d\d$/.test(yr)) continue;
-          const raw = {
-            src: 'ocr', page: pg.pageNo, imgIdx: idx, band: { top: band.top, bot: band.bot, x0: det.cols[0].x0 - 3, x1: det.cols[det.cols.length - 1].x1 + 3 },
-            payDate: yr + U.digits(await get(1, 'm')).padStart(2, '0') + U.digits(await get(2, 'd')).padStart(2, '0'),
-            periodTokens: (await get(10, 'period')).match(/\d{8}/g) || [],
-            rate: await get(11, 'rate'), pay: await get(12, 'pay'), taxRate: await get(13, 'taxRate'), incomeTax: await get(14, 'incTax'), corpTax: await get(15, 'corp'), localTax: await get(16, 'local'),
-            code: '', glyphIssues: [], ocrFields: ['payDate', 'start', 'end', 'rate', 'pay', 'taxRate', 'corpTax', 'localTax']
-          };
-          if (band.partial && raw.periodTokens.length > 1) raw.periodTokens = raw.periodTokens.slice(-1); // 잘린 상단 라인 불신
-          ex.raws.push(raw);
+        if (!ex.info || !((ex.info.accts || []).length || (ex.info.bizNos || []).length)) {
+          setProg('OCR 판독 중… 소득자 정보(' + pg.pageNo + '페이지)', 0.87);
+          const hi = await ocrHeaderInfo(img, det.rows.length ? det.rows[0].top : img.h, scale);
+          if (hi.accts.length || hi.bizNos.length) ex.info = hi;
         }
+        det.rows.forEach(band => units.push({ pg, img, idx, scale, det, band }));
       }
     }
+    // 1단계: 연(첫 칸)으로 지급 행 확인
+    const yRes = await voteCells(units.map((u, i) => ({ key: i + ':y', f: 'y', img: u.img, cell: cellOf(u.det.cols[0], u.band), scale: u.scale })),
+      (sp, k, n) => setProg('OCR 다수결 판독 중… 지급 행 찾기 ' + k + '/' + n, 0.87));
+    const rowsU = units.filter((u, i) => /^20\d\d$/.test(U.digits(yRes[i + ':y'].text)));
+    // 2단계: 행마다 나머지 칸
+    const COLF = [[1, 'm'], [2, 'd'], [10, 'period'], [11, 'rate'], [12, 'pay'], [13, 'taxRate'], [14, 'incTax'], [15, 'corp'], [16, 'local']];
+    const specs = [];
+    rowsU.forEach((u, ri) => COLF.forEach(([ci, f]) => { if (u.det.cols[ci]) specs.push({ key: ri + ':' + f, f, ri, img: u.img, cell: cellOf(u.det.cols[ci], u.band), scale: u.scale }); }));
+    const res = await voteCells(specs, (sp, k, n) => setProg('OCR 다수결 판독 중… 행 ' + (sp.ri + 1) + '/' + rowsU.length + ' · ' + VOTE_NAME[sp.f], 0.87 + 0.1 * k / Math.max(1, n)));
+    rowsU.forEach((u, ri) => {
+      const yi = units.indexOf(u), band = u.band, cols = u.det.cols;
+      const raw = { src: 'ocr', page: u.pg.pageNo, imgIdx: u.idx, band: { top: band.top, bot: band.bot, x0: cols[0].x0 - 3, x1: cols[cols.length - 1].x1 + 3 },
+        code: '', glyphIssues: [], ocrNotes: [], ocrFields: ['payDate', 'start', 'end', 'rate', 'pay', 'taxRate', 'corpTax', 'localTax'] };
+      const R = f => res[ri + ':' + f] || { text: '', bad: true, cands: [], amb: '칸 없음', tie: '' };
+      applyVote(raw, 'y', yRes[yi + ':y']);
+      const yr = U.digits(yRes[yi + ':y'].text), mm = U.digits(applyVote(raw, 'm', R('m'))), dd = U.digits(applyVote(raw, 'd', R('d')));
+      raw.payDate = yr + (mm ? mm.padStart(2, '0') : '') + (dd ? dd.padStart(2, '0') : '');
+      raw.periodTokens = (applyVote(raw, 'period', R('period')).match(/\d{8}/g) || []);
+      raw.rate = applyVote(raw, 'rate', R('rate')); raw.taxRate = applyVote(raw, 'taxRate', R('taxRate'));
+      raw.pay = applyVote(raw, 'pay', R('pay'));
+      const it = R('incTax'); raw.incomeTax = it.blank ? '' : applyVote(raw, 'incTax', it);
+      raw.corpTax = applyVote(raw, 'corp', R('corp')); raw.localTax = applyVote(raw, 'local', R('local'));
+      if (band.partial && raw.periodTokens.length > 1) raw.periodTokens = raw.periodTokens.slice(-1); // 잘린 상단 라인 불신
+      pickByCheck(raw, { pay: R('pay'), corp: R('corp'), local: R('local') });
+      ex.raws.push(raw);
+    });
   }
+  /* OCR 칸 사유를 검증 결과에 덧붙임(P.validate 뒤마다) — MMTParser 객체는 바꾸지 않는다 */
+  function noteRows(rows) {
+    const RANK = { info: 1, warn: 2, error: 3 };
+    rows.forEach(r => {
+      (r.ocrNotes || []).forEach(n => { r.issues.push(n); if (!r.cellLevel[n.field] || RANK[n.level] > RANK[r.cellLevel[n.field]]) r.cellLevel[n.field] = n.level; });
+      r.level = r.issues.some(i => i.level === 'error') ? 'error' : (r.issues.some(i => i.level === 'warn') ? 'warn' : 'ok');
+    });
+    return rows;
+  }
+  const validateRows = rows => noteRows(P.validate(rows));
 
   /* ---------- STEP 2 렌더 ---------- */
   const FIELDS = [
@@ -21630,17 +21894,18 @@ window.__INT_CMAPS = Object.freeze({"Adobe-Japan1-UCS2":"BOBSQ29weXJpZ2h0IDE5OTA
     else if (['pay', 'corpTax', 'localTax'].includes(k)) r[k] = U.int(v);
     else r[k] = v;
     r.ocrFields = (r.ocrFields || []).filter(f => f !== k); if (k === 'pay') r.nearGlyph = false;
+    r.ocrNotes = (r.ocrNotes || []).filter(n => n.field !== k);   // [v124] 직접 고친 칸은 OCR 사유도 지움
     if (r.src !== 'manual') r.edited = true;
     revalidate();
   }
   function revalidate() {
     const from = U.digits($('#mmt-from').value);
     S.rows.forEach(r => { if (r._fromExcluded && (!from || r.payDate >= from)) { r.include = true; r._fromExcluded = false; } if (from && U.isYmd(r.payDate) && r.payDate < from && r.include) { r.include = false; r._fromExcluded = true; } });
-    P.validate(S.rows); renderRows(); rebuild();
+    validateRows(S.rows); renderRows(); rebuild();
   }
   $('#mmt-from').addEventListener('change', revalidate);
   $('#mmt-showimg').addEventListener('change', renderRows);
-  $('#mmt-allchk').addEventListener('change', e => { S.rows.forEach(r => { r.include = e.target.checked; r._fromExcluded = false; }); P.validate(S.rows); renderRows(); rebuild(); });
+  $('#mmt-allchk').addEventListener('change', e => { S.rows.forEach(r => { r.include = e.target.checked; r._fromExcluded = false; }); validateRows(S.rows); renderRows(); rebuild(); });
   $('#mmt-addrow').addEventListener('click', () => {
     const last = S.rows[S.rows.length - 1];
     const r = P.normalize({ src: 'manual', payDate: '', periodTokens: last && last.end ? [last.end, ''] : [], rate: last ? last.rate : '', taxRate: last ? last.taxRate : '14.0', incomeTax: '0', pay: '', corpTax: '', localTax: '' }, last ? last.end : '');
