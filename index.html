@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v125 · 2026-11-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v127 · 2026-11-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -1606,6 +1606,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
               <div class="grp"><span class="lbl">기준월</span><div class="card-val"><input type="month" class="card-date exYm" id="xbaYm" aria-label="기준월"></div></div>
               <div class="grp"><span class="lbl">기준일</span><div class="card-val"><input type="date" class="card-date" id="xbaBase" aria-label="기준일"></div></div>
               <div class="grp"><span class="lbl">기준일 외화평가</span><div class="card-val"><label class="mini"><input type="checkbox" id="xbaFx" checked> 기준일 외화평가 줄 빼기</label></div></div>
+              <div class="grp"><span class="lbl">사용중지 거래처</span><div class="card-val"><label class="mini" title="반제항목명(거래처)이 '(사용중지)'로 시작하는 거래처의 줄을 2-2 단계에서 지웁니다 — 굿어스데이터만"><input type="checkbox" id="xbaSusp" checked> 굿어스데이터 (사용중지) 거래처 빼기</label></div></div>
             </div>
           </div>
         </div>
@@ -1621,7 +1622,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
         </div>
 
         <div class="panel fer-panel">
-          <header><h2>2. 경과일수별 잔액</h2><span class="sub">45일 이내 · 46~60日 · 61~90日 · 91~180日 · 181~270日 · 271~360日 · 361日초과 — 구간 칸을 누르면 줄 목록</span>
+          <header><h2>2. 경과일수별 잔액</h2><span class="sub">45일 이내 · 46~60日 · 61~90日 · 91~180日 · 181~365日 · 365日초과 — 구간 칸을 누르면 줄 목록</span>
             <div class="sp"><div class="seg" id="xbaUnit" role="group" aria-label="단위"><button type="button" data-u="won" aria-pressed="true">원</button><button type="button" data-u="mil" aria-pressed="false">백만원</button><button type="button" data-u="eok" aria-pressed="false">억원</button></div></div></header>
           <div class="scroll"><table class="tbl card-tbl exb-tbl" id="xbaTbl"></table></div>
           <div class="pad" id="xbaAcct"></div>
@@ -16354,8 +16355,11 @@ $$("#execTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.da
   }
 
   /* ---------- 3. 계정잔액명세서 (채권잔액) ---------- */
-  var BUCKETS=["45일 이내","46~60日","61~90日","91~180日","181~270日","271~360日","361日초과"], LIMS=[45,60,90,180,270,360];
-  function bucketOf(age){ for(var i=0;i<LIMS.length;i++) if(age<=LIMS[i]) return BUCKETS[i]; return BUCKETS[6]; }
+  /* [v127] 구간 6개(사용자 양식 변경 2026-11-20): 181~270日·271~360日·361日초과 → 181~365日 · 365日초과 */
+  var BUCKETS=["45일 이내","46~60日","61~90日","91~180日","181~365日","365日초과"], LIMS=[45,60,90,180,365];
+  function bucketOf(age){ for(var i=0;i<LIMS.length;i++) if(age<=LIMS[i]) return BUCKETS[i]; return BUCKETS[LIMS.length]; }
+  /* 3.일자분류 B열 수식 — 사용자 수식 모양(첫 칸 <=, 다음부터 경계>=A) 그대로 LIMS·BUCKETS에서 만든다 */
+  function bucketFormula(r){ var f='"'+BUCKETS[LIMS.length]+'"'; for(var i=LIMS.length-1;i>=1;i--) f='IF('+LIMS[i]+'>=A'+r+',"'+BUCKETS[i]+'",'+f+')'; return 'IF(A'+r+'<='+LIMS[0]+',"'+BUCKETS[0]+'",'+f+')'; }
   var AGING_HEAD=["계정코드","계정명","반제항목코드","반제항목명","회계일자"];
   function isAgingAoa(a){ return a && a[0] && AGING_HEAD.every(function(h,i){ return txt(a[0][i]).trim()===h; }); }
   function pdate(v){ if(v==null||v==="") return ""; if(typeof v==="number") return isoOfSerial(v); var m=String(v).trim().match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/); return m?m[1]+"-"+pad(m[2])+"-"+pad(m[3]):""; }
@@ -16373,6 +16377,11 @@ $$("#execTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.da
     var s21=withD.slice().sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:a.i-b.i; }).concat(body.filter(function(x){ return x.sub; }));
     var excl=[]; var s22=s21.filter(function(x){ return !x.sub; });
     if(opt.fxExclude){ excl=s22.filter(function(x){ return x.d===baseIso && /외화평가/.test(txt(x.row[iF])); }); s22=s22.filter(function(x){ return excl.indexOf(x)<0; }); }
+    /* [v126] (사용중지) 거래처 빼기(굿어스데이터 — 사용자 결정 2026-11-20): 반제항목명(거래처)이 '(사용중지)'로 시작하는 거래처의 줄 전부. 지운 거래처·줄·금액은 항상 돌려줘 화면·엑셀에 표시 */
+    var susp=[], suspBy={};
+    if(opt.suspended){ susp=s22.filter(function(x){ return /^\(사용중지\)/.test(x.partner); }); s22=s22.filter(function(x){ return susp.indexOf(x)<0; });
+      susp.forEach(function(x){ var o=suspBy[x.partner]=suspBy[x.partner]||{n:0, amt:0}; o.n++; o.amt+=x.amt; }); }
+    var suspAmt=susp.reduce(function(a,x){ return a+x.amt; },0);
     var piv={}; BUCKETS.forEach(function(k){ piv[k]=0; });
     var acc={}, accN={}, future=[], neg=0, lines=[];
     s22.forEach(function(x){ var age=dayDiff(baseIso, x.d)+1, bk=bucketOf(age); x.age=age; x.bk=bk; piv[bk]+=x.amt; acc[x.acct]=(acc[x.acct]||0)+x.amt; accN[x.acct]=(accN[x.acct]||0)+1; if(age<=0) future.push(x); if(x.amt<0) neg++; });
@@ -16380,8 +16389,8 @@ $$("#execTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.da
     var sumD=withD.reduce(function(a,x){ return a+x.amt; },0), pivTot=BUCKETS.reduce(function(a,k){ return a+piv[k]; },0);
     var chk={ totalOk: total!=null && Math.round(total)===Math.round(sumD), total:total, sumD:sumD,
       acctOk: Object.keys(acctSub).every(function(k){ return Math.round(acctSub[k])===Math.round(allAcc[k]||0); }), acctSub:acctSub, allAcc:allAcc,
-      pivOk: Math.round(pivTot)===Math.round(sumD-excl.reduce(function(a,x){ return a+x.amt; },0)) };
-    return {H:H, s21:s21, s22:s22, excl:{n:excl.length, amt:excl.reduce(function(a,x){ return a+x.amt; },0), rows:excl}, piv:piv, pivTot:pivTot, acct:acc, acctN:accN, future:future, neg:neg, chk:chk, n0:aoa.length-1, iF:iF, iJ:iJ};
+      pivOk: Math.round(pivTot)===Math.round(sumD-excl.reduce(function(a,x){ return a+x.amt; },0)-suspAmt) };
+    return {H:H, s21:s21, s22:s22, excl:{n:excl.length, amt:excl.reduce(function(a,x){ return a+x.amt; },0), rows:excl}, susp:{n:susp.length, amt:suspAmt, by:suspBy, rows:susp}, piv:piv, pivTot:pivTot, acct:acc, acctN:accN, future:future, neg:neg, chk:chk, n0:aoa.length-1, iF:iF, iJ:iJ};
   }
   /* 작업 엑셀: 1.ROW · 2-1.지우기 · 2-2.지우기 · 2-3.지우기 · 3.일자분류 · 4.최종피벗(SUMPRODUCT 수식 — SUMIF는 '~'를 이스케이프로 읽어 0) */
   function buildAgingXlsx(EX, aoa, A, baseIso){
@@ -16398,7 +16407,7 @@ $$("#execTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.da
     s23[0].forEach(function(h,j){ ws.getCell(1,3+j).value=h; });
     A.s22.forEach(function(x, k){ var r=k+2, row=x.row.slice(4), dd=x.d.split("-").map(Number);
       ws.getCell(r,1).value={formula:"$A$1-C"+r+"+1", result:x.age};
-      ws.getCell(r,2).value={formula:'IF(A'+r+'<=45,"45일 이내",IF(60>=A'+r+',"46~60日",IF(90>=A'+r+',"61~90日",IF(180>=A'+r+',"91~180日",IF(270>=A'+r+',"181~270日",IF(360>=A'+r+',"271~360日","361日초과"))))))', result:x.bk};
+      ws.getCell(r,2).value={formula:bucketFormula(r), result:x.bk};
       var c3=ws.getCell(r,3); c3.value=new Date(Date.UTC(dd[0],dd[1]-1,dd[2])); c3.numFmt="yyyy/mm/dd";
       row.slice(1).forEach(function(v,j){ if(v!=null && v!=="") ws.getCell(r,4+j).value=v; });
     });
@@ -16407,13 +16416,17 @@ $$("#execTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.da
     BUCKETS.concat(["총합계"]).forEach(function(k,j){ p.getCell(4,2+j).value=k; });
     p.getCell("A5").value="요약";
     BUCKETS.forEach(function(k,j){ var L=colL(1+j); p.getCell(5,2+j).value={formula:"SUMPRODUCT(('3.일자분류'!$B$2:$B$"+last+"="+L+"$4)*'3.일자분류'!$H$2:$H$"+last+")", result:A.piv[k]}; p.getCell(5,2+j).numFmt="#,##0"; });
-    p.getCell("I5").value={formula:"SUM(B5:H5)", result:A.pivTot}; p.getCell("I5").numFmt="#,##0";
-    if(A.excl.n){ p.getCell("A7").value="제외: 기준일("+baseIso+") 외화평가 "+A.excl.n+"줄 · 합 "+A.excl.amt.toLocaleString("ko-KR")+"원 — 원본 합계와 차이"; }
-    p.getColumn(1).width=14; for(var j=2;j<=9;j++) p.getColumn(j).width=16;
+    var tc=colL(1+BUCKETS.length);   // 총합계 칸(구간 6개 → H)
+    p.getCell(tc+"5").value={formula:"SUM(B5:"+colL(BUCKETS.length)+"5)", result:A.pivTot}; p.getCell(tc+"5").numFmt="#,##0";
+    var nr=7;
+    if(A.excl.n){ p.getCell("A"+(nr++)).value="제외: 기준일("+baseIso+") 외화평가 "+A.excl.n+"줄 · 합 "+A.excl.amt.toLocaleString("ko-KR")+"원 — 원본 합계와 차이"; }
+    if(A.susp && A.susp.n){ p.getCell("A"+(nr++)).value="제외: (사용중지) 거래처 "+Object.keys(A.susp.by).length+"곳 "+A.susp.n+"줄 · 합 "+A.susp.amt.toLocaleString("ko-KR")+"원 — 원본 합계와 차이";
+      Object.keys(A.susp.by).forEach(function(k){ p.getCell("B"+(nr++)).value=k+" · "+A.susp.by[k].n+"줄 · "+A.susp.by[k].amt.toLocaleString("ko-KR")+"원"; }); }
+    p.getColumn(1).width=14; for(var j=2;j<=BUCKETS.length+2;j++) p.getColumn(j).width=16;
     return wb;
   }
 
-  root.EXB={CO_ORDER:CO_ORDER, CO_LABEL:CO_LABEL, CO_NAME:CO_NAME, ITEMS:ITEMS, CASH:CASH, MAP_DEFAULT:MAP_DEFAULT, BUCKETS:BUCKETS,
+  root.EXB={CO_ORDER:CO_ORDER, CO_LABEL:CO_LABEL, CO_NAME:CO_NAME, ITEMS:ITEMS, CASH:CASH, MAP_DEFAULT:MAP_DEFAULT, BUCKETS:BUCKETS, bucketFormula:bucketFormula,
     lastDay:lastDay, shiftYm:shiftYm, yy:yy, targetCos:targetCos, isoInName:isoInName, coInName:coInName, coByGisu:coByGisu, aoaOf:aoaOf,
     isBsAoa:isBsAoa, parseBs:parseBs, extract:extract, findAcct:findAcct, buildBaseXlsx:buildBaseXlsx,
     reportScan:reportScan, layoutOf:layoutOf, buildReport:buildReport, loanTable:loanTable,
@@ -16425,7 +16438,7 @@ $$("#execTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.da
 var EXEC_TABS={exbs:"대차대조표", exaging:"채권잔액"};
 var EXBS={ym:null, base:null, baseSet:false, bs:{}, bsPend:[], cache:{}, rep:null, scan:null, ext:{}, unit:"won", sel:null,
          map:null, mapLoaded:false, saved:{}, loanFix:false, made:null, files:[],
-         ag:{}, agPend:[], agRes:{}, fx:true, aUnit:"won", aSel:null, agSaved:{}, aFiles:[]};
+         ag:{}, agPend:[], agRes:{}, fx:true, susp:true, aUnit:"won", aSel:null, agSaved:{}, aFiles:[]};
 function exbYm(){ if(!EXBS.ym) EXBS.ym=EXB.shiftYm(todayISO().slice(0,7),-1); return EXBS.ym; }
 function exbBase(){ return EXBS.baseSet&&EXBS.base&&EXBS.base.slice(0,7)===exbYm() ? EXBS.base : EXB.lastDay(exbYm()); }
 function exbMap(){ return (EXBS.map&&EXBS.map.map)||EXB.MAP_DEFAULT; }
@@ -16475,7 +16488,7 @@ function exbRecalc(){
   cos.forEach(function(c){ if(EXBS.bs[c]) EXBS.ext[c]=EXB.extract(EXBS.bs[c].bs, c, exbMap()); });
   EXBS.scan=null; if(EXBS.rep){ try{ EXBS.scan=EXB.reportScan(XLSX, EXBS.rep.bytes, ym); }catch(e){ EXBS.scan={errs:["보고 파일을 읽지 못했습니다: "+(e&&e.message||e)], names:[]}; } }
   EXBS.agRes={}; var base=exbBase();
-  Object.keys(EXBS.ag).forEach(function(c){ try{ EXBS.agRes[c]=EXB.aging(EXBS.ag[c].aoa, base, {fxExclude:EXBS.fx}); }catch(e){ EXBS.agRes[c]={err:String(e&&e.message||e)}; } });
+  Object.keys(EXBS.ag).forEach(function(c){ try{ EXBS.agRes[c]=EXB.aging(EXBS.ag[c].aoa, base, {fxExclude:EXBS.fx, suspended:EXBS.susp && c==="GD"}); /* [v126] (사용중지) 거래처 빼기는 굿어스데이터만 */ }catch(e){ EXBS.agRes[c]={err:String(e&&e.message||e)}; } });
 }
 function exbLoadSaved(){
   var ym=exbYm();
@@ -16632,7 +16645,7 @@ function renderExa(){
   var ym=exbYm(), base=exbBase(), u=EXBS.aUnit, B=EXB.BUCKETS, cos=EXB.CO_ORDER.filter(function(c){ return EXBS.agRes[c]; });
   $$(".exYm").forEach(function(el){ if(document.activeElement!==el) el.value=ym; });
   if(document.activeElement!==$("#xbaBase")) $("#xbaBase").value=base;
-  $("#xbaFx").checked=EXBS.fx;
+  $("#xbaFx").checked=EXBS.fx; $("#xbaSusp").checked=EXBS.susp;
   $("#xbaFiles").innerHTML=EXBS.aFiles.map(function(f){ var lab={aging:"계정잔액명세서",route:"다른 탭",unknown:"알 수 없음",report:"보고 파일",bs:"대차대조표",bundle:"묶음 대차대조표"}[f.kind]||f.kind;
     var pend=f.pend && EXBS.agPend.some(function(p){ return p.id===f.pend; });
     return '<div class="filerow"'+(f.bad?' style="border-color:var(--out);color:var(--out)"':'')+'><span>'+esc(f.name)+'</span><span class="chip '+(f.bad?"out":f.kind==="route"?"nv":"in")+'">'+esc(lab)+'</span>'+(f.co&&f.kind==="aging"?exbCoChip(f.co):'')+'<span class="mini">'+esc(f.info||"")+'</span>'+
@@ -16646,7 +16659,8 @@ function renderExa(){
     if(A.err){ ck.push({ok:false, t:L+": "+A.err}); return; }
     ck.push({ok:A.chk.totalOk, t:L+" 원본 ‘합계’ 줄 "+fmt(A.chk.total)+(A.chk.totalOk?" = ":" ≠ ")+"회계일자 있는 줄 합 "+fmt(A.chk.sumD)});
     ck.push({ok:A.chk.acctOk, t:L+" 계정 ‘계’ 줄 = 그 계정 줄 합: "+Object.keys(A.chk.acctSub).map(function(k){ return k+" "+fmt(A.chk.acctSub[k])+(Math.round(A.chk.acctSub[k])===Math.round(A.chk.allAcc[k]||0)?" ✓":" ≠ "+fmt(A.chk.allAcc[k]||0)); }).join(" · ")});
-    ck.push({ok:A.chk.pivOk, t:L+" 피벗 총합계 "+fmt(A.pivTot)+(A.excl.n?" = 원본 합계 "+fmt(A.chk.sumD)+" − 기준일 외화평가 "+A.excl.n+"줄 "+fmt(A.excl.amt):" = 원본 합계")});
+    ck.push({ok:A.chk.pivOk, t:L+" 피벗 총합계 "+fmt(A.pivTot)+(A.excl.n||A.susp.n?" = 원본 합계 "+fmt(A.chk.sumD)+(A.excl.n?" − 기준일 외화평가 "+A.excl.n+"줄 "+fmt(A.excl.amt):"")+(A.susp.n?" − (사용중지) 거래처 "+A.susp.n+"줄 "+fmt(A.susp.amt):""):" = 원본 합계")});
+    if(A.susp.n) ck.push({ok:null, t:L+" (사용중지) 거래처 "+Object.keys(A.susp.by).length+"곳 "+A.susp.n+"줄 · 합 "+fmt(A.susp.amt)+"원 제외: "+Object.keys(A.susp.by).map(function(k){ return k.replace(/^\(사용중지\)\s*/,"")+" "+fmt(A.susp.by[k].amt); }).join(" · ")});
     if(A.future.length) ck.push({ok:null, t:L+" 회계일자가 기준일("+base+") 뒤인 줄 "+A.future.length+"개 — 경과일수 ≤ 0이라 ‘45일 이내’로 들어감(기준일 확인)"});
     var X=EXBS.ext[c]; if(X && EXBS.bs[c] && (!EXBS.bs[c].ym || EXBS.bs[c].ym===ym)){ var bs=EXBS.bs[c].bs, bad=[], parts=[];
       Object.keys(A.chk.allAcc).forEach(function(k){ var f=EXB.findAcct(bs, k); if(!f.row) { bad.push(k+" 대차대조표에 없음"); return; } var ok=Math.round(f.row.amt)===Math.round(A.chk.allAcc[k]); parts.push(k+" "+fmt(A.chk.allAcc[k])+(ok?" = ":" ≠ ")+fmt(f.row.amt)); if(!ok) bad.push(k); });
@@ -16658,21 +16672,21 @@ function renderExa(){
   $("#xbaChecks").innerHTML=ck.map(function(c){ return '<div class="exb-check'+(c.muted?" muted":"")+'"><span class="chip '+(c.ok===true?"in":c.ok===false?"out":"nv")+'">'+(c.ok===true?"✓":c.ok===false?"✗":"⚠")+'</span><span>'+esc(c.t)+'</span></div>'; }).join("");
   /* 구간 표 */
   var ok=cos.filter(function(c){ return !EXBS.agRes[c].err; });
-  var COLORS=["var(--c-gd)","#5B8DEF","#8E7CC3","#F5A623","#E8833A","#D9534F","#8B1E1E"];
+  var COLORS=["var(--c-gd)","#5B8DEF","#8E7CC3","#F5A623","#D9534F","#8B1E1E"];
   var h='<thead><tr><th>법인</th>'+B.map(function(k){ return '<th class="num">'+esc(k)+'</th>'; }).join("")+'<th class="num">총합계</th><th>구간 비중</th></tr></thead><tbody>', T={}; B.forEach(function(k){ T[k]=0; });
   ok.forEach(function(c){ var A=EXBS.agRes[c], prv=EXBS.agSaved[c+"/"+EXB.shiftYm(ym,-1)];
     h+='<tr><td>'+exbCoChip(c)+'</td>'+B.map(function(k){ T[k]+=A.piv[k]; return '<td class="num exb-cell'+(EXBS.aSel&&EXBS.aSel.c===c&&EXBS.aSel.k===k?" exb-sel":"")+'" data-c="'+c+'" data-k="'+esc(k)+'" title="'+fmt(A.piv[k])+'원">'+exbAmt(A.piv[k],u)+'</td>'; }).join("")+
       '<td class="num"><b>'+exbAmt(A.pivTot,u)+'</b></td><td><div class="exb-bar">'+B.map(function(k,i){ var w=A.pivTot>0?Math.max(0,A.piv[k])/A.pivTot*100:0; return '<span style="width:'+w.toFixed(2)+'%;background:'+COLORS[i]+'" title="'+esc(k)+' '+w.toFixed(1)+'%"></span>'; }).join("")+'</div></td></tr>';
-    if(prv && prv!=="loading" && prv.piv) h+='<tr class="exb-sub"><td class="mini">전월 대비</td>'+B.map(function(k){ var d=A.piv[k]-(+prv.piv[k]||0); return '<td class="num mini">'+(d>0?"+":"")+exbAmt(d,u)+'</td>'; }).join("")+'<td class="num mini">'+(function(){ var d=A.pivTot-B.reduce(function(a,k){ return a+(+prv.piv[k]||0); },0); return (d>0?"+":"")+exbAmt(d,u); })()+'</td><td class="mini">'+esc(EXB.shiftYm(ym,-1))+' 저장값</td></tr>';
+    if(prv && prv!=="loading" && prv.piv && B.every(function(k){ return k in prv.piv; })) h+='<tr class="exb-sub"><td class="mini">전월 대비</td>'+B.map(function(k){ var d=A.piv[k]-(+prv.piv[k]||0); return '<td class="num mini">'+(d>0?"+":"")+exbAmt(d,u)+'</td>'; }).join("")+'<td class="num mini">'+(function(){ var d=A.pivTot-B.reduce(function(a,k){ return a+(+prv.piv[k]||0); },0); return (d>0?"+":"")+exbAmt(d,u); })()+'</td><td class="mini">'+esc(EXB.shiftYm(ym,-1))+' 저장값</td></tr>';
   });
   var tt=B.reduce(function(a,k){ return a+T[k]; },0);
   if(ok.length>1) h+='<tr class="exb-sum"><td>합계</td>'+B.map(function(k){ return '<td class="num">'+exbAmt(T[k],u)+'</td>'; }).join("")+'<td class="num">'+exbAmt(tt,u)+'</td><td></td></tr>';
-  if(!ok.length){ var svs=EXB.targetCos(ym).map(function(c){ var s=EXBS.agSaved[c+"/"+ym]; return s&&s!=="loading"&&s.piv?{c:c, s:s}:null; }).filter(Boolean);
-    h+=svs.length?svs.map(function(x){ return '<tr><td>'+exbCoChip(x.c)+'</td>'+B.map(function(k){ return '<td class="num exb-old">'+exbAmt(+x.s.piv[k]||0,u)+'</td>'; }).join("")+'<td class="num exb-old">'+exbAmt(B.reduce(function(a,k){ return a+(+x.s.piv[k]||0); },0),u)+'</td><td class="mini">'+esc(ym)+' 지난 저장값</td></tr>'; }).join(""):'<tr><td colspan="10" class="mini" style="padding:16px">계정잔액명세서를 올리면 경과일수 구간별 잔액이 나옵니다.</td></tr>'; }
+  if(!ok.length){ var svs=EXB.targetCos(ym).map(function(c){ var s=EXBS.agSaved[c+"/"+ym]; return s&&s!=="loading"&&s.piv&&B.every(function(k){ return k in s.piv; })?{c:c, s:s}:null; }).filter(Boolean);
+    h+=svs.length?svs.map(function(x){ return '<tr><td>'+exbCoChip(x.c)+'</td>'+B.map(function(k){ return '<td class="num exb-old">'+exbAmt(+x.s.piv[k]||0,u)+'</td>'; }).join("")+'<td class="num exb-old">'+exbAmt(B.reduce(function(a,k){ return a+(+x.s.piv[k]||0); },0),u)+'</td><td class="mini">'+esc(ym)+' 지난 저장값</td></tr>'; }).join(""):'<tr><td colspan="'+(B.length+3)+'" class="mini" style="padding:16px">계정잔액명세서를 올리면 경과일수 구간별 잔액이 나옵니다.</td></tr>'; }
   h+='</tbody>'; $("#xbaTbl").innerHTML=h;
   $$("#xbaTbl td.exb-cell").forEach(function(td){ td.onclick=function(){ EXBS.aSel=(EXBS.aSel&&EXBS.aSel.c===td.dataset.c&&EXBS.aSel.k===td.dataset.k)?null:{c:td.dataset.c, k:td.dataset.k}; renderExa(); }; });
   $$("#xbaUnit button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.u===u)); });
-  $("#xbaAcct").innerHTML=ok.map(function(c){ var A=EXBS.agRes[c]; return '<div class="mini">'+exbCoChip(c)+' 계정별 · '+Object.keys(A.acct).map(function(k){ return esc(k)+' '+fmt(A.acct[k])+'('+A.acctN[k]+'줄)'; }).join(" · ")+' · 원본 '+A.n0+'줄 → '+A.s22.length+'줄'+(A.excl.n?' · 제외: 기준일 외화평가 '+A.excl.n+'줄 · 합 '+fmt(A.excl.amt)+'원 — 원본 합계와 차이':'')+'</div>'; }).join("");
+  $("#xbaAcct").innerHTML=ok.map(function(c){ var A=EXBS.agRes[c]; return '<div class="mini">'+exbCoChip(c)+' 계정별 · '+Object.keys(A.acct).map(function(k){ return esc(k)+' '+fmt(A.acct[k])+'('+A.acctN[k]+'줄)'; }).join(" · ")+' · 원본 '+A.n0+'줄 → '+A.s22.length+'줄'+(A.excl.n?' · 제외: 기준일 외화평가 '+A.excl.n+'줄 · 합 '+fmt(A.excl.amt)+'원 — 원본 합계와 차이':'')+(A.susp.n?' · 제외: (사용중지) 거래처 '+A.susp.n+'줄 · 합 '+fmt(A.susp.amt)+'원':'')+'</div>'; }).join("");
   var lh="";
   if(EXBS.aSel && EXBS.agRes[EXBS.aSel.c] && !EXBS.agRes[EXBS.aSel.c].err){ var A2=EXBS.agRes[EXBS.aSel.c], iF=A2.iF, rows=A2.s22.filter(function(x){ return x.bk===EXBS.aSel.k; }).sort(function(a,b){ return b.amt-a.amt; });
     lh='<thead><tr><th colspan="6">'+esc(EXB.CO_LABEL[EXBS.aSel.c]+" · "+EXBS.aSel.k+" · "+rows.length+"줄")+'</th></tr><tr><th>회계일자</th><th class="num">경과일수</th><th>거래처명</th><th>적요</th><th>계정</th><th class="num">잔액</th></tr></thead><tbody>'+
@@ -16682,12 +16696,12 @@ function renderExa(){
   var acts=ok.map(function(c){ var sv=EXBS.agSaved[c+"/"+ym]; return '<div class="exb-check" style="flex-wrap:wrap">'+exbCoChip(c)+'<button class="btn sm" type="button" data-copy="'+c+'">피벗 값 복사</button><button class="btn sm primary" type="button" data-xlsx="'+c+'">작업 엑셀 받기</button><button class="btn sm" type="button" data-save="'+c+'"'+(exbCanSave()?"":" disabled")+'>저장</button><span class="mini">'+(exbCanSave()?(sv&&sv!=="loading"?"지난 저장 "+esc((sv.at||"").slice(0,16).replace("T"," ")):"app/exec/aging/"+c+"/"+ym+" · 구간·계정 합계만"):"보기 전용 — 저장할 수 없습니다")+'</span></div>'; }).join("");
   $("#xbaActs").innerHTML=acts||'<span class="mini">계정잔액명세서를 올리면 작업 엑셀을 받을 수 있습니다.</span>';
   $$("#xbaActs [data-copy]").forEach(function(b){ b.onclick=function(){ var A=EXBS.agRes[b.dataset.copy]; var t=B.map(function(k){ return Math.round(A.piv[k]); }).concat([Math.round(A.pivTot)]).join("\t");
-    (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject()).then(function(){ toast("피벗 값 8칸(B5:I5) 복사"); audit("export", {menu:"fep", target:"exec/aging-copy", co:b.dataset.copy}); }, function(){ toast("복사하지 못했습니다(브라우저 권한)"); }); }; });
+    (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject()).then(function(){ toast("피벗 값 "+(B.length+1)+"칸(B5:"+String.fromCharCode(66+B.length)+"5) 복사"); audit("export", {menu:"fep", target:"exec/aging-copy", co:b.dataset.copy}); }, function(){ toast("복사하지 못했습니다(브라우저 권한)"); }); }; });
   $$("#xbaActs [data-xlsx]").forEach(function(b){ b.onclick=function(){ var c=b.dataset.xlsx, A=EXBS.agRes[c], name=c+"_계정잔액명세서_"+base+"기준.xlsx"; b.disabled=true;
     loadExcelJS().then(function(EX){ return EXB.buildAgingXlsx(EX, EXBS.ag[c].aoa, A, base).xlsx.writeBuffer(); }).then(function(buf){ EXBS.aDone=true; audit("export", {menu:"fep", target:"exec/aging-xlsx", co:c, detail:name}); return offerDownload(name, buf); })
       .catch(function(e){ toast("엑셀을 만들지 못했습니다: "+(e&&e.message||e)); }).then(function(){ renderExa(); }); }; });
   $$("#xbaActs [data-save]").forEach(function(b){ b.onclick=function(){ var c=b.dataset.save, A=EXBS.agRes[c];
-    var doc={at:new Date().toISOString(), by:exbWho(), base:base, fxExclude:EXBS.fx, piv:A.piv, acct:A.acct, excl:{n:A.excl.n, amt:A.excl.amt}, rows:A.s22.length};
+    var doc={at:new Date().toISOString(), by:exbWho(), base:base, fxExclude:EXBS.fx, piv:A.piv, acct:A.acct, excl:{n:A.excl.n, amt:A.excl.amt}, susp:{on:c==="GD"&&EXBS.susp, n:A.susp.n, amt:A.susp.amt}, rows:A.s22.length};
     fepDocSet("app/exec/aging/"+c+"/"+ym, doc).then(function(){ EXBS.agSaved[c+"/"+ym]=doc; toast(EXB.CO_LABEL[c]+" "+ym+" 채권잔액 저장됨"); audit("edit", {menu:"fep", target:"exec/aging", co:c, detail:ym}); renderExa(); }).catch(function(e){ toast("저장 실패: "+(e&&e.message||e)); }); }; });
   var on={1:ok.length>0, 2:ok.length>0 && ok.every(function(c){ var A=EXBS.agRes[c]; return A.chk.totalOk&&A.chk.acctOk&&A.chk.pivOk; }), 3:!!EXBS.aDone}, cur=[1,2,3].filter(function(n){ return !on[n]; })[0]||4;
   $$("#xbaSteps li").forEach(function(li){ var n=+li.dataset.s; li.className=on[n]?"on":n===cur?"cur":""; });
@@ -16706,6 +16720,7 @@ function renderExa(){
   $$(".exYm").forEach(function(el){ el.onchange=function(){ exbSetYm(el.value); renderExb(); renderExa(); }; });
   $("#xbaBase").onchange=function(){ var v=this.value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return; EXBS.ym=v.slice(0,7); EXBS.base=v; EXBS.baseSet=true; exbRecalc(); exbLoadSaved(); renderExa(); renderExb(); };
   $("#xbaFx").onchange=function(){ EXBS.fx=this.checked; exbRecalc(); renderExa(); };
+  $("#xbaSusp").onchange=function(){ EXBS.susp=this.checked; exbRecalc(); renderExa(); };   // [v126]
   $$("#xbUnit button").forEach(function(b){ b.onclick=function(){ EXBS.unit=b.dataset.u; renderExb(); }; });
   $$("#xbaUnit button").forEach(function(b){ b.onclick=function(){ EXBS.aUnit=b.dataset.u; renderExa(); }; });
   $("#xbRe").onchange=function(){ renderExb(); };
