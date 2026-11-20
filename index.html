@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v124 · 2026-11-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v125 · 2026-11-20</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -817,7 +817,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
     <section class="view" id="v-fep" hidden>
       <div id="autoHub">
         <div class="auto-hero"><div><div class="auto-hero-t">에스넷그룹 자금파트 · 업무 모듈</div><div class="mini">필요한 업무를 선택하세요. 모든 파일은 이 브라우저 안에서만 처리됩니다.</div></div>
-          <div class="auto-pills"><span>운영 모듈 7개</span><span class="acc">엑셀 자동 생성</span><span>법인별 일괄 처리</span></div></div>
+          <div class="auto-pills"><span>운영 모듈 8개</span><span class="acc">엑셀 자동 생성</span><span>법인별 일괄 처리</span></div></div>
         <div class="auto-grid" id="autoGrid"></div>
       </div>
       <div class="auto-back" id="autoBack" hidden><button class="btn sm" id="btnAutoBack">← 자금업무자동화 목록</button><b id="autoToolTitle"></b></div>
@@ -826,6 +826,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
       <div class="seg" id="empTabs" role="group" aria-label="사원경비 자동화 업무" hidden><button type="button" data-t="cardpay" aria-pressed="true">법인카드 계정대체</button><button type="button" data-t="expense" aria-pressed="false">사원경비</button><button type="button" data-t="overdue" aria-pressed="false">연체자 관리</button></div>
       <div class="seg" id="purTabs" role="group" aria-label="매입대금 별도지불 업무" hidden><button type="button" data-t="orapay" aria-pressed="true">오라클 지급</button><button type="button" data-t="snetpay" aria-pressed="false">에스넷 별도지급</button></div>
       <div class="seg" id="intTabs" role="group" aria-label="이자수익전표 종류" hidden><button type="button" data-t="mmt" aria-pressed="true">MMT 이자수익전표</button><button type="button" data-t="int" aria-pressed="false">기타 이자수익전표</button></div>
+      <div class="seg" id="execTabs" role="group" aria-label="임원보고자료 업무" hidden><button type="button" data-t="exbs" aria-pressed="true">대차대조표</button><button type="button" data-t="exaging" aria-pressed="false">채권잔액</button></div>
 
       <div class="auto-screen" data-tool="plan" hidden>
       <div class="panel">
@@ -1511,6 +1512,128 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
       <!-- [v66] 연체자 관리 — 카드사 연체내역 × 사원경비전표(카드번호 AE/AF → 사번 AC · 이름 AD) → 3개 계정 지급 합계 ↔ 연체금액.
            저장하지 않는다(브라우저 메모리만, 새로고침하면 사라짐). 화면에서는 카드번호를 가리고 엑셀에는 전체 번호. -->
+      <!-- [v125] 임원보고자료 카드(k:"exec") 하위 탭 — exbs = 대차대조표 · exaging = 채권잔액. 원본 파일은 브라우저 안에서만 처리, 추출·집계 값만 저장 -->
+      <div class="auto-screen" data-tool="exbs" hidden>
+<style>
+#execTabs{margin:0 0 12px}
+.exb-tbl td,.exb-tbl th{white-space:nowrap}
+.exb-tbl th.num,.exb-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+.exb-tbl td.ctr,.exb-tbl th.ctr{text-align:center}
+.exb-tbl tr.exb-sum td{border-top:1px solid var(--rule-strong);font-weight:600}
+.exb-tbl td.exb-cell{cursor:pointer}
+.exb-tbl td.exb-cell:hover{background:var(--surface-2)}
+.exb-tbl td.exb-sel{outline:2px solid var(--navy);outline-offset:-2px}
+.exb-tbl td.exb-old{color:var(--muted)}
+.exb-tbl td.exb-bad{color:var(--out);font-weight:600}
+.exb-tbl .exb-sub{display:block;font-size:10.5px;color:var(--muted);font-weight:400}
+.exb-checks{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.exb-check{display:flex;align-items:baseline;gap:8px 12px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--rule);border-radius:var(--r-md);background:var(--surface-2);font-size:12.5px}
+.exb-check b{font-variant-numeric:tabular-nums}
+.exb-check .mini{flex-basis:100%}
+.exb-check.muted{color:var(--muted)}
+.exb-cos{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.exb-cos .chip.off{opacity:.4}
+.exb-pick{display:inline-flex;gap:4px;flex-wrap:wrap}
+.exb-pick button{font:inherit;font-size:12px;padding:2px 9px;border:1px solid var(--rule-strong);border-radius:999px;background:var(--surface);color:var(--ink);cursor:pointer}
+.exb-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.exb-map{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.exb-map .exb-mapco{border:1px solid var(--rule);border-radius:var(--r-md);padding:8px 10px;background:var(--surface-2)}
+.exb-map .exb-mapit{margin:6px 0 0;font-size:12px}
+.exb-map .exb-mapit b{display:block;font-size:12px;margin-bottom:2px}
+.exb-tag{display:inline-flex;align-items:center;gap:3px;margin:2px 4px 2px 0;padding:1px 7px;border:1px solid var(--rule-strong);border-radius:999px;font-size:11.5px;background:var(--surface)}
+.exb-tag button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 2px;font:inherit}
+.exb-map input{font:inherit;font-size:12px;padding:2px 6px;width:150px;border:1px solid var(--rule-strong);border-radius:6px;background:var(--surface);color:var(--ink)}
+.exb-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface-2);min-width:120px}
+.exb-bar span{display:block;height:100%}
+.exb-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:900px){.exb-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+        <div class="panel fer-panel card-head">
+          <header><h2>대차대조표</h2><span class="sub">법인별 ERP 대차대조표 → 기준 엑셀(원본 A:F + I~M 추출 수식) · 3사 보고 파일에 기준월 시트(YY.MM) 만들기</span>
+            <div class="sp"><button class="btn sm" id="btnXbNew" type="button">새로 시작</button></div></header>
+          <div class="pad card-headpad">
+            <ol class="fer-steps card-steps" id="xbSteps"><li data-s="1">대차대조표 올리기</li><li data-s="2">추출 확인</li><li data-s="3">기준 엑셀</li><li data-s="4">보고 파일</li></ol>
+            <div class="card-ctl">
+              <div class="grp"><span class="lbl">기준월</span><div class="card-val"><input type="month" class="card-date exYm" id="xbYm" aria-label="기준월"> <span class="mini exBaseTxt"></span></div></div>
+              <div class="grp"><span class="lbl">대상 법인 · 첨부</span><div class="card-val exb-cos" id="xbCos"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>1. 파일 올리기</h2><span class="sub">ERP 대차대조표(.xls, 법인별) · 묶음 파일(시트 SN·GD·GS) · 지난 3사 보고 파일(.xlsx) — 여러 개를 한꺼번에, 종류는 내용으로 판별</span></header>
+          <div class="pad">
+            <div class="ilbo-drop card-drop" id="xbDrop" tabindex="0" role="button" aria-label="파일 선택"><b>파일을 끌어다 놓거나 눌러서 선택</b><span class="mini">대차대조표: 1행 ‘계정명’ · 보고 파일: YY.MM 월 시트 · 계정잔액명세서는 [채권잔액] 탭으로 보냅니다</span></div>
+            <input type="file" id="xbIn" accept=".xls,.xlsx" multiple hidden>
+            <div id="xbFiles" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"></div>
+            <div class="exb-checks" id="xbChecks"></div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>2. 추출 결과</h2><span class="sub">금액 = 당기 C ≠ 0 이면 C, 아니면 D · 계정은 이름으로(같은 이름이 여러 줄이면 가장 깊은 줄) · 칸을 누르면 구성 계정</span>
+            <div class="sp"><div class="seg" id="xbUnit" role="group" aria-label="단위"><button type="button" data-u="won" aria-pressed="true">원</button><button type="button" data-u="eok" aria-pressed="false">억원</button></div></div></header>
+          <div class="scroll"><table class="tbl card-tbl exb-tbl" id="xbTbl"></table></div>
+          <div class="pad" id="xbSrc"></div>
+          <div class="pad" style="padding-top:0"><details id="xbMapBox"><summary class="mini" style="cursor:pointer">항목 구성(법인별 계정 목록) 보기 · 관리자만 고칠 수 있음</summary><div id="xbMapPad" style="margin-top:8px"></div></details></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>3. 기준 엑셀</h2><span class="sub">사용자가 만들던 ‘대차대조표_YYYY-MM-DD기준’ — 법인별 시트 = ERP 원본 A:F + I~M 추출 수식(어느 계정을 더했는지 수식으로 확인)</span></header>
+          <div class="pad exb-acts"><button class="btn primary" id="btnXbBase" type="button" disabled>기준 엑셀 받기</button><span class="mini" id="xbBaseNote"></span>
+            <span style="flex:1"></span><button class="btn" id="btnXbSave" type="button" disabled>추출 값 저장</button><span class="mini" id="xbSaveNote"></span></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>4. 보고 파일</h2><span class="sub">지난 3사 보고 파일에 기준월 시트를 새로 만든다(양식 = 같은 법인 구성의 최근 시트 · 칸은 머리글로 찾음 · 전월 참조 다시 씀) — 파일 XML을 직접 복제, 기존 시트는 그대로</span></header>
+          <div class="pad">
+            <div class="exb-acts"><button class="btn primary" id="btnXbRep" type="button" disabled>보고 파일에 시트 만들기 → 받기</button>
+              <button class="btn sm" id="btnXbCopyAvail" type="button" disabled>가용자금 칸 복사</button><button class="btn sm" id="btnXbCopyCash" type="button" disabled>보유예금 칸 복사</button>
+              <label class="mini" id="xbReLbl" hidden><input type="checkbox" id="xbRe"> 같은 이름 시트 다시 만들기</label></div>
+            <div class="mini" id="xbRepNote" style="margin-top:8px"></div>
+            <div id="xbLoans" style="margin-top:10px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="auto-screen" data-tool="exaging" hidden>
+        <div class="panel fer-panel card-head">
+          <header><h2>채권잔액</h2><span class="sub">ERP 계정잔액명세서 → 회계일자 정렬 → 회계일자 없는 줄(소계·합계) 삭제 → A~D열 삭제 → 경과일수(기준일 − 회계일자 + 1) 7구간 → 구분별 잔액</span>
+            <div class="sp"><button class="btn sm" id="btnXbaNew" type="button">새로 시작</button></div></header>
+          <div class="pad card-headpad">
+            <ol class="fer-steps card-steps" id="xbaSteps"><li data-s="1">계정잔액명세서 올리기</li><li data-s="2">경과일수 확인</li><li data-s="3">작업 엑셀</li></ol>
+            <div class="card-ctl">
+              <div class="grp"><span class="lbl">기준월</span><div class="card-val"><input type="month" class="card-date exYm" id="xbaYm" aria-label="기준월"></div></div>
+              <div class="grp"><span class="lbl">기준일</span><div class="card-val"><input type="date" class="card-date" id="xbaBase" aria-label="기준일"></div></div>
+              <div class="grp"><span class="lbl">기준일 외화평가</span><div class="card-val"><label class="mini"><input type="checkbox" id="xbaFx" checked> 기준일 외화평가 줄 빼기</label></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>1. 파일 올리기</h2><span class="sub">ERP 계정잔액명세서(.xls) — 1행 머리글 ‘계정코드 · 계정명 · 반제항목코드 · 반제항목명 · 회계일자 …’ 시트를 찾아 씀 · 법인별 여러 개 한꺼번에</span></header>
+          <div class="pad">
+            <div class="ilbo-drop card-drop" id="xbaDrop" tabindex="0" role="button" aria-label="파일 선택"><b>파일을 끌어다 놓거나 눌러서 선택</b><span class="mini">법인은 파일 이름(SN·GD·GS)으로, 못 하면 칩으로 고릅니다</span></div>
+            <input type="file" id="xbaIn" accept=".xls,.xlsx" multiple hidden>
+            <div id="xbaFiles" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"></div>
+            <div class="exb-checks" id="xbaChecks"></div>
+          </div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>2. 경과일수별 잔액</h2><span class="sub">45일 이내 · 46~60日 · 61~90日 · 91~180日 · 181~270日 · 271~360日 · 361日초과 — 구간 칸을 누르면 줄 목록</span>
+            <div class="sp"><div class="seg" id="xbaUnit" role="group" aria-label="단위"><button type="button" data-u="won" aria-pressed="true">원</button><button type="button" data-u="mil" aria-pressed="false">백만원</button><button type="button" data-u="eok" aria-pressed="false">억원</button></div></div></header>
+          <div class="scroll"><table class="tbl card-tbl exb-tbl" id="xbaTbl"></table></div>
+          <div class="pad" id="xbaAcct"></div>
+          <div class="scroll"><table class="tbl card-tbl exb-tbl" id="xbaList"></table></div>
+        </div>
+
+        <div class="panel fer-panel">
+          <header><h2>3. 작업 엑셀 · 저장</h2><span class="sub">시트 1.ROW · 2-1.지우기 · 2-2.지우기 · 2-3.지우기 · 3.일자분류 · 4.최종피벗(SUMPRODUCT 수식 표) — 저장은 구간·계정 합계만(거래처·전표 줄 저장 안 함)</span></header>
+          <div class="pad exb-acts" id="xbaActs"></div>
+        </div>
+      </div>
+
       <div class="auto-screen" data-tool="overdue" hidden>
 <style>
 #empTabs{margin:0 0 12px}
@@ -15868,7 +15991,8 @@ var AUTO_TOOLS=[
   {k:"emp",    t:"사원경비 자동화",     d:"법인카드 계정대체 · 사원경비 대량이체 · 카드 연체자 관리", tags:["법인카드 계정대체","사원경비","연체자 관리"], ico:'<circle cx="9" cy="7.5" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 9.4-3.9"/><circle cx="17" cy="16.5" r="4.5"/>'},
   {k:"card",   t:"법인카드 등록",       d:"삼성카드 발급내역 → ERP 업로드 파일 · CMS 등록 파일", tags:["발급내역 업로드","ERP·CMS 파일"], ico:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6 15h4"/>'},
   {k:"pur",    t:"매입대금 별도지불",   d:"구매팀 매입리스트 → 60일 지급일정(주말·공휴일 전영업일) · 특이케이스 반영 · 지출일정 엑셀", tags:["오라클 지급","에스넷 별도지급","지출일정 생성"], ico:'<path d="M4 6.5h16v11H4z"/><path d="M4 10h16"/><path d="M8 14h3"/><path d="M15.5 13.2v3.6M13.7 15h3.6"/>'},
-  {k:"mmt",    t:"이자수익전표",       d:"MMT·기타 계좌 원천징수영수증 PDF → 이자수익 전표", tags:["MMT · 기타 계좌","PDF 판독","ERP KO 엑셀 다운로드"], ico:'<rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M7 9h4M7 13h6M7 17h3"/><circle cx="16.5" cy="15.5" r="3.2"/><path d="M15 17l3-3"/>'}
+  {k:"mmt",    t:"이자수익전표",       d:"MMT·기타 계좌 원천징수영수증 PDF → 이자수익 전표", tags:["MMT · 기타 계좌","PDF 판독","ERP KO 엑셀 다운로드"], ico:'<rect x="3" y="4" width="18" height="16" rx="2.2"/><path d="M7 9h4M7 13h6M7 17h3"/><circle cx="16.5" cy="15.5" r="3.2"/><path d="M15 17l3-3"/>'},
+  {k:"exec",   t:"임원보고자료",       d:"ERP 대차대조표 → 기준 엑셀 · 3사 보고 파일 월 시트 · 계정잔액명세서 → 채권 경과일수별 잔액", tags:["대차대조표","보고 파일 생성","채권잔액"], ico:'<path d="M3.5 20.5h17"/><path d="M6 17V11M10.5 17V6.5M15 17v-4M19.5 17V8.5"/>'}   // [v125]
 ];
 /* [v60] 'int'(기타 이자수익전표)는 이자수익전표 카드(k:"mmt")의 하위 탭 — 카드 정의는 하나, 화면은 둘 */
 var INT_TABS={mmt:"MMT", int:"기타"};
@@ -15876,17 +16000,19 @@ var INT_TABS={mmt:"MMT", int:"기타"};
 var EMP_TABS={cardpay:"법인카드 계정대체", expense:"사원경비", overdue:"연체자 관리"};
 /* 매입대금 별도지불 카드(k:"pur") 하위 탭 — 화면은 orapay · snetpay. 카드를 누르면 첫 탭(오라클 지급) */
 var PUR_TABS={orapay:"오라클 지급", snetpay:"에스넷 별도지급"};
-function autoToolOf(t){ var k=t==="int"?"mmt":EMP_TABS[t]?"emp":PUR_TABS[t]?"pur":t; return AUTO_TOOLS.filter(function(x){ return x.k===k; })[0]; }
+function autoToolOf(t){ var k=t==="int"?"mmt":EMP_TABS[t]?"emp":PUR_TABS[t]?"pur":EXEC_TABS[t]?"exec":t; return AUTO_TOOLS.filter(function(x){ return x.k===k; })[0]; }
 function renderAutoHub(){
   var t=AUTO.tool;
   if(t==="emp") t=AUTO.tool="cardpay";
   if(t==="pur") t=AUTO.tool="orapay";
+  if(t==="exec") t=AUTO.tool="exbs";   // [v125] 임원보고자료 → 첫 탭 [대차대조표]
   $("#autoHub").hidden=!!t; $("#autoBack").hidden=!t;
   $("#intTabs").hidden=!INT_TABS[t]; $$("#intTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });
   $("#empTabs").hidden=!EMP_TABS[t]; $$("#empTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });   // [v66]
   $("#purTabs").hidden=!PUR_TABS[t]; $$("#purTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });
+  $("#execTabs").hidden=!EXEC_TABS[t]; $$("#execTabs button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.t===t)); });   // [v125]
   $$("#v-fep .auto-screen").forEach(function(s){ s.hidden=s.dataset.tool!==t; });
-  $("#viewTitle").textContent = t ? "자금업무 자동화 · "+autoToolOf(t).t+(INT_TABS[t]?" · "+INT_TABS[t]:EMP_TABS[t]?" · "+EMP_TABS[t]:PUR_TABS[t]?" · "+PUR_TABS[t]:"") : TITLES.fep;
+  $("#viewTitle").textContent = t ? "자금업무 자동화 · "+autoToolOf(t).t+(INT_TABS[t]?" · "+INT_TABS[t]:EMP_TABS[t]?" · "+EMP_TABS[t]:PUR_TABS[t]?" · "+PUR_TABS[t]:EXEC_TABS[t]?" · "+EXEC_TABS[t]:"") : TITLES.fep;
   if(!t){
     $("#autoGrid").innerHTML=AUTO_TOOLS.map(function(x){
       return '<button class="auto-card" data-k="'+x.k+'"><span class="auto-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+x.ico+'</svg></span>'+
@@ -15902,11 +16028,709 @@ function renderAutoHub(){
   else if(t==="overdue"){ renderOverdue(); }   // [v66] 연체자 관리
   else if(t==="orapay"){ renderOrp(); }   // 매입대금 별도지불 · 오라클 지급
   else if(t==="int"){ if(window.IntSlipApp) window.IntSlipApp.show(); }   // [v60] 기타 이자수익전표 — 계좌 목록(D) 로드 후 매핑 상태를 다시 읽는다
+  else if(t==="exbs"){ exbLoadSaved(); exbRecalc(); renderExb(); }   // [v125] 임원보고자료 · 대차대조표
+  else if(t==="exaging"){ exbLoadSaved(); exbRecalc(); renderExa(); }   // [v125] 임원보고자료 · 채권잔액
 }
 $("#btnAutoBack").onclick=function(){ AUTO.tool=null; renderAutoHub(); };
 $$("#intTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });   // [v60]
 $$("#empTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });   // [v66]
 $$("#purTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });
+$$("#execTabs button").forEach(function(b){ b.onclick=function(){ AUTO.tool=b.dataset.t; renderAutoHub(); }; });   // [v125]
+/* ===================== [v125] 임원보고자료 — 엔진 (window.EXB) =====================
+   [대차대조표] ERP 대차대조표(.xls) → 법인별 항목(보유예금 · 매출채권~퇴직연금) → 기준 엑셀(A:F 원본 + I~M 수식) · 3사 보고 파일 YY.MM 시트(XML 복제)
+   [채권잔액]  ERP 계정잔액명세서 → 회계일자 정렬 → 회계일자 없는 줄 삭제 → A~D 삭제 → 경과일수 7구간 → 구분별 잔액
+   규칙: 금액 = 당기 C ≠ 0 이면 C, 아니면 D · 계정은 이름(앞뒤 공백 무시)으로 찾고 같은 이름이 여러 줄이면 가장 깊은 줄(앞 공백 수)
+         행 번호·열 위치를 박지 않는다(계정은 이름, 보고 칸은 머리글). 원본 파일은 저장·전송하지 않는다 — 추출 값만 돌려준다. */
+(function(root){
+  var CO_ORDER=["SN","GU","GD","GS"], CO_LABEL={SN:"SNET",GU:"Goodus",GD:"G/D",GS:"G/S"}, LABEL_CO={"SNET":"SN","Goodus":"GU","G/D":"GD","G/S":"GS"};
+  var CO_NAME={SN:"에스넷시스템",GU:"굿어스",GD:"굿어스데이터",GS:"굿어스스마트솔루션"};
+  var ITEMS=[{k:"매출채권",sign:1},{k:"재고자산",sign:1},{k:"대여금",sign:1},{k:"매입채무",sign:-1},{k:"차입금",sign:-1},{k:"퇴직충당금",sign:-1},{k:"퇴직연금",sign:1}];
+  var CASH="현금및현금성자산";
+  var PAY_GU=["외상매입금","외상매입금(인건비)","외화외상매입금","미지급금(거래처)","미지급금(자동이체)","미지급금(사원경비)","미지급금(급여)","미지급금(법인카드)","미지급금(법인개인카드)"];
+  function baseMap(){ return { 재고자산:["원재료","상품"], 대여금:["단기대여금"], 차입금:["단기차입금"], 퇴직충당금:["퇴직급여충당금"], 퇴직연금:["퇴직연금운용자산"], 매출채권:["외상매출금","외화외상매출금","받을어음"] }; }
+  /* 기본 항목 구성 = 사용자 기준 엑셀 I~M열 수식을 계정명으로 옮긴 것. GD 매입채무는 이중 합산(상위+세부 외상매입금)을 바로잡아 GS와 같게(사용자 결정 2026-11-20) */
+  var MAP_DEFAULT=(function(){
+    var SN=baseMap(); SN.재고자산=["원재료"]; SN.매출채권=["외상매출금","외화외상매출금","받을어음","미수금(인사)","미수금(MDF)"];
+    SN.매입채무=["외상매입금","외상매입금(기타)","외상매입금(자동결제)","외화외상매입금","미지급금(거래처)","미지급금(사원경비)","미지급금(급여)","미지급금(법인카드)","미지급금(법인개인카드)","미지급금(자동이체)","외화미지급금(거래처)"];
+    var GU=baseMap(); GU.매입채무=PAY_GU.slice();
+    var GD=baseMap(); GD.매입채무=PAY_GU.concat(["외화미지급금(거래처)"]);
+    var GS=baseMap(); GS.매입채무=GD.매입채무.slice();
+    return {SN:SN, GU:GU, GD:GD, GS:GS};
+  })();
+  function pad(n){ return String(n).padStart(2,"0"); }
+  function lastDay(ym){ var y=+ym.slice(0,4), m=+ym.slice(5,7); return ym+"-"+pad(new Date(Date.UTC(y,m,0)).getUTCDate()); }
+  function shiftYm(ym,k){ var t=(+ym.slice(0,4))*12+(+ym.slice(5,7)-1)+k; return Math.floor(t/12)+"-"+pad(t%12+1); }
+  function yy(ym){ return ym.slice(2,4)+"."+ym.slice(5,7); }
+  function ymOfYy(s){ var m=String(s).match(/^(\d\d)\.(\d\d)$/); return m?"20"+m[1]+"-"+m[2]:""; }
+  function serialOf(iso){ return Math.round((Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10))-Date.UTC(1899,11,30))/86400000); }
+  function isoOfSerial(n){ var d=new Date(Date.UTC(1899,11,30)+Math.round(n)*86400000); return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate()); }
+  function targetCos(ym){ return ym<="2026-09" ? ["SN","GU","GD","GS"] : ["SN","GD","GS"]; }   // 굿어스 2026-10-20 소멸
+  function num(v){ if(typeof v==="number") return v; var s=String(v==null?"":v).replace(/[,\s]/g,""); if(s===""||s==="-") return 0; var n=+s; return isFinite(n)?n:0; }
+  function txt(v){ return String(v==null?"":v); }
+  function isoInName(name){ var m=String(name||"").match(/(20\d\d)[-.](\d\d)[-.](\d\d)/); return m?m[1]+"-"+m[2]+"-"+m[3]:""; }
+  function coInName(name){ var s=String(name||""); var m=s.match(/(^|[^A-Za-z])(SN|GU|GD|GS)([^A-Za-z]|$)/); if(m) return m[2];
+    if(/굿어스스마트솔루션|스마트솔루션|솔루션/.test(s)) return "GS"; if(/굿어스데이터|데이터/.test(s)) return "GD"; if(/에스넷/.test(s)) return "SN"; if(/굿어스/.test(s)) return "GU"; return ""; }
+  function colL(i){ var s=""; i++; while(i>0){ var m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); } return s; }
+  function refEnd(ws){ var m=String(ws["!ref"]||"A1:A1").split(":").pop().match(/^([A-Z]+)(\d+)$/); return m?{c1:colI(m[1]), r1:+m[2]}:{c1:30, r1:80}; }
+  function colI(L){ var n=0; for(var i=0;i<L.length;i++) n=n*26+(L.charCodeAt(i)-64); return n-1; }
+
+  /* ---------- 1. ERP 대차대조표 ---------- */
+  function aoaOf(XLSX, ws){ return XLSX.utils.sheet_to_json(ws,{header:1, raw:true, defval:null, blankrows:true}); }
+  function isBsAoa(a){ return a && a[0] && txt(a[0][0]).trim()==="계정명" && /제\s*\d+\s*\(당\)기/.test(txt(a[0][2])); }
+  function parseBs(aoa, ws){
+    var gisu=(txt(aoa[0][2]).match(/제\s*(\d+)\s*\(당\)기/)||[])[1]||"";
+    var rows=[];
+    for(var i=1;i<aoa.length;i++){ var r=aoa[i]||[], a=txt(r[0]); if(!a.trim()) continue;
+      var depth=a.length-a.replace(/^ +/,"").length, C=num(r[2]), Dv=num(r[3]);
+      rows.push({r:i+1, name:a.trim(), depth:depth, C:C, D:Dv, col:C!==0?"C":"D", amt:C!==0?C:Dv}); }
+    var cache=null;
+    if(ws){ cache={}; for(var k=5;k<=12;k++){ var c=ws["K"+k]; if(c && typeof c.v==="number") cache[k]=c.v; } if(!Object.keys(cache).length) cache=null; }
+    return {gisu:+gisu||0, rows:rows, aoa:aoa, cache:cache};
+  }
+  function coByGisu(g){ return g===28?"SN":g===25?"GU":""; }
+  function findAcct(bs, name, opt){
+    var hit=bs.rows.filter(function(r){ return r.name===name; });
+    if(!hit.length) return {miss:true};
+    if(opt && opt.depth0){ var z=hit.filter(function(r){ return r.depth===0; }); if(z.length===1) return {row:z[0]}; }
+    var dmax=Math.max.apply(null, hit.map(function(r){ return r.depth; })), deep=hit.filter(function(r){ return r.depth===dmax; });
+    if(deep.length>1) return {dup:deep};
+    return {row:deep[0]};
+  }
+  /* 법인 1곳 추출: {보유예금, 매출채권…, src:{항목:[{acct,r,col,amt}]}, warn:[], err:[], total:{asset, le, ok}} */
+  function extract(bs, co, map){
+    var M=(map&&map[co])||MAP_DEFAULT[co]||MAP_DEFAULT.GD, out={src:{}, warn:[], err:[]};
+    var cash=findAcct(bs, CASH, {depth0:true});
+    if(cash.row){ out.보유예금=cash.row.amt; out.src.보유예금=[{acct:CASH, r:cash.row.r, col:cash.row.col, amt:cash.row.amt}]; }
+    else { out.보유예금=0; out.src.보유예금=[]; (cash.dup?out.err:out.warn).push("보유예금: "+CASH+(cash.dup?" 같은 깊이 중복 계정":" 계정 없음")); }
+    ITEMS.forEach(function(it){
+      var s=0, src=[];
+      (M[it.k]||[]).forEach(function(nm){
+        var f=findAcct(bs, nm);
+        if(f.miss){ out.warn.push(it.k+": '"+nm+"' 계정 없음"); return; }
+        if(f.dup){ out.err.push(it.k+": '"+nm+"' 같은 깊이 중복 계정("+f.dup.map(function(r){ return r.r+"행"; }).join("·")+")"); return; }
+        s+=f.row.amt; src.push({acct:nm, r:f.row.r, col:f.row.col, amt:f.row.amt});
+      });
+      out[it.k]=(Math.round(s)*it.sign)||0; out.src[it.k]=src;
+    });
+    out.nonCash=ITEMS.reduce(function(a,it){ return a+out[it.k]; },0); out.avail=out.보유예금+out.nonCash;
+    var A=findAcct(bs,"자산총계"), LE=findAcct(bs,"부채와자본총계"), L=findAcct(bs,"부채총계"), E=findAcct(bs,"자본총계");
+    var asset=A.row?A.row.amt:null, le=LE.row?LE.row.amt:(L.row&&E.row?L.row.amt+E.row.amt:null);
+    out.total={asset:asset, le:le, ok:asset!=null && le!=null && Math.round(asset)===Math.round(le)};
+    return out;
+  }
+  function itemFormula(src, sign){ if(!src.length) return null; return src.map(function(s){ return s.col+s.r; }).join("+"); }
+
+  /* 기준 엑셀 대차대조표_YYYY-MM-DD기준.xlsx — 시트 = 법인, A:F 원본 값 + I~M 추출 수식(캐시 값 포함) */
+  function buildBaseXlsx(EX, list, baseIso){
+    var wb=new EX.Workbook(); wb.calcProperties={fullCalcOnLoad:true};
+    list.forEach(function(x){
+      var ws=wb.addWorksheet(x.co), aoa=x.bs.aoa, ext=x.ext;
+      aoa.forEach(function(r, i){ if(!r) return; for(var c=0;c<6;c++){ var v=r[c]; if(v==null||v==="") continue; var cell=ws.getCell(i+1, c+1); cell.value=v; if(typeof v==="number") cell.numFmt="#,##0"; } });
+      for(var c=1;c<=6;c++){ var h=ws.getCell(1,c); h.fill={type:"pattern", pattern:"solid", fgColor:{argb:"FFD9D9D9"}}; h.font={bold:true}; }
+      [21.4,8.6,18.6,18.6,18.6,18.6].forEach(function(w,i){ ws.getColumn(i+1).width=w; });
+      ws.getCell("I1").value="계정레벨"; ws.getCell("J1").value="세목"; ws.getCell("I2").value="전체계정조회"; ws.getCell("I3").value="엑셀출력(화면)";
+      var cs=ext.src.보유예금[0];
+      ws.getCell("I5").value="잔액"; ws.getCell("K5").value=cs?{formula:cs.col+cs.r, result:ext.보유예금}:0; ws.getCell("M5").value={formula:"K5", result:ext.보유예금};
+      ITEMS.forEach(function(it, i){ var r=6+i, src=ext.src[it.k], f=itemFormula(src), pos=Math.abs(ext[it.k]);
+        ws.getCell("I"+r).value=it.k; ws.getCell("K"+r).value=f?{formula:f, result:pos}:0; ws.getCell("L"+r).value=it.sign>0?"+":"-";
+        ws.getCell("M"+r).value={formula:(it.sign>0?"":"-")+"K"+r, result:ext[it.k]}; });
+      ["K","M"].forEach(function(c){ for(var r=5;r<=12;r++) ws.getCell(c+r).numFmt="#,##0"; });
+      ws.getColumn(9).width=14; ws.getColumn(11).width=18; ws.getColumn(13).width=18;
+    });
+    return wb;
+  }
+
+  /* ---------- 2. 3사 보고 파일 ---------- */
+  function xmlEsc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  /* 머리글 행에서 법인 라벨 위치 — 두 번째(오른쪽) 묶음 = 원 단위 칸 */
+  function headCols(ws, row){
+    var occ=[]; var rg=refEnd(ws);
+    for(var c=0;c<=Math.max(30,rg.c1);c++){ var cell=ws[colL(c)+row]; if(!cell) continue; var t=txt(cell.v).trim(); if(LABEL_CO[t]) occ.push({co:LABEL_CO[t], c:c}); }
+    var firstCo=occ.length?occ[0].co:null, k=-1; occ.forEach(function(o,i){ if(i>0 && o.co===firstCo && k<0) k=i; });
+    var g1=k>0?occ.slice(0,k):occ, g2=k>0?occ.slice(k):[];
+    var cols={}; g2.forEach(function(o){ cols[o.co]=colL(o.c); });
+    return {cos:g2.map(function(o){ return o.co; }), cols:cols, ekCos:g1.map(function(o){ return o.co; })};
+  }
+  function layoutOf(ws){
+    var b5=ws.B5, date=null; if(b5 && b5.f){ var m=String(b5.f).match(/^\$?([A-Z]{1,2})\$?(\d+)$/); if(m) date=m[1]+m[2]; }
+    if(!date){ for(var c=2;c<10;c++){ var x=ws[colL(c)+"2"]; if(x && (x.t==="d" || (typeof x.v==="number" && x.v>40000 && x.v<60000))){ date=colL(c)+"2"; break; } } }
+    var h4=headCols(ws,4), h12=headCols(ws,12), h28=headCols(ws,28);
+    var labels={}; for(var r=14;r<=20;r++){ var t=""; for(var c=1;c<6;c++){ var x=ws[colL(c)+r]; if(x && typeof x.v==="string" && x.v.trim()){ t=x.v.trim(); break; } } labels[r]=t; }
+    return {date:date, cash:h4, avail:h12, loan:h28, labels:labels, cos:h12.cos};
+  }
+  function sameCos(a,b){ return a.length===b.length && a.every(function(x,i){ return x===b[i]; }); }
+  /* 보고 파일 훑기: 시트 목록·배치·양식/전월 판정 */
+  function reportScan(XLSX, bytes, ym){
+    var wb=XLSX.read(bytes,{type:"array", cellFormula:true, cellDates:false, cellStyles:false});
+    var names=wb.SheetNames.slice(), months=names.filter(function(n){ return /^\d\d\.\d\d$/.test(n); });
+    var res={wb:wb, names:names, months:months, ym:ym, name:yy(ym), prevName:yy(shiftYm(ym,-1)), errs:[], notes:[]};
+    if(months.length<2){ res.errs.push("보고 파일이 아닙니다 — YY.MM 시트가 없습니다"); return res; }
+    var cos=targetCos(ym);
+    res.exists=names.indexOf(res.name)>=0;
+    res.prev=names.indexOf(res.prevName)>=0 ? res.prevName : null;
+    if(!res.prev) res.errs.push("전월 시트 "+res.prevName+" 없음");
+    var cand=months.filter(function(n){ return ymOfYy(n)<=ym; }).sort().reverse(), tpl=null;
+    for(var i=0;i<cand.length;i++){ var L=layoutOf(wb.Sheets[cand[i]]); if(sameCos(L.cos, cos)){ tpl={name:cand[i], L:L}; break; } }
+    if(!tpl) res.errs.push((cos.length===3?"3사":"4사")+" 양식 시트가 없습니다 — "+(cos.length===3?"26.10 시트가 있는 보고 파일을 올려 주세요":"같은 법인 구성의 시트가 있는 보고 파일을 올려 주세요"));
+    res.tpl=tpl; if(res.prev) res.prevL=layoutOf(wb.Sheets[res.prev]);
+    if(tpl){
+      var bad=[]; ITEMS.forEach(function(it,i){ if(tpl.L.labels[14+i]!==it.k) bad.push((14+i)+"행 '"+(tpl.L.labels[14+i]||"")+"'"); });
+      if(bad.length) res.errs.push("양식 시트 "+tpl.name+" 가용자금 항목 순서가 다릅니다: "+bad.join(", "));
+      if(!tpl.L.date) res.errs.push("양식 시트 "+tpl.name+" 날짜 칸을 찾지 못했습니다(B5 수식)");
+      cos.forEach(function(c){ if(!tpl.L.cash.cols[c]||!tpl.L.avail.cols[c]||!tpl.L.loan.cols[c]) res.errs.push("양식 시트 "+tpl.name+" 머리글에서 "+CO_LABEL[c]+" 칸을 찾지 못했습니다"); });
+    }
+    if(res.prevL) cos.forEach(function(c){ if(!res.prevL.cash.cols[c]||!res.prevL.avail.cols[c]||!res.prevL.loan.cols[c]) res.errs.push("전월 시트 "+res.prev+" 머리글에서 "+CO_LABEL[c]+" 칸을 찾지 못했습니다"); });
+    /* 이미 기준월 시트가 있으면 값 대조용 */
+    if(res.exists){ var ws=wb.Sheets[res.name], L2=layoutOf(ws), cur={};
+      cos.forEach(function(c){ var o={}; var x=L2.cash.cols[c]?ws[L2.cash.cols[c]+"5"]:null; o.보유예금=x&&typeof x.v==="number"?x.v:null;
+        ITEMS.forEach(function(it,i){ var y=L2.avail.cols[c]?ws[L2.avail.cols[c]+(14+i)]:null; o[it.k]=y&&typeof y.v==="number"?y.v:null; }); cur[c]=o; });
+      res.current=cur; }
+    /* 차입·여신 한도 표(양식 시트) */
+    if(tpl) res.loans=loanTable(wb.Sheets[tpl.name]);
+    return res;
+  }
+  /* 금융권 여신 한도 표: 머리글(거래처·구분) 아래 줄들 · 법인 블록은 '○○ 소계' 줄로 끊는다 */
+  function loanTable(ws){
+    var rg=refEnd(ws), head=0, out={rows:[], subs:[]};
+    for(var r=25;r<=rg.r1;r++){ var d=ws["D"+r], e=ws["E"+r]; if(d&&e&&txt(d.v).trim()==="거래처"&&txt(e.v).trim()==="구분"){ head=r; break; } }
+    if(!head) return out;
+    var pend=[];
+    var SUBCO={"에스넷":"SN","굿어스":"GU","데이터":"GD","솔루션":"GS"};
+    for(var r2=head+1;r2<=rg.r1;r2++){
+      var b=ws["B"+r2], bt=b?txt(b.v).trim():"";
+      var sm=bt.match(/^(\S+)\s*소계$/);
+      if(sm){ var co=SUBCO[sm[1]]||""; pend.forEach(function(x){ x.co=co; out.rows.push(x); }); pend=[];
+        var o=ws["O"+r2], m=ws["M"+r2]; out.subs.push({r:r2, co:co, o:o&&typeof o.v==="number"?o.v:null}); continue; }
+      var dd=ws["D"+r2]; if(!dd || !txt(dd.v).trim()) continue;
+      var g=function(L){ var x=ws[L+r2]; return x?x.v:null; };
+      pend.push({r:r2, bank:txt(g("D")).trim(), type:txt(g("E")).trim(), rate:typeof g("F")==="number"?g("F"):null, end:typeof g("I")==="number"?isoOfSerial(g("I")):"", limit:typeof g("L")==="number"?g("L"):null, amount:typeof g("M")==="number"?g("M"):(ws["M"+r2]&&ws["M"+r2].f?null:0), mF:!!(ws["M"+r2]&&ws["M"+r2].f), hF:!!(ws["H"+r2]&&ws["H"+r2].f)});
+    }
+    return out;
+  }
+
+  /* ---- XML 조작 ---- */
+  var DEC=function(u){ return new TextDecoder("utf-8").decode(u instanceof Uint8Array?u:new Uint8Array(u)); }, ENC=function(s){ return new TextEncoder().encode(s); };
+  function zipOpen(CFB, bytes){
+    var z=CFB.read(bytes instanceof Uint8Array?bytes:new Uint8Array(bytes),{type:"array"});
+    var pre=(z.FullPaths[0]||"").replace(/[^/]*$/,"");   // 'Root Entry/' 같은 접두
+    function full(p){ var hit=z.FullPaths.filter(function(x){ return x===pre+p || x.replace(/^[^/]*\//,"")===p; })[0]; return hit||null; }
+    return {z:z, has:function(p){ return !!full(p); },
+      get:function(p){ var f=full(p); if(!f) return null; var e=CFB.find(z,f); return e?DEC(e.content):null; },
+      bin:function(p){ var f=full(p); if(!f) return null; var e=CFB.find(z,f); return e?new Uint8Array(e.content):null; },
+      put:function(p, s){ var data=typeof s==="string"?ENC(s):s, f=full(p); if(f){ var e=CFB.find(z,f); e.content=data; e.size=data.length; } else CFB.utils.cfb_add(z, p, data); },
+      del:function(p){ var f=full(p); if(f) CFB.utils.cfb_del(z, f); },
+      list:function(){ return z.FullPaths.map(function(x){ return x.replace(/^[^/]*\//,""); }); },
+      write:function(){ return CFB.write(z,{type:"array", fileType:"zip", compression:true}); }};
+  }
+  function relsOf(xml){ var out=[]; (xml||"").replace(/<Relationship\b([^>]*)\/?>/g, function(_,a){ var g=function(k){ var m=a.match(new RegExp(k+'="([^"]*)"')); return m?m[1]:""; }; out.push({id:g("Id"), type:g("Type").split("/").pop(), target:g("Target")}); }); return out; }
+  function resolveT(base, t){ if(t.charAt(0)==="/") return t.slice(1); var parts=base.split("/"); parts.pop(); t.split("/").forEach(function(s){ if(s==="..") parts.pop(); else if(s!==".") parts.push(s); }); return parts.join("/"); }
+  /* 수식 참조 이동(공유 수식 펼치기) — 따옴표 문자열·시트명 밖의 상대 참조만 */
+  function shiftF(f, dr, dc){
+    if(!dr && !dc) return f;
+    var out="", i=0;
+    while(i<f.length){
+      var ch=f.charAt(i);
+      if(ch==='"' || ch==="'"){ var j=i+1; while(j<f.length){ if(f.charAt(j)===ch){ if(f.charAt(j+1)===ch){ j+=2; continue; } break; } j++; } out+=f.slice(i,j+1); i=j+1; continue; }
+      var m=f.slice(i).match(/^(\$?)([A-Z]{1,3})(\$?)(\d{1,7})(?![\w(.])/);
+      var prev=i>0?f.charAt(i-1):"";
+      if(m && !/[A-Za-z0-9_.]/.test(prev)){
+        var c=colI(m[2]), r=+m[4];
+        if(!m[1]) c+=dc; if(!m[3]) r+=dr;
+        out+=m[1]+colL(c)+m[3]+r; i+=m[0].length; continue;
+      }
+      out+=ch; i++;
+    }
+    return out;
+  }
+  function refRC(ref){ var m=ref.match(/^([A-Z]{1,3})(\d+)$/); return {c:colI(m[1]), r:+m[2]}; }
+  function unshareAndClear(xml){
+    var masters={};
+    xml.replace(/<c r="([A-Z]+\d+)"[^>]*?(?<!\/)>\s*<f t="shared" ref="[^"]*" si="(\d+)"[^>]*>([^<]*)<\/f>/g, function(_,ref,si,f){ masters[si]={ref:ref, f:f}; return _; });
+    xml=xml.replace(/<c r="([A-Z]+\d+)"([^>]*?)(?<!\/)>([\s\S]*?)<\/c>/g, function(all, ref, attrs, inner){
+      if(inner.indexOf("<f")<0) return all;
+      inner=inner.replace(/<f t="shared" ref="[^"]*" si="\d+"([^>]*)>([^<]*)<\/f>/, function(_,a,f){ return "<f"+a+">"+f+"</f>"; });
+      inner=inner.replace(/<f t="shared" si="(\d+)"[^>]*\/>/, function(_,si){ var M=masters[si]; if(!M) return _; var a=refRC(M.ref), b=refRC(ref); return "<f>"+shiftF(M.f.replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"'), b.r-a.r, b.c-a.c).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</f>"; });
+      inner=inner.replace(/<v>[\s\S]*?<\/v>/g,"").replace(/<v\/>/g,"");
+      attrs=attrs.replace(/\st="[^"]*"/,"");
+      return '<c r="'+ref+'"'+attrs+'>'+inner+'</c>';
+    });
+    return xml;
+  }
+  /* 칸 하나 쓰기: {n:숫자} 또는 {f:수식} — 서식(s) 유지, 없으면 행 안 열 순서에 끼운다 */
+  function setCell(xml, ref, val){
+    var R=refRC(ref).r, body=val.f!=null?"<f>"+xmlEsc(val.f)+"</f>":"<v>"+val.n+"</v>";
+    var rowRe=new RegExp('<row r="'+R+'"([^>]*?)(\\/>|>([\\s\\S]*?)<\\/row>)');
+    var rm=xml.match(rowRe);
+    if(!rm) throw new Error(ref+" 행("+R+")을 양식에서 찾지 못했습니다");
+    var inner=rm[3]||"", cre=new RegExp('<c r="'+ref+'"(\\s[^>]*?)?(\\/>|>[\\s\\S]*?<\\/c>)'), cm=inner.match(cre), ni;
+    if(cm){ var attrs=(cm[1]||"").replace(/\st="[^"]*"/,""); ni=inner.replace(cre, '<c r="'+ref+'"'+attrs+'>'+body+'</c>'); }
+    else {
+      var C=refRC(ref).c, cells=inner.match(/<c r="[A-Z]+\d+"[\s\S]*?(\/>|<\/c>)/g)||[], pos=inner.length, acc=0;
+      for(var i=0;i<cells.length;i++){ var cr=cells[i].match(/<c r="([A-Z]+)\d+"/)[1]; var idx=inner.indexOf(cells[i], acc); if(colI(cr)>C){ pos=idx; break; } acc=idx+cells[i].length; }
+      ni=inner.slice(0,pos)+'<c r="'+ref+'">'+body+'</c>'+inner.slice(pos);
+    }
+    return xml.replace(rowRe, '<row r="'+R+'"'+rm[1]+'>'+ni+'</row>');
+  }
+  /* 보고 파일에 기준월 시트 만들기. data = {SN:{보유예금, 매출채권, …}, …}  opt.replace = 같은 이름 시트 다시 만들기 */
+  function buildReport(XLSX, bytes, ym, data, opt){
+    opt=opt||{};
+    var scan=reportScan(XLSX, bytes, ym); if(scan.errs.length) throw new Error(scan.errs.join(" · "));
+    if(scan.exists && !opt.replace) throw new Error("같은 이름 시트 "+scan.name+"가 이미 있습니다 — [다시 만들기]");
+    var Z=zipOpen(XLSX.CFB, bytes), notes=[], cos=targetCos(ym), wbXml=Z.get("xl/workbook.xml"), wbRels=Z.get("xl/_rels/workbook.xml.rels"), R=relsOf(wbRels);
+    var sheetsX=[]; wbXml.replace(/<sheet\b([^>]*)\/>/g, function(_,a){ var g=function(k){ var m=a.match(new RegExp('(?:^|\\s)'+k+'="([^"]*)"')); return m?m[1]:""; };
+      var rid=g("r:id"), rel=R.filter(function(x){ return x.id===rid; })[0]; sheetsX.push({name:g("name").replace(/&amp;/g,"&"), sheetId:+g("sheetId"), rid:rid, path:rel?resolveT("xl/workbook.xml", rel.target):""}); return _; });
+    var tplS=sheetsX.filter(function(s){ return s.name===scan.tpl.name; })[0], L=scan.tpl.L, PL=scan.prevL, pq="'"+scan.prev+"'!";
+    var xml=Z.get(tplS.path);
+    xml=unshareAndClear(xml);
+    xml=xml.replace(/(<worksheet\b[^>]*?)\s+xr:uid="[^"]*"/, "$1");
+    var iso=lastDay(ym);
+    xml=setCell(xml, L.date, {n:serialOf(iso)});
+    cos.forEach(function(c){ var d=data[c]; if(!d) throw new Error(CO_LABEL[c]+" 추출 값이 없습니다");
+      xml=setCell(xml, L.cash.cols[c]+"5", {n:Math.round(d.보유예금)});
+      xml=setCell(xml, L.cash.cols[c]+"6", {f:pq+PL.cash.cols[c]+"5"});
+      ITEMS.forEach(function(it,i){ xml=setCell(xml, L.avail.cols[c]+(14+i), {n:Math.round(d[it.k]||0)}); });
+      xml=setCell(xml, L.avail.cols[c]+"23", {f:pq+PL.avail.cols[c]+"22"});
+      xml=setCell(xml, L.loan.cols[c]+"31", {f:pq+PL.loan.cols[c]+"30"});
+    });
+    /* 차입·여신 표: 관리자가 [대시보드 값으로 고치기]로 고른 칸만(행 추가·삭제 없음) */
+    (opt.fix||[]).forEach(function(x){ xml=setCell(xml, x.ref, {n:x.n}); notes.push("여신 한도 표 "+x.ref+" = 대시보드 값 "+x.n); });
+    /* 조건부 서식이 날짜 칸이 아닌 2행 칸($F$2 등)을 보면 날짜 칸으로 */
+    var dm=L.date.match(/^([A-Z]+)(\d+)$/), dAbs="$"+dm[1]+"$"+dm[2], tplWs=scan.wb.Sheets[scan.tpl.name];
+    xml=xml.replace(/(<conditionalFormatting sqref="([^"]*)">[\s\S]*?<\/conditionalFormatting>)/g, function(blk, _a, sq){
+      return blk.replace(/<formula>\$([A-Z]{1,2})\$2<\/formula>/g, function(f, col){ if(col+"2"===L.date || tplWs[col+"2"]) return f; notes.push("조건부 서식 "+sq+"이 $"+col+"$2를 보던 것을 날짜 칸 "+dAbs+"로 바꿈(양식 "+scan.tpl.name+"에서는 이 칸 서식이 걸리지 않았음)"); return "<formula>"+dAbs+"</formula>"; }); });
+    xml=xml.replace(/<sheetView\b([^>]*?)\stabSelected="1"/, "<sheetView$1").replace(/<sheetView\b/, '<sheetView tabSelected="1"');
+    /* 다른 시트 tabSelected 해제 */
+    sheetsX.forEach(function(s){ if(scan.exists && s.name===scan.name) return; var x=Z.get(s.path); if(x && /tabSelected="1"/.test(x)) Z.put(s.path, x.replace(/\stabSelected="1"/,"")); });
+    var ct=Z.get("[Content_Types].xml"), app=Z.get("docProps/app.xml");
+    var newIdx;
+    if(scan.exists){
+      var ex=sheetsX.filter(function(s){ return s.name===scan.name; })[0];
+      var exRels=relsOf(Z.get(relPath(ex.path))||""), tpRels=relsOf(Z.get(relPath(tplS.path))||"");
+      xml=xml.replace(/r:id="([^"]+)"/g, function(_, id){ var t=tpRels.filter(function(x){ return x.id===id; })[0]; var e=t?exRels.filter(function(x){ return x.type===t.type; })[0]:null; return e?'r:id="'+e.id+'"':'r:id="'+id+'"'; });
+      if(tplS.path!==ex.path){ tpRels.forEach(function(t){ if(!exRels.some(function(e){ return e.type===t.type; })){ var re=t.type==="vmlDrawing"?/<legacyDrawing [^>]*\/>/:t.type==="printerSettings"?/\sr:id="[^"]*"(?=[^>]*\/>)/:null; if(re) xml=xml.replace(re,""); } }); }
+      Z.put(ex.path, xml); newIdx=sheetsX.indexOf(ex);
+    } else {
+      var maxN=function(re){ var n=0; Z.list().forEach(function(p){ var m=p.match(re); if(m) n=Math.max(n,+m[1]); }); return n; };
+      var sn=maxN(/^xl\/worksheets\/sheet(\d+)\.xml$/)+1, path="xl/worksheets/sheet"+sn+".xml";
+      var tr=Z.get(relPath(tplS.path));
+      if(tr){
+        var nr=tr;
+        relsOf(tr).forEach(function(t){
+          var src=resolveT(tplS.path, t.target), dst=null;
+          if(t.type==="comments"){ var k=maxN(/^xl\/comments(\d+)\.xml$/)+1; dst="xl/comments"+k+".xml"; Z.put(dst, Z.get(src)); ct=ct.replace("</Types>",'<Override PartName="/'+dst+'" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"/></Types>'); }
+          else if(t.type==="vmlDrawing"){ var k2=maxN(/^xl\/drawings\/vmlDrawing(\d+)\.vml$/)+1; dst="xl/drawings/vmlDrawing"+k2+".vml"; Z.put(dst, renumVml(Z.get(src), Z)); }
+          else if(t.type==="printerSettings"){ var k3=maxN(/^xl\/printerSettings\/printerSettings(\d+)\.bin$/)+1; dst="xl/printerSettings/printerSettings"+k3+".bin"; Z.put(dst, Z.bin(src)); }
+          if(dst) nr=nr.replace('Target="'+t.target+'"', 'Target="'+relTarget(path, dst)+'"');
+        });
+        Z.put(relPath(path), nr);
+      }
+      Z.put(path, xml);
+      ct=ct.replace("</Types>",'<Override PartName="/'+path+'" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+      var maxR=0; R.forEach(function(x){ var m=x.id.match(/^rId(\d+)$/); if(m) maxR=Math.max(maxR,+m[1]); }); var rid="rId"+(maxR+1);
+      wbRels=wbRels.replace("</Relationships>",'<Relationship Id="'+rid+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+sn+'.xml"/></Relationships>');
+      var maxId=Math.max.apply(null, sheetsX.map(function(s){ return s.sheetId; }));
+      wbXml=wbXml.replace("</sheets>",'<sheet name="'+xmlEsc(scan.name)+'" sheetId="'+(maxId+1)+'" r:id="'+rid+'"/></sheets>');
+      newIdx=sheetsX.length;
+      if(app){ var nS=sheetsX.length;
+        app=app.replace(/(<vt:lpstr>워크시트<\/vt:lpstr><\/vt:variant><vt:variant><vt:i4>)(\d+)(<\/vt:i4>)/, function(_,a,n,b){ return a+(+n+1)+b; });
+        app=app.replace(/(<TitlesOfParts><vt:vector size=")(\d+)("[^>]*>)([\s\S]*?)(<\/vt:vector>)/, function(_,a,n,b,body,e){ var parts=body.match(/<vt:lpstr>[\s\S]*?<\/vt:lpstr>/g)||[]; parts.splice(nS,0,"<vt:lpstr>"+xmlEsc(scan.name)+"</vt:lpstr>"); return a+(+n+1)+b+parts.join("")+e; }); }
+    }
+    /* calcChain 삭제 · 열 때 다시 계산 · 활성 탭 */
+    if(Z.has("xl/calcChain.xml")){ Z.del("xl/calcChain.xml"); wbRels=wbRels.replace(/<Relationship [^>]*calcChain[^>]*\/>/,""); ct=ct.replace(/<Override PartName="\/xl\/calcChain.xml"[^>]*\/>/,""); }
+    if(/<calcPr\b/.test(wbXml)) wbXml=wbXml.replace(/<calcPr\b([^>]*?)(\s*\/?>)/, function(_,a,e){ return "<calcPr"+a.replace(/\sfullCalcOnLoad="[^"]*"/,"")+' fullCalcOnLoad="1"'+e; });
+    else wbXml=wbXml.replace("</sheets>",'</sheets><calcPr fullCalcOnLoad="1"/>');
+    wbXml=wbXml.replace(/(<workbookView\b[^>]*?)\sactiveTab="\d+"/, "$1").replace(/<workbookView\b/, '<workbookView activeTab="'+newIdx+'"');
+    Z.put("xl/workbook.xml", wbXml); Z.put("xl/_rels/workbook.xml.rels", wbRels); Z.put("[Content_Types].xml", ct); if(app) Z.put("docProps/app.xml", app);
+    return {bytes:Z.write(), scan:scan, notes:notes, tpl:scan.tpl.name, prev:scan.prev, name:scan.name, replaced:!!scan.exists};
+  }
+  function relPath(p){ var i=p.lastIndexOf("/"); return p.slice(0,i)+"/_rels/"+p.slice(i+1)+".rels"; }
+  function relTarget(from, to){ var a=from.split("/"); a.pop(); var b=to.split("/"), i=0; while(i<a.length && i<b.length-1 && a[i]===b[i]) i++; var up=a.length-i; return new Array(up+1).join("../")+b.slice(i).join("/"); }
+  function renumVml(v, Z){
+    var used=0; Z.list().forEach(function(p){ if(/\.vml$/.test(p)){ var x=Z.get(p)||"", m=x.match(/<o:idmap[^>]*data="([\d,]+)"/); if(m) m[1].split(",").forEach(function(n){ used=Math.max(used,+n); }); } });
+    var id=used+1;
+    v=v.replace(/(<o:idmap[^>]*data=")[\d,]+(")/, "$1"+id+"$2");
+    var k=0; v=v.replace(/(o:spid|id)="_x0000_s(\d+)"/g, function(_, a){ return a+'="_x0000_s'+(id*1024+1+(k++))+'"'; });
+    return v;
+  }
+
+  /* ---------- 3. 계정잔액명세서 (채권잔액) ---------- */
+  var BUCKETS=["45일 이내","46~60日","61~90日","91~180日","181~270日","271~360日","361日초과"], LIMS=[45,60,90,180,270,360];
+  function bucketOf(age){ for(var i=0;i<LIMS.length;i++) if(age<=LIMS[i]) return BUCKETS[i]; return BUCKETS[6]; }
+  var AGING_HEAD=["계정코드","계정명","반제항목코드","반제항목명","회계일자"];
+  function isAgingAoa(a){ return a && a[0] && AGING_HEAD.every(function(h,i){ return txt(a[0][i]).trim()===h; }); }
+  function pdate(v){ if(v==null||v==="") return ""; if(typeof v==="number") return isoOfSerial(v); var m=String(v).trim().match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/); return m?m[1]+"-"+pad(m[2])+"-"+pad(m[3]):""; }
+  function dayDiff(a,b){ return Math.round((Date.UTC(+a.slice(0,4),+a.slice(5,7)-1,+a.slice(8,10))-Date.UTC(+b.slice(0,4),+b.slice(5,7)-1,+b.slice(8,10)))/86400000); }
+  function aging(aoa, baseIso, opt){
+    opt=opt||{}; var H=aoa[0], W=H.length, iE=4, iF=H.indexOf("적요"), iJ=H.indexOf("잔액"), iD=3;
+    if(iJ<0||iF<0) throw new Error("머리글에 적요·잔액 열이 없습니다");
+    var body=[], acct="", partner="", total=null, acctSub={}, partSubBad=[], acctRows={};
+    for(var i=1;i<aoa.length;i++){ var r=(aoa[i]||[]).slice(); while(r.length<W) r.push(null);
+      var d=pdate(r[iE]), b=txt(r[1]).trim(), dn=txt(r[iD]).trim();
+      if(d){ if(b) acct=b; if(dn) partner=dn; body.push({row:r, i:i, d:d, acct:acct, partner:partner, amt:num(r[iJ])}); }
+      else { if(dn==="합계") total=num(r[iJ]); else { var m=b.match(/^(.+?)\s*계$/); if(m) acctSub[m[1]]=num(r[iJ]); } body.push({row:r, i:i, d:"", sub:true}); }
+    }
+    var withD=body.filter(function(x){ return !x.sub; });
+    var s21=withD.slice().sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:a.i-b.i; }).concat(body.filter(function(x){ return x.sub; }));
+    var excl=[]; var s22=s21.filter(function(x){ return !x.sub; });
+    if(opt.fxExclude){ excl=s22.filter(function(x){ return x.d===baseIso && /외화평가/.test(txt(x.row[iF])); }); s22=s22.filter(function(x){ return excl.indexOf(x)<0; }); }
+    var piv={}; BUCKETS.forEach(function(k){ piv[k]=0; });
+    var acc={}, accN={}, future=[], neg=0, lines=[];
+    s22.forEach(function(x){ var age=dayDiff(baseIso, x.d)+1, bk=bucketOf(age); x.age=age; x.bk=bk; piv[bk]+=x.amt; acc[x.acct]=(acc[x.acct]||0)+x.amt; accN[x.acct]=(accN[x.acct]||0)+1; if(age<=0) future.push(x); if(x.amt<0) neg++; });
+    var allAcc={}; withD.forEach(function(x){ allAcc[x.acct]=(allAcc[x.acct]||0)+x.amt; });
+    var sumD=withD.reduce(function(a,x){ return a+x.amt; },0), pivTot=BUCKETS.reduce(function(a,k){ return a+piv[k]; },0);
+    var chk={ totalOk: total!=null && Math.round(total)===Math.round(sumD), total:total, sumD:sumD,
+      acctOk: Object.keys(acctSub).every(function(k){ return Math.round(acctSub[k])===Math.round(allAcc[k]||0); }), acctSub:acctSub, allAcc:allAcc,
+      pivOk: Math.round(pivTot)===Math.round(sumD-excl.reduce(function(a,x){ return a+x.amt; },0)) };
+    return {H:H, s21:s21, s22:s22, excl:{n:excl.length, amt:excl.reduce(function(a,x){ return a+x.amt; },0), rows:excl}, piv:piv, pivTot:pivTot, acct:acc, acctN:accN, future:future, neg:neg, chk:chk, n0:aoa.length-1, iF:iF, iJ:iJ};
+  }
+  /* 작업 엑셀: 1.ROW · 2-1.지우기 · 2-2.지우기 · 2-3.지우기 · 3.일자분류 · 4.최종피벗(SUMPRODUCT 수식 — SUMIF는 '~'를 이스케이프로 읽어 0) */
+  function buildAgingXlsx(EX, aoa, A, baseIso){
+    var wb=new EX.Workbook(); wb.calcProperties={fullCalcOnLoad:true};
+    var put=function(name, rows){ var ws=wb.addWorksheet(name); rows.forEach(function(r){ ws.addRow(r.map(function(v){ return v===""?null:v; })); }); return ws; };
+    put("1.ROW", aoa);
+    put("2-1.지우기", [A.H].concat(A.s21.map(function(x){ return x.row; })));
+    put("2-2.지우기", [A.H].concat(A.s22.map(function(x){ return x.row; })));
+    var s23=[A.H.slice(4)].concat(A.s22.map(function(x){ return x.row.slice(4); }));
+    put("2-3.지우기", s23);
+    var ws=wb.addWorksheet("3.일자분류");
+    var b=baseIso.split("-").map(Number), bd=new Date(Date.UTC(b[0],b[1]-1,b[2]));
+    ws.getCell("A1").value=bd; ws.getCell("A1").numFmt="yyyy-mm-dd"; ws.getCell("B1").value="구분";
+    s23[0].forEach(function(h,j){ ws.getCell(1,3+j).value=h; });
+    A.s22.forEach(function(x, k){ var r=k+2, row=x.row.slice(4), dd=x.d.split("-").map(Number);
+      ws.getCell(r,1).value={formula:"$A$1-C"+r+"+1", result:x.age};
+      ws.getCell(r,2).value={formula:'IF(A'+r+'<=45,"45일 이내",IF(60>=A'+r+',"46~60日",IF(90>=A'+r+',"61~90日",IF(180>=A'+r+',"91~180日",IF(270>=A'+r+',"181~270日",IF(360>=A'+r+',"271~360日","361日초과"))))))', result:x.bk};
+      var c3=ws.getCell(r,3); c3.value=new Date(Date.UTC(dd[0],dd[1]-1,dd[2])); c3.numFmt="yyyy/mm/dd";
+      row.slice(1).forEach(function(v,j){ if(v!=null && v!=="") ws.getCell(r,4+j).value=v; });
+    });
+    var last=A.s22.length+1, p=wb.addWorksheet("4.최종피벗");
+    p.getCell("A3").value="합계 : 잔액"; p.getCell("B3").value="구분";
+    BUCKETS.concat(["총합계"]).forEach(function(k,j){ p.getCell(4,2+j).value=k; });
+    p.getCell("A5").value="요약";
+    BUCKETS.forEach(function(k,j){ var L=colL(1+j); p.getCell(5,2+j).value={formula:"SUMPRODUCT(('3.일자분류'!$B$2:$B$"+last+"="+L+"$4)*'3.일자분류'!$H$2:$H$"+last+")", result:A.piv[k]}; p.getCell(5,2+j).numFmt="#,##0"; });
+    p.getCell("I5").value={formula:"SUM(B5:H5)", result:A.pivTot}; p.getCell("I5").numFmt="#,##0";
+    if(A.excl.n){ p.getCell("A7").value="제외: 기준일("+baseIso+") 외화평가 "+A.excl.n+"줄 · 합 "+A.excl.amt.toLocaleString("ko-KR")+"원 — 원본 합계와 차이"; }
+    p.getColumn(1).width=14; for(var j=2;j<=9;j++) p.getColumn(j).width=16;
+    return wb;
+  }
+
+  root.EXB={CO_ORDER:CO_ORDER, CO_LABEL:CO_LABEL, CO_NAME:CO_NAME, ITEMS:ITEMS, CASH:CASH, MAP_DEFAULT:MAP_DEFAULT, BUCKETS:BUCKETS,
+    lastDay:lastDay, shiftYm:shiftYm, yy:yy, targetCos:targetCos, isoInName:isoInName, coInName:coInName, coByGisu:coByGisu, aoaOf:aoaOf,
+    isBsAoa:isBsAoa, parseBs:parseBs, extract:extract, findAcct:findAcct, buildBaseXlsx:buildBaseXlsx,
+    reportScan:reportScan, layoutOf:layoutOf, buildReport:buildReport, loanTable:loanTable,
+    isAgingAoa:isAgingAoa, aging:aging, buildAgingXlsx:buildAgingXlsx, shiftF:shiftF, serialOf:serialOf};
+})(typeof window!=="undefined"?window:globalThis);
+/* ===================== [v125] 임원보고자료 — 화면 (자금업무 자동화 8번째 카드 · 탭 [대차대조표] · [채권잔액]) =====================
+   상태 EXBS — 원본 파일(대차대조표·보고 파일·계정잔액명세서)은 이 상태(메모리)에만 있고 저장·전송하지 않는다.
+   공용 저장소: app/exec/bsMap(항목 구성, 관리자) · app/exec/bs/<YYYY-MM>(추출 값) · app/exec/aging/<법인>/<YYYY-MM>(구간·계정 합계) */
+var EXEC_TABS={exbs:"대차대조표", exaging:"채권잔액"};
+var EXBS={ym:null, base:null, baseSet:false, bs:{}, bsPend:[], cache:{}, rep:null, scan:null, ext:{}, unit:"won", sel:null,
+         map:null, mapLoaded:false, saved:{}, loanFix:false, made:null, files:[],
+         ag:{}, agPend:[], agRes:{}, fx:true, aUnit:"won", aSel:null, agSaved:{}, aFiles:[]};
+function exbYm(){ if(!EXBS.ym) EXBS.ym=EXB.shiftYm(todayISO().slice(0,7),-1); return EXBS.ym; }
+function exbBase(){ return EXBS.baseSet&&EXBS.base&&EXBS.base.slice(0,7)===exbYm() ? EXBS.base : EXB.lastDay(exbYm()); }
+function exbMap(){ return (EXBS.map&&EXBS.map.map)||EXB.MAP_DEFAULT; }
+function exbWho(){ return (typeof AUTH!=="undefined" && AUTH && AUTH.user && AUTH.user.email)||""; }
+function exbCanSave(){ return !readOnly && typeof ROLE!=="undefined" && !!(ROLE.admin||ROLE.upload); }
+function exbIsAdmin(){ return !readOnly && typeof ROLE!=="undefined" && !!ROLE.admin; }
+function exbCo(c){ try{ return (typeof D!=="undefined" && D && D.companies) ? co(c) : null; }catch(e){ return null; } }
+function exbCoChip(c){ return '<span class="chip co" style="color:var(--c-'+c.toLowerCase()+')" title="'+esc(EXB.CO_NAME[c])+'">'+c+'</span>'; }
+function exbAmt(n, u){ if(n==null||isNaN(n)) return "-"; if(u==="eok") return Math.round(n/1e8).toLocaleString("ko-KR"); if(u==="mil") return Math.round(n/1e6).toLocaleString("ko-KR"); return Math.round(n).toLocaleString("ko-KR"); }
+function exbSetYm(ym){ if(!/^\d{4}-\d{2}$/.test(ym||"")) return; EXBS.ym=ym; if(EXBS.base && EXBS.base.slice(0,7)!==ym){ EXBS.baseSet=false; EXBS.base=null; } EXBS.made=null; exbRecalc(); exbLoadSaved(); }
+/* 파일 판별 · 적재(두 탭 공용) — 종류는 내용으로: YY.MM 시트들 = 보고 파일 · 1행 계정명 = 대차대조표 · 계정잔액명세서 머리글 = 채권잔액 */
+function exbIngest(name, bytes){
+  var wb=XLSX.read(bytes,{type:"array", cellFormula:true}), names=wb.SheetNames;
+  var months=names.filter(function(n){ return /^\d\d\.\d\d$/.test(n); });
+  if(months.length>=2){ EXBS.rep={name:name, bytes:bytes}; EXBS.made=null; return {kind:"report", tab:"exbs", info:"월 시트 "+months.length+"개 ("+months[0]+" ~ "+months[months.length-1]+") — 읽기만, 저장 안 함"}; }
+  var iso=EXB.isoInName(name);
+  var bundle=names.filter(function(n){ return EXB.CO_ORDER.indexOf(n)>=0 && EXB.isBsAoa(EXB.aoaOf(XLSX, wb.Sheets[n])); });
+  if(bundle.length){ if(iso){ EXBS.ym=iso.slice(0,7); }
+    bundle.forEach(function(n){ var ws=wb.Sheets[n], bs=EXB.parseBs(EXB.aoaOf(XLSX, ws), ws); if(!EXBS.bs[n]) EXBS.bs[n]={bs:bs, src:name, by:"묶음 파일 시트 "+n, ym:exbYm()}; if(bs.cache) EXBS.cache[n]={v:bs.cache, src:name}; });
+    return {kind:"bundle", tab:"exbs", co:bundle.join("·"), info:"묶음 파일 · 시트 "+bundle.join("·")+" — 비어 있는 법인만 이 시트로 채우고, K5:K12 값은 대조용"}; }
+  var ws0=wb.Sheets[names[0]], a0=EXB.aoaOf(XLSX, ws0);
+  if(EXB.isBsAoa(a0)){
+    if(iso) EXBS.ym=iso.slice(0,7);
+    var bs=EXB.parseBs(a0, ws0), byName=EXB.coInName(name), byGisu=EXB.coByGisu(bs.gisu), c=byName||byGisu;
+    if(c){ EXBS.bs[c]={bs:bs, src:name, by:byName?"파일 이름":"기수 제 "+bs.gisu+"기", ym:exbYm()}; return {kind:"bs", tab:"exbs", co:c, info:"제 "+bs.gisu+"(당)기 · 법인 근거: "+(byName?"파일 이름":"기수")}; }
+    var pid="p"+Date.now()+Math.random(); EXBS.bsPend.push({id:pid, bs:bs, name:name}); return {kind:"bs", tab:"exbs", co:"", pend:pid, info:"제 "+bs.gisu+"(당)기 · 파일 이름·기수로 법인을 정하지 못했습니다 — 법인을 고르세요"};
+  }
+  for(var i=0;i<names.length;i++){ var a=EXB.aoaOf(XLSX, wb.Sheets[names[i]]);
+    if(EXB.isAgingAoa(a)){
+      if(iso){ EXBS.ym=iso.slice(0,7); EXBS.base=iso; EXBS.baseSet=true; }
+      var c2=EXB.coInName(name);
+      if(c2){ EXBS.ag[c2]={aoa:a, src:name, sheet:names[i]}; return {kind:"aging", tab:"exaging", co:c2, info:"시트 "+names[i]+" · "+(a.length-1)+"줄"}; }
+      var pid2="a"+Date.now()+Math.random(); EXBS.agPend.push({id:pid2, aoa:a, name:name, sheet:names[i]}); return {kind:"aging", tab:"exaging", co:"", pend:pid2, info:"시트 "+names[i]+" · 법인을 고르세요"};
+    } }
+  return {kind:"unknown", bad:true, info:"대차대조표·보고 파일·계정잔액명세서 어느 것도 아닙니다(1행 머리글 확인)"};
+}
+function exbAddFiles(list, from){
+  var arr=Array.from(list||[]); if(!arr.length) return;
+  Promise.all(arr.map(function(f){ return f.arrayBuffer().then(function(b){ var r; try{ r=exbIngest(f.name, new Uint8Array(b)); }catch(e){ r={kind:"unknown", bad:true, info:"읽기 실패: "+(e&&e.message||e)}; } r.name=f.name; return r; }); }))
+    .then(function(rs){ rs.forEach(function(r){ var tab=r.tab||from; (tab==="exaging"?EXBS.aFiles:EXBS.files).push(r);
+        if(r.tab && r.tab!==from) (from==="exaging"?EXBS.aFiles:EXBS.files).push({name:r.name, kind:"route", info:r.tab==="exaging"?"계정잔액명세서 → [채권잔액] 탭에 넣었습니다":(r.kind==="report"?"보고 파일":"대차대조표")+" → [대차대조표] 탭에 넣었습니다(계정 소계 대조에도 씀)"}); });
+      audit("upload", {menu:"fep", target:"exec", detail:rs.map(function(r){ return r.kind; }).join(",")});
+      exbRecalc(); exbLoadSaved(); renderExb(); renderExa(); });
+}
+function exbRecalc(){
+  var ym=exbYm(), cos=EXB.targetCos(ym); EXBS.ext={};
+  cos.forEach(function(c){ if(EXBS.bs[c]) EXBS.ext[c]=EXB.extract(EXBS.bs[c].bs, c, exbMap()); });
+  EXBS.scan=null; if(EXBS.rep){ try{ EXBS.scan=EXB.reportScan(XLSX, EXBS.rep.bytes, ym); }catch(e){ EXBS.scan={errs:["보고 파일을 읽지 못했습니다: "+(e&&e.message||e)], names:[]}; } }
+  EXBS.agRes={}; var base=exbBase();
+  Object.keys(EXBS.ag).forEach(function(c){ try{ EXBS.agRes[c]=EXB.aging(EXBS.ag[c].aoa, base, {fxExclude:EXBS.fx}); }catch(e){ EXBS.agRes[c]={err:String(e&&e.message||e)}; } });
+}
+function exbLoadSaved(){
+  var ym=exbYm();
+  if(!EXBS.mapLoaded){ EXBS.mapLoaded=true; fepDocGet("app/exec/bsMap").then(function(d){ if(d&&d.map){ EXBS.map=d; exbRecalc(); renderExb(); } }).catch(function(){}); }
+  if(!EXBS.saved[ym]){ EXBS.saved[ym]="loading"; fepDocGet("app/exec/bs/"+ym).then(function(d){ EXBS.saved[ym]=d||null; renderExb(); }).catch(function(){ EXBS.saved[ym]=null; }); }
+  ["SN","GU","GD","GS"].forEach(function(c){ [ym, EXB.shiftYm(ym,-1)].forEach(function(m){ var k=c+"/"+m; if(EXBS.agSaved[k]===undefined){ EXBS.agSaved[k]="loading"; fepDocGet("app/exec/aging/"+k).then(function(d){ EXBS.agSaved[k]=d||null; renderExa(); }).catch(function(){ EXBS.agSaved[k]=null; }); } }); });
+}
+/* ---------- 검증 줄 ---------- */
+function exbDashBorrow(c, iso){ var C=exbCo(c); if(!C) return null; return (C.loans||[]).reduce(function(s,l){ var v=loanAt(l, iso); return s+(+v.amount||0); },0); }
+function exbDashCash(c, iso){ try{ var C=exbCo(c); if(!C || !Object.keys(C.days||{}).some(function(d){ return d<=iso; })) return null; var s=daySummary(C, iso); return s&&typeof s.close==="number"?s.close:null; }catch(e){ return null; } }
+function exbCmpRef(c){   // 대조 기준: 보고 파일의 기준월 시트(있으면) → 묶음 파일 K5:K12
+  var S=EXBS.scan;
+  if(S && S.current && S.current[c]) return {src:"보고 파일 "+S.name+" 시트", v:S.current[c]};
+  var K=EXBS.cache[c]; if(K){ var v={보유예금:K.v[5]!=null?K.v[5]:null}; EXB.ITEMS.forEach(function(it,i){ var x=K.v[6+i]; v[it.k]=x==null?null:x*it.sign; }); return {src:"묶음 파일 "+K.src, v:v}; }
+  return null;
+}
+function exbChecks(){
+  var ym=exbYm(), cos=EXB.targetCos(ym), base=exbBase(), out=[];
+  var have=cos.filter(function(c){ return !!EXBS.ext[c]; }), miss=cos.filter(function(c){ return !EXBS.ext[c]; });
+  out.push({ok:!miss.length, t:"대상 법인 파일 "+have.length+"/"+cos.length+(miss.length?" — 없음: "+miss.map(function(c){ return EXB.CO_LABEL[c]; }).join("·"):"")+" · 기준월 "+ym+" (기준일 "+EXB.lastDay(ym)+")"});
+  if(EXBS.bsPend.length) out.push({ok:false, t:"법인을 고르지 않은 대차대조표 "+EXBS.bsPend.length+"개 — 위 파일 줄에서 법인을 고르세요"});
+  var other=have.filter(function(c){ return EXBS.bs[c].ym && EXBS.bs[c].ym!==ym; });
+  if(other.length) out.push({ok:null, t:"대차대조표를 다른 기준월에 올렸습니다: "+other.map(function(c){ return EXB.CO_LABEL[c]+" "+EXBS.bs[c].ym; }).join(" · ")+" — 이 달 파일이면 그대로, 아니면 이 달 대차대조표를 다시 올리세요"});
+  var errs=[], warns=[];
+  have.forEach(function(c){ EXBS.ext[c].err.forEach(function(e){ errs.push(EXB.CO_LABEL[c]+" "+e); }); EXBS.ext[c].warn.forEach(function(e){ warns.push(EXB.CO_LABEL[c]+" "+e); }); });
+  if(have.length) out.push({ok:!errs.length, t:errs.length?"계정 찾기 오류 "+errs.length+"건 — 기준 엑셀·보고 파일 버튼을 막습니다":"계정 찾기 오류 없음", d:errs.join(" · ")});
+  if(warns.length) out.push({ok:null, t:"계정 없음 "+warns.length+"건 — 0으로 계산(법인마다 계정표가 달라 정상일 수 있음)", d:warns.join(" · ")});
+  have.forEach(function(c){ var T=EXBS.ext[c].total; out.push({ok:T.ok, t:EXB.CO_LABEL[c]+" 대차 검산: 자산총계 "+fmt(T.asset)+(T.ok?" = ":" ≠ ")+"부채와자본총계 "+fmt(T.le)}); });
+  have.forEach(function(c){ var bb=(-EXBS.ext[c].차입금)||0, d=exbDashBorrow(c, base); if(d==null) return; out.push({ok:Math.round(bb)===Math.round(d), t:EXB.CO_LABEL[c]+" 차입금: 단기차입금 "+fmt(bb)+(Math.round(bb)===Math.round(d)?" = ":" ≠ ")+"대시보드 차입현황 "+base+" 잔액 "+fmt(d)}); });
+  have.forEach(function(c){ var d=exbDashCash(c, base); if(d==null) return; out.push({ok:null, muted:true, t:EXB.CO_LABEL[c]+" 보유예금 참고: 현금및현금성자산 "+fmt(EXBS.ext[c].보유예금)+" · 대시보드 "+base+" 시재 "+fmt(d)+" (범위가 달라 차이는 오류 아님)"}); });
+  var S=EXBS.scan;
+  if(EXBS.rep && S){
+    if(S.errs && S.errs.length) out.push({ok:false, t:"보고 파일: "+S.errs.join(" · ")});
+    else out.push({ok:true, t:"보고 파일: 양식 "+S.tpl.name+" · 전월 "+S.prev+(S.exists?" · 같은 이름 시트 "+S.name+" 있음 → ‘다시 만들기’를 체크해야 바꿉니다":" · "+S.name+" 새로 만듦")});
+  } else out.push({ok:null, t:"보고 파일을 올리면 기준월 시트를 만들 수 있습니다(지난달 보고 파일)"});
+  have.forEach(function(c){ var R=exbCmpRef(c); if(!R) return; var bad=[]; ["보유예금"].concat(EXB.ITEMS.map(function(it){ return it.k; })).forEach(function(k){ var a=EXBS.ext[c][k], b=R.v[k]; if(b==null) return; if(Math.round(a)!==Math.round(b)) bad.push(k+" "+fmt(b)+" → "+fmt(a)+" (차액 "+fmt(a-b)+")"+(c==="GD"&&k==="매입채무"?" — 이중 합산 수정, 이전 보고 수식과 다름":"")); });
+    out.push({ok:!bad.length?true:(bad.length===1&&c==="GD"&&/이중 합산/.test(bad[0])?null:false), t:EXB.CO_LABEL[c]+" 대조("+R.src+"): "+(bad.length?bad.length+"칸 다름":"8칸 모두 같음"), d:bad.join(" · ")}); });
+  return {list:out, errs:errs};
+}
+/* 차입·여신 한도 표 대조(양식 시트 ↔ 대시보드 금융 › 차입현황 기준일 값) — 줄 = 법인 블록 · 거래처 · 구분, 같은 묶음은 한도→만기 순으로 짝 */
+function exbBankKey(b){ return String(b||"").replace(/\s|은행/g,""); }
+function exbTypeKey(t){ t=String(t||""); return /개별/.test(t)?"개별":/한도|\(-\)|통장|대출/.test(t)?"한도":t; }
+function exbLoanCmp(){
+  var S=EXBS.scan; if(!S || !S.loans || !S.tpl) return null;
+  var base=exbBase(), cos=EXB.targetCos(exbYm()), diffs=[], only=[], miss=[], subs=[];
+  cos.forEach(function(c){ var C=exbCo(c); if(!C) return;
+    var dash=(C.loans||[]).map(function(l){ return {l:l, v:loanAt(l, base)}; }).filter(function(x){ return x.v.active||x.v.amount; }), used=[];
+    S.loans.rows.filter(function(r){ return r.co===c; }).forEach(function(r){
+      var g=dash.filter(function(x){ return used.indexOf(x)<0 && exbBankKey(x.l.bank)===exbBankKey(r.bank) && exbTypeKey(x.l.type)===exbTypeKey(r.type); });
+      var m=g.filter(function(x){ return Math.round(x.v.limit)===Math.round(r.limit||0); })[0]||g.filter(function(x){ return x.l.end===r.end; })[0]||g[0];
+      if(!m){ only.push({c:c, r:r}); return; } used.push(m);
+      var push=function(col, a, b, n, label){ diffs.push({c:c, r:r.r, col:col, ref:col+r.r, sheet:a, dash:b, n:n, label:label, bank:r.bank, type:r.type}); };
+      if(r.rate!=null && Math.abs(r.rate-m.v.rate)>1e-7) push("F", (r.rate*100).toFixed(3)+"%", (m.v.rate*100).toFixed(3)+"%", m.v.rate, "금리");
+      if(r.end && m.l.end && r.end!==m.l.end) push("I", r.end, m.l.end, EXB.serialOf(m.l.end), "만기");
+      if(r.limit!=null && Math.round(r.limit)!==Math.round(m.v.limit)) push("L", fmt(r.limit), fmt(m.v.limit), Math.round(m.v.limit), "한도");
+      if(!r.mF && Math.round(r.amount||0)!==Math.round(m.v.amount||0)) push("M", fmt(r.amount||0), fmt(m.v.amount), Math.round(m.v.amount||0), "차입액");
+    });
+    dash.forEach(function(x){ if(used.indexOf(x)<0) miss.push({c:c, x:x}); });
+    var sub=S.loans.subs.filter(function(s){ return s.co===c; })[0], tot=dash.reduce(function(s,x){ return s+(+x.v.amount||0); },0);
+    if(sub && sub.o!=null) subs.push({c:c, r:sub.r, o:sub.o, dash:tot, ok:Math.round(sub.o)===Math.round(tot)});
+  });
+  return {diffs:diffs, only:only, miss:miss, subs:subs};
+}
+/* ---------- [대차대조표] 그리기 ---------- */
+function renderExb(){
+  if(!$("#xbDrop")) return;
+  var ym=exbYm(), cos=EXB.targetCos(ym), base=EXB.lastDay(ym), u=EXBS.unit;
+  $$(".exYm").forEach(function(el){ if(document.activeElement!==el) el.value=ym; });
+  $$(".exBaseTxt").forEach(function(el){ el.textContent="기준일 "+base+(ym<="2026-09"?" · 4사":" · 3사(굿어스 2026-10-20 소멸)"); });
+  $("#xbCos").innerHTML=cos.map(function(c){ var x=EXBS.bs[c]; return '<span class="chip co'+(x?"":" off")+'" style="color:var(--c-'+c.toLowerCase()+')" title="'+esc(EXB.CO_NAME[c]+(x?" · "+x.src+" ("+x.by+")":" · 파일 없음"))+'">'+c+(x?" ✓":"")+'</span>'; }).join("");
+  $("#xbFiles").innerHTML=EXBS.files.map(function(f){ var lab={report:"보고 파일",bundle:"묶음 대차대조표",bs:"대차대조표",aging:"계정잔액명세서",route:"다른 탭",unknown:"알 수 없음"}[f.kind]||f.kind;
+    var pend=f.pend && EXBS.bsPend.some(function(p){ return p.id===f.pend; });
+    return '<div class="filerow"'+(f.bad?' style="border-color:var(--out);color:var(--out)"':'')+'><span>'+esc(f.name)+'</span><span class="chip '+(f.bad?"out":f.kind==="route"?"nv":"in")+'">'+esc(lab)+'</span>'+(f.co?exbCoChip(f.co.split("·")[0])+(f.co.indexOf("·")>0?'<span class="mini">'+esc(f.co)+'</span>':''):'')+
+      '<span class="mini">'+esc(f.info||"")+'</span>'+(pend?'<span class="exb-pick" data-pend="'+esc(f.pend)+'">'+cos.map(function(c){ return '<button type="button" data-co="'+c+'">'+c+'</button>'; }).join("")+'</span>':'')+'</div>'; }).join("");
+  $$("#xbFiles .exb-pick button").forEach(function(b){ b.onclick=function(){ var id=b.parentNode.dataset.pend, p=EXBS.bsPend.filter(function(x){ return x.id===id; })[0]; if(!p) return; var c=b.dataset.co;
+    EXBS.bs[c]={bs:p.bs, src:p.name, by:"직접 선택", ym:exbYm()}; EXBS.bsPend=EXBS.bsPend.filter(function(x){ return x!==p; }); EXBS.files.forEach(function(f){ if(f.pend===id){ f.co=c; f.info=f.info.replace(/ · 파일 이름.*$/," · 법인 직접 선택"); } }); exbRecalc(); renderExb(); }; });
+  var CK=exbChecks();
+  $("#xbChecks").innerHTML=CK.list.map(function(c){ return '<div class="exb-check'+(c.muted?" muted":"")+'"><span class="chip '+(c.ok===true?"in":c.ok===false?"out":"nv")+'">'+(c.ok===true?"✓":c.ok===false?"✗":"⚠")+'</span><span>'+esc(c.t)+'</span>'+(c.d?'<span class="mini">'+esc(c.d)+'</span>':'')+'</div>'; }).join("");
+  /* 추출 표 */
+  var sv=EXBS.saved[ym]&&EXBS.saved[ym]!=="loading"?EXBS.saved[ym]:null;
+  var rowsDef=[{k:"보유예금"}].concat(EXB.ITEMS).concat([{k:"nonCash", t:"비현금성 자산", sum:true},{k:"avail", t:"가용자금", sum:true}]);
+  var anyExt=cos.some(function(c){ return EXBS.ext[c]; });
+  var h='<thead><tr><th>항목</th><th class="ctr">부호</th>'+cos.map(function(c){ return '<th class="num">'+EXB.CO_LABEL[c]+'</th>'; }).join("")+'</tr></thead><tbody>';
+  rowsDef.forEach(function(rd){
+    h+='<tr'+(rd.sum?' class="exb-sum"':'')+'><td>'+esc(rd.t||rd.k)+'</td><td class="ctr">'+(rd.sign?(rd.sign>0?"+":"−"):"")+'</td>';
+    cos.forEach(function(c){ var e=EXBS.ext[c], v=e?e[rd.k]:(sv&&sv.cos&&sv.cos[c]?(rd.k==="nonCash"||rd.k==="avail"?null:sv.cos[c][rd.k]):null);
+      if(!e && sv&&sv.cos&&sv.cos[c] && (rd.k==="nonCash"||rd.k==="avail")){ var sc=sv.cos[c], nc=EXB.ITEMS.reduce(function(a,it){ return a+(+sc[it.k]||0); },0); v=rd.k==="nonCash"?nc:nc+(+sc.보유예금||0); }
+      var R=e?exbCmpRef(c):null, rv=R&&R.v[rd.k], bad=e&&rv!=null&&Math.round(rv)!==Math.round(v);
+      var cls="num"+(e&&!rd.sum?" exb-cell":"")+(!e&&v!=null?" exb-old":"")+(bad?" exb-bad":"")+(EXBS.sel&&EXBS.sel.c===c&&EXBS.sel.k===rd.k?" exb-sel":"");
+      h+='<td class="'+cls+'" data-c="'+c+'" data-k="'+esc(rd.k)+'" title="'+esc(v!=null?fmt(v)+"원":"")+(bad?esc(" · 대조값 "+fmt(rv)+(c==="GD"&&rd.k==="매입채무"?" — 이중 합산 수정(이전 보고 수식과 다름)":"")):"")+(!e&&v!=null?" · 지난 저장값":"")+'">'+(v==null?"-":exbAmt(v,u))+(bad&&c==="GD"&&rd.k==="매입채무"?'<span class="exb-sub">이중 합산 수정</span>':'')+'</td>'; });
+    h+='</tr>'; });
+  h+='</tbody>';
+  $("#xbTbl").innerHTML=h;
+  $$("#xbTbl td.exb-cell").forEach(function(td){ td.onclick=function(){ EXBS.sel={c:td.dataset.c, k:td.dataset.k}; renderExb(); }; });
+  $$("#xbUnit button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.u===u)); });
+  var srcH="";
+  if(EXBS.sel && EXBS.ext[EXBS.sel.c] && EXBS.ext[EXBS.sel.c].src[EXBS.sel.k]){ var c=EXBS.sel.c, L=EXBS.ext[c].src[EXBS.sel.k];
+    srcH='<div class="mini" style="margin-bottom:6px"><b>'+esc(EXB.CO_LABEL[c]+" · "+EXBS.sel.k)+'</b> 구성 계정 — 원본 '+esc(EXBS.bs[c].src)+'</div><div class="scroll"><table class="tbl card-tbl exb-tbl"><thead><tr><th>계정명</th><th class="ctr">엑셀 행</th><th class="ctr">열</th><th class="num">금액</th></tr></thead><tbody>'+
+      (L.length?L.map(function(s){ return '<tr><td>'+esc(s.acct)+'</td><td class="ctr">'+s.r+'</td><td class="ctr">'+s.col+'</td><td class="num">'+fmt(s.amt)+'</td></tr>'; }).join(""):'<tr><td colspan="4" class="mini">찾은 계정 없음 — 0</td></tr>')+'</tbody></table></div>'; }
+  else if(!anyExt) srcH='<div class="mini">대차대조표를 올리면 법인별 항목 값이 나옵니다.'+(sv?' 회색 = '+esc(ym)+' 지난 저장값('+esc((sv.at||"").slice(0,10))+(sv.by?" · "+esc(sv.by):"")+').':'')+'</div>';
+  $("#xbSrc").innerHTML=srcH;
+  renderExbMap();
+  /* 버튼 상태 */
+  var ready=cos.every(function(c){ return EXBS.ext[c]; }) && !CK.errs.length && !EXBS.bsPend.length;
+  $("#btnXbBase").disabled=!ready; $("#xbBaseNote").textContent=ready?"대차대조표_"+base+"기준.xlsx":"대상 법인 파일을 모두 올리고 계정 찾기 오류가 없어야 합니다";
+  $("#btnXbSave").disabled=!(ready && exbCanSave()); $("#xbSaveNote").textContent=!exbCanSave()?"보기 전용 — 저장할 수 없습니다":(sv?"지난 저장 "+(sv.at||"").slice(0,16).replace("T"," "):"app/exec/bs/"+ym+" · 추출 값만");
+  var S=EXBS.scan, repOk=ready && S && !(S.errs&&S.errs.length);
+  $("#xbReLbl").hidden=!(S && S.exists);
+  $("#btnXbRep").disabled=!(repOk && (!S.exists || $("#xbRe").checked));
+  $("#btnXbRep").textContent=S&&S.name?(S.exists?"보고 파일의 "+S.name+" 시트 다시 만들기 → 받기":"보고 파일에 "+S.name+" 시트 만들기 → 받기"):"보고 파일에 시트 만들기 → 받기";
+  $("#btnXbCopyAvail").disabled=!ready; $("#btnXbCopyCash").disabled=!ready;
+  $("#xbRepNote").innerHTML=EXBS.made?'<div class="banner good">'+esc(EXBS.made.file)+' — '+esc(EXBS.made.name)+' 시트'+(EXBS.made.replaced?" 다시 만듦":" 추가")+'(양식 '+esc(EXBS.made.tpl)+' · 전월 '+esc(EXBS.made.prev)+'). Excel에서 열면 다시 계산됩니다. 저장 후 다음 달 작업 때 이 파일을 올려 주세요.'+(EXBS.made.notes.length?'<br>'+EXBS.made.notes.map(esc).join("<br>"):'')+'</div>':
+    (EXBS.rep?'<span>'+esc(EXBS.rep.name)+'</span>':'지난달 3사 보고 파일(.xlsx)을 1번에 올려 주세요. 읽기만 하고 저장하지 않습니다.');
+  /* 차입·여신 표 대조 */
+  var LC=exbLoanCmp(), lh="";
+  if(LC){
+    var n=LC.diffs.length+LC.only.length+LC.miss.length+LC.subs.filter(function(s){ return !s.ok; }).length;
+    lh+='<div class="exb-check"><span class="chip '+(n?"out":"in")+'">'+(n?"⚠ "+n+"건":"✓")+'</span><span>차입·여신 한도 표(양식 '+esc(S.tpl.name)+' 25행 아래) ↔ 대시보드 금융 › 차입현황 '+esc(exbBase())+' — 표는 양식 값 그대로 복제하고 대조만 합니다</span></div>';
+    if(LC.diffs.length) lh+='<div class="scroll"><table class="tbl card-tbl exb-tbl"><thead><tr><th>법인</th><th>줄</th><th>거래처 · 구분</th><th>칸</th><th class="num">시트 값</th><th class="num">대시보드 값</th></tr></thead><tbody>'+LC.diffs.map(function(d){ return '<tr><td>'+exbCoChip(d.c)+'</td><td class="ctr">'+d.r+'</td><td>'+esc(d.bank+" "+d.type)+'</td><td>'+esc(d.label+" ("+d.ref+")")+'</td><td class="num">'+esc(d.sheet)+'</td><td class="num">'+esc(d.dash)+'</td></tr>'; }).join("")+'</tbody></table></div>';
+    LC.only.forEach(function(o){ lh+='<div class="exb-check"><span class="chip nv">시트에만</span><span>'+exbCoChip(o.c)+' '+o.r.r+'행 '+esc(o.r.bank+" "+o.r.type)+' — 대시보드에 '+esc(exbBase())+' 기준 같은 대출이 없습니다(엑셀에서 직접 행 삭제·수정)</span></div>'; });
+    LC.miss.forEach(function(o){ lh+='<div class="exb-check"><span class="chip nv">대시보드에만</span><span>'+exbCoChip(o.c)+' '+esc(o.x.l.bank+" "+o.x.l.type)+' 한도 '+fmt(o.x.v.limit)+' · 차입 '+fmt(o.x.v.amount)+' — 시트에 줄이 없습니다(엑셀에서 직접 행 추가)</span></div>'; });
+    LC.subs.forEach(function(s){ lh+='<div class="exb-check"><span class="chip '+(s.ok?"in":"out")+'">'+(s.ok?"✓":"✗")+'</span><span>'+exbCoChip(s.c)+' O'+s.r+' 자금현황보고 확인값 '+fmt(s.o)+(s.ok?" = ":" ≠ ")+'대시보드 차입 잔액 '+fmt(s.dash)+'</span></div>'; });
+    if(LC.diffs.length) lh+='<div class="exb-acts" style="margin-top:6px"><label class="mini"><input type="checkbox" id="xbLoanFix"'+(EXBS.loanFix?" checked":"")+(exbIsAdmin()?"":" disabled")+'> 새 시트에서 위 '+LC.diffs.length+'칸을 대시보드 값으로 고치기'+(exbIsAdmin()?"":" (관리자만)")+'</label></div>';
+  }
+  $("#xbLoans").innerHTML=lh;
+  if($("#xbLoanFix")) $("#xbLoanFix").onchange=function(){ EXBS.loanFix=this.checked && exbIsAdmin(); };
+  var on={1:anyExt, 2:ready, 3:!!EXBS.baseDone, 4:!!EXBS.made}, cur=[1,2,3,4].filter(function(n){ return !on[n]; })[0]||5;
+  $$("#xbSteps li").forEach(function(li){ var n=+li.dataset.s; li.className=on[n]?"on":n===cur?"cur":""; });
+}
+function renderExbMap(){
+  var pad=$("#xbMapPad"); if(!pad) return;
+  var M=exbMap(), adm=exbIsAdmin(), cos=EXB.targetCos(exbYm());
+  pad.innerHTML='<div class="mini" style="margin-bottom:6px">'+(EXBS.map?"저장된 구성 v"+(EXBS.map.v||1)+" · "+esc((EXBS.map.at||"").slice(0,10))+(EXBS.map.by?" · "+esc(EXBS.map.by):""):"기본 구성(사용자 기준 엑셀 I~M열 수식을 계정명으로 옮긴 것 · GD 매입채무는 이중 합산 수정)")+(adm?' · 관리자: × 로 빼고, 칸에 계정명을 쓰고 Enter로 더합니다':'')+'</div><div class="exb-map">'+
+    cos.map(function(c){ return '<div class="exb-mapco">'+exbCoChip(c)+' <b>'+esc(EXB.CO_NAME[c])+'</b>'+EXB.ITEMS.map(function(it){ var L=(M[c]&&M[c][it.k])||[];
+      return '<div class="exb-mapit"><b>'+esc(it.k)+' ('+(it.sign>0?"+":"−")+')</b>'+L.map(function(a,i){ return '<span class="exb-tag">'+esc(a)+(adm?'<button type="button" data-c="'+c+'" data-k="'+esc(it.k)+'" data-i="'+i+'" aria-label="빼기">×</button>':'')+'</span>'; }).join("")+(adm?'<input data-c="'+c+'" data-k="'+esc(it.k)+'" placeholder="계정명 추가">':'')+'</div>'; }).join("")+'</div>'; }).join("")+'</div>'+
+    (adm&&EXBS.map?'<div style="margin-top:8px"><button class="btn sm" id="btnXbMapReset" type="button">기본 구성으로 되돌리기</button></div>':'');
+  var save=function(nm){ nm.v=((EXBS.map&&EXBS.map.v)||0)+1; nm.at=new Date().toISOString(); nm.by=exbWho();
+    fepDocSet("app/exec/bsMap", nm).then(function(){ EXBS.map=nm; exbRecalc(); renderExb(); toast("항목 구성 저장됨"); audit("edit", {menu:"fep", target:"exec/bsMap", detail:"v"+nm.v}); }).catch(function(e){ toast("저장 실패: "+(e&&e.message||e)); }); };
+  var clone=function(){ return JSON.parse(JSON.stringify({map:exbMap()})); };
+  $$("#xbMapPad .exb-tag button").forEach(function(b){ b.onclick=function(){ var nm=clone(); nm.map[b.dataset.c]=nm.map[b.dataset.c]||{}; (nm.map[b.dataset.c][b.dataset.k]||[]).splice(+b.dataset.i,1); save(nm); }; });
+  $$("#xbMapPad input").forEach(function(inp){ inp.onkeydown=function(e){ if(e.key!=="Enter") return; var v=inp.value.trim(); if(!v) return; var nm=clone(); var o=nm.map[inp.dataset.c]=nm.map[inp.dataset.c]||{}; o[inp.dataset.k]=o[inp.dataset.k]||[]; if(o[inp.dataset.k].indexOf(v)<0) o[inp.dataset.k].push(v); save(nm); }; });
+  if($("#btnXbMapReset")) $("#btnXbMapReset").onclick=function(){ save({map:JSON.parse(JSON.stringify(EXB.MAP_DEFAULT))}); };
+}
+function exbCopy(kind){
+  var cos=EXB.targetCos(exbYm()), t;
+  if(kind==="cash") t=cos.map(function(c){ return Math.round(EXBS.ext[c].보유예금); }).join("\t");
+  else t=EXB.ITEMS.map(function(it){ return cos.map(function(c){ return Math.round(EXBS.ext[c][it.k]); }).join("\t"); }).join("\n");
+  (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject()).then(function(){ toast((kind==="cash"?"보유예금":"가용자금")+" 칸 값을 복사했습니다 — 엑셀 "+(kind==="cash"?"5행":"14~20행")+" 원 칸에 붙여넣기"); audit("export", {menu:"fep", target:"exec/copy", detail:kind}); },
+    function(){ toast("복사하지 못했습니다(브라우저 권한)"); });
+}
+/* ---------- [채권잔액] 그리기 ---------- */
+function renderExa(){
+  if(!$("#xbaDrop")) return;
+  var ym=exbYm(), base=exbBase(), u=EXBS.aUnit, B=EXB.BUCKETS, cos=EXB.CO_ORDER.filter(function(c){ return EXBS.agRes[c]; });
+  $$(".exYm").forEach(function(el){ if(document.activeElement!==el) el.value=ym; });
+  if(document.activeElement!==$("#xbaBase")) $("#xbaBase").value=base;
+  $("#xbaFx").checked=EXBS.fx;
+  $("#xbaFiles").innerHTML=EXBS.aFiles.map(function(f){ var lab={aging:"계정잔액명세서",route:"다른 탭",unknown:"알 수 없음",report:"보고 파일",bs:"대차대조표",bundle:"묶음 대차대조표"}[f.kind]||f.kind;
+    var pend=f.pend && EXBS.agPend.some(function(p){ return p.id===f.pend; });
+    return '<div class="filerow"'+(f.bad?' style="border-color:var(--out);color:var(--out)"':'')+'><span>'+esc(f.name)+'</span><span class="chip '+(f.bad?"out":f.kind==="route"?"nv":"in")+'">'+esc(lab)+'</span>'+(f.co&&f.kind==="aging"?exbCoChip(f.co):'')+'<span class="mini">'+esc(f.info||"")+'</span>'+
+      (pend?'<span class="exb-pick" data-pend="'+esc(f.pend)+'">'+EXB.targetCos(ym).map(function(c){ return '<button type="button" data-co="'+c+'">'+c+'</button>'; }).join("")+'</span>':'')+'</div>'; }).join("");
+  $$("#xbaFiles .exb-pick button").forEach(function(b){ b.onclick=function(){ var id=b.parentNode.dataset.pend, p=EXBS.agPend.filter(function(x){ return x.id===id; })[0]; if(!p) return; var c=b.dataset.co;
+    EXBS.ag[c]={aoa:p.aoa, src:p.name, sheet:p.sheet}; EXBS.agPend=EXBS.agPend.filter(function(x){ return x!==p; }); EXBS.aFiles.forEach(function(f){ if(f.pend===id){ f.co=c; f.info=f.info.replace(" · 법인을 고르세요"," · 법인 직접 선택"); } }); exbRecalc(); renderExa(); }; });
+  /* 검증 줄 */
+  var ck=[];
+  if(EXBS.agPend.length) ck.push({ok:false, t:"법인을 고르지 않은 계정잔액명세서 "+EXBS.agPend.length+"개"});
+  cos.forEach(function(c){ var A=EXBS.agRes[c], L=EXB.CO_LABEL[c];
+    if(A.err){ ck.push({ok:false, t:L+": "+A.err}); return; }
+    ck.push({ok:A.chk.totalOk, t:L+" 원본 ‘합계’ 줄 "+fmt(A.chk.total)+(A.chk.totalOk?" = ":" ≠ ")+"회계일자 있는 줄 합 "+fmt(A.chk.sumD)});
+    ck.push({ok:A.chk.acctOk, t:L+" 계정 ‘계’ 줄 = 그 계정 줄 합: "+Object.keys(A.chk.acctSub).map(function(k){ return k+" "+fmt(A.chk.acctSub[k])+(Math.round(A.chk.acctSub[k])===Math.round(A.chk.allAcc[k]||0)?" ✓":" ≠ "+fmt(A.chk.allAcc[k]||0)); }).join(" · ")});
+    ck.push({ok:A.chk.pivOk, t:L+" 피벗 총합계 "+fmt(A.pivTot)+(A.excl.n?" = 원본 합계 "+fmt(A.chk.sumD)+" − 기준일 외화평가 "+A.excl.n+"줄 "+fmt(A.excl.amt):" = 원본 합계")});
+    if(A.future.length) ck.push({ok:null, t:L+" 회계일자가 기준일("+base+") 뒤인 줄 "+A.future.length+"개 — 경과일수 ≤ 0이라 ‘45일 이내’로 들어감(기준일 확인)"});
+    var X=EXBS.ext[c]; if(X && EXBS.bs[c] && (!EXBS.bs[c].ym || EXBS.bs[c].ym===ym)){ var bs=EXBS.bs[c].bs, bad=[], parts=[];
+      Object.keys(A.chk.allAcc).forEach(function(k){ var f=EXB.findAcct(bs, k); if(!f.row) { bad.push(k+" 대차대조표에 없음"); return; } var ok=Math.round(f.row.amt)===Math.round(A.chk.allAcc[k]); parts.push(k+" "+fmt(A.chk.allAcc[k])+(ok?" = ":" ≠ ")+fmt(f.row.amt)); if(!ok) bad.push(k); });
+      ck.push({ok:!bad.length, t:L+" 대차대조표 대조("+EXBS.bs[c].src+"): "+parts.join(" · ")+(bad.length?" — "+bad.join(", "):"")}); }
+    else ck.push({ok:null, muted:true, t:L+" 대차대조표 대조: [대차대조표] 탭에 같은 법인·기준월 대차대조표를 올리면 계정 소계를 대조합니다"});
+    ck.push({ok:null, muted:true, t:L+" 음수 잔액 줄 "+A.neg+"개 (정보)"});
+  });
+  if(!cos.length && !EXBS.agPend.length) ck.push({ok:null, t:"계정잔액명세서를 올려 주세요. 기준일 = 기준월 말일("+EXB.lastDay(ym)+"), 파일 이름에 YYYY-MM-DD가 있으면 그 날짜."});
+  $("#xbaChecks").innerHTML=ck.map(function(c){ return '<div class="exb-check'+(c.muted?" muted":"")+'"><span class="chip '+(c.ok===true?"in":c.ok===false?"out":"nv")+'">'+(c.ok===true?"✓":c.ok===false?"✗":"⚠")+'</span><span>'+esc(c.t)+'</span></div>'; }).join("");
+  /* 구간 표 */
+  var ok=cos.filter(function(c){ return !EXBS.agRes[c].err; });
+  var COLORS=["var(--c-gd)","#5B8DEF","#8E7CC3","#F5A623","#E8833A","#D9534F","#8B1E1E"];
+  var h='<thead><tr><th>법인</th>'+B.map(function(k){ return '<th class="num">'+esc(k)+'</th>'; }).join("")+'<th class="num">총합계</th><th>구간 비중</th></tr></thead><tbody>', T={}; B.forEach(function(k){ T[k]=0; });
+  ok.forEach(function(c){ var A=EXBS.agRes[c], prv=EXBS.agSaved[c+"/"+EXB.shiftYm(ym,-1)];
+    h+='<tr><td>'+exbCoChip(c)+'</td>'+B.map(function(k){ T[k]+=A.piv[k]; return '<td class="num exb-cell'+(EXBS.aSel&&EXBS.aSel.c===c&&EXBS.aSel.k===k?" exb-sel":"")+'" data-c="'+c+'" data-k="'+esc(k)+'" title="'+fmt(A.piv[k])+'원">'+exbAmt(A.piv[k],u)+'</td>'; }).join("")+
+      '<td class="num"><b>'+exbAmt(A.pivTot,u)+'</b></td><td><div class="exb-bar">'+B.map(function(k,i){ var w=A.pivTot>0?Math.max(0,A.piv[k])/A.pivTot*100:0; return '<span style="width:'+w.toFixed(2)+'%;background:'+COLORS[i]+'" title="'+esc(k)+' '+w.toFixed(1)+'%"></span>'; }).join("")+'</div></td></tr>';
+    if(prv && prv!=="loading" && prv.piv) h+='<tr class="exb-sub"><td class="mini">전월 대비</td>'+B.map(function(k){ var d=A.piv[k]-(+prv.piv[k]||0); return '<td class="num mini">'+(d>0?"+":"")+exbAmt(d,u)+'</td>'; }).join("")+'<td class="num mini">'+(function(){ var d=A.pivTot-B.reduce(function(a,k){ return a+(+prv.piv[k]||0); },0); return (d>0?"+":"")+exbAmt(d,u); })()+'</td><td class="mini">'+esc(EXB.shiftYm(ym,-1))+' 저장값</td></tr>';
+  });
+  var tt=B.reduce(function(a,k){ return a+T[k]; },0);
+  if(ok.length>1) h+='<tr class="exb-sum"><td>합계</td>'+B.map(function(k){ return '<td class="num">'+exbAmt(T[k],u)+'</td>'; }).join("")+'<td class="num">'+exbAmt(tt,u)+'</td><td></td></tr>';
+  if(!ok.length){ var svs=EXB.targetCos(ym).map(function(c){ var s=EXBS.agSaved[c+"/"+ym]; return s&&s!=="loading"&&s.piv?{c:c, s:s}:null; }).filter(Boolean);
+    h+=svs.length?svs.map(function(x){ return '<tr><td>'+exbCoChip(x.c)+'</td>'+B.map(function(k){ return '<td class="num exb-old">'+exbAmt(+x.s.piv[k]||0,u)+'</td>'; }).join("")+'<td class="num exb-old">'+exbAmt(B.reduce(function(a,k){ return a+(+x.s.piv[k]||0); },0),u)+'</td><td class="mini">'+esc(ym)+' 지난 저장값</td></tr>'; }).join(""):'<tr><td colspan="10" class="mini" style="padding:16px">계정잔액명세서를 올리면 경과일수 구간별 잔액이 나옵니다.</td></tr>'; }
+  h+='</tbody>'; $("#xbaTbl").innerHTML=h;
+  $$("#xbaTbl td.exb-cell").forEach(function(td){ td.onclick=function(){ EXBS.aSel=(EXBS.aSel&&EXBS.aSel.c===td.dataset.c&&EXBS.aSel.k===td.dataset.k)?null:{c:td.dataset.c, k:td.dataset.k}; renderExa(); }; });
+  $$("#xbaUnit button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.u===u)); });
+  $("#xbaAcct").innerHTML=ok.map(function(c){ var A=EXBS.agRes[c]; return '<div class="mini">'+exbCoChip(c)+' 계정별 · '+Object.keys(A.acct).map(function(k){ return esc(k)+' '+fmt(A.acct[k])+'('+A.acctN[k]+'줄)'; }).join(" · ")+' · 원본 '+A.n0+'줄 → '+A.s22.length+'줄'+(A.excl.n?' · 제외: 기준일 외화평가 '+A.excl.n+'줄 · 합 '+fmt(A.excl.amt)+'원 — 원본 합계와 차이':'')+'</div>'; }).join("");
+  var lh="";
+  if(EXBS.aSel && EXBS.agRes[EXBS.aSel.c] && !EXBS.agRes[EXBS.aSel.c].err){ var A2=EXBS.agRes[EXBS.aSel.c], iF=A2.iF, rows=A2.s22.filter(function(x){ return x.bk===EXBS.aSel.k; }).sort(function(a,b){ return b.amt-a.amt; });
+    lh='<thead><tr><th colspan="6">'+esc(EXB.CO_LABEL[EXBS.aSel.c]+" · "+EXBS.aSel.k+" · "+rows.length+"줄")+'</th></tr><tr><th>회계일자</th><th class="num">경과일수</th><th>거래처명</th><th>적요</th><th>계정</th><th class="num">잔액</th></tr></thead><tbody>'+
+      rows.slice(0,300).map(function(x){ return '<tr><td>'+esc(x.d)+'</td><td class="num">'+x.age+'</td><td>'+esc(x.partner)+'</td><td>'+esc(String(x.row[iF]||"").slice(0,60))+'</td><td>'+esc(x.acct)+'</td><td class="num">'+fmt(x.amt)+'</td></tr>'; }).join("")+(rows.length>300?'<tr><td colspan="6" class="mini">… 300줄까지 표시</td></tr>':'')+'</tbody>'; }
+  $("#xbaList").innerHTML=lh;
+  /* 버튼 */
+  var acts=ok.map(function(c){ var sv=EXBS.agSaved[c+"/"+ym]; return '<div class="exb-check" style="flex-wrap:wrap">'+exbCoChip(c)+'<button class="btn sm" type="button" data-copy="'+c+'">피벗 값 복사</button><button class="btn sm primary" type="button" data-xlsx="'+c+'">작업 엑셀 받기</button><button class="btn sm" type="button" data-save="'+c+'"'+(exbCanSave()?"":" disabled")+'>저장</button><span class="mini">'+(exbCanSave()?(sv&&sv!=="loading"?"지난 저장 "+esc((sv.at||"").slice(0,16).replace("T"," ")):"app/exec/aging/"+c+"/"+ym+" · 구간·계정 합계만"):"보기 전용 — 저장할 수 없습니다")+'</span></div>'; }).join("");
+  $("#xbaActs").innerHTML=acts||'<span class="mini">계정잔액명세서를 올리면 작업 엑셀을 받을 수 있습니다.</span>';
+  $$("#xbaActs [data-copy]").forEach(function(b){ b.onclick=function(){ var A=EXBS.agRes[b.dataset.copy]; var t=B.map(function(k){ return Math.round(A.piv[k]); }).concat([Math.round(A.pivTot)]).join("\t");
+    (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject()).then(function(){ toast("피벗 값 8칸(B5:I5) 복사"); audit("export", {menu:"fep", target:"exec/aging-copy", co:b.dataset.copy}); }, function(){ toast("복사하지 못했습니다(브라우저 권한)"); }); }; });
+  $$("#xbaActs [data-xlsx]").forEach(function(b){ b.onclick=function(){ var c=b.dataset.xlsx, A=EXBS.agRes[c], name=c+"_계정잔액명세서_"+base+"기준.xlsx"; b.disabled=true;
+    loadExcelJS().then(function(EX){ return EXB.buildAgingXlsx(EX, EXBS.ag[c].aoa, A, base).xlsx.writeBuffer(); }).then(function(buf){ EXBS.aDone=true; audit("export", {menu:"fep", target:"exec/aging-xlsx", co:c, detail:name}); return offerDownload(name, buf); })
+      .catch(function(e){ toast("엑셀을 만들지 못했습니다: "+(e&&e.message||e)); }).then(function(){ renderExa(); }); }; });
+  $$("#xbaActs [data-save]").forEach(function(b){ b.onclick=function(){ var c=b.dataset.save, A=EXBS.agRes[c];
+    var doc={at:new Date().toISOString(), by:exbWho(), base:base, fxExclude:EXBS.fx, piv:A.piv, acct:A.acct, excl:{n:A.excl.n, amt:A.excl.amt}, rows:A.s22.length};
+    fepDocSet("app/exec/aging/"+c+"/"+ym, doc).then(function(){ EXBS.agSaved[c+"/"+ym]=doc; toast(EXB.CO_LABEL[c]+" "+ym+" 채권잔액 저장됨"); audit("edit", {menu:"fep", target:"exec/aging", co:c, detail:ym}); renderExa(); }).catch(function(e){ toast("저장 실패: "+(e&&e.message||e)); }); }; });
+  var on={1:ok.length>0, 2:ok.length>0 && ok.every(function(c){ var A=EXBS.agRes[c]; return A.chk.totalOk&&A.chk.acctOk&&A.chk.pivOk; }), 3:!!EXBS.aDone}, cur=[1,2,3].filter(function(n){ return !on[n]; })[0]||4;
+  $$("#xbaSteps li").forEach(function(li){ var n=+li.dataset.s; li.className=on[n]?"on":n===cur?"cur":""; });
+}
+/* ---------- 이벤트 ---------- */
+(function(){
+  if(!$("#xbDrop")) return;
+  [["#xbDrop","#xbIn"],["#xbaDrop","#xbaIn"]].forEach(function(p){ var drop=$(p[0]), inp=$(p[1]);
+    drop.onclick=function(){ inp.click(); };
+    drop.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); inp.click(); } };
+    drop.ondragover=function(e){ e.preventDefault(); drop.classList.add("over"); };
+    drop.ondragleave=function(){ drop.classList.remove("over"); };
+    var from=p[0]==="#xbDrop"?"exbs":"exaging";
+    drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove("over"); exbAddFiles(e.dataTransfer.files, from); };
+    inp.onchange=function(){ exbAddFiles(inp.files, from); setTimeout(function(){ inp.value=""; },0); }; });
+  $$(".exYm").forEach(function(el){ el.onchange=function(){ exbSetYm(el.value); renderExb(); renderExa(); }; });
+  $("#xbaBase").onchange=function(){ var v=this.value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return; EXBS.ym=v.slice(0,7); EXBS.base=v; EXBS.baseSet=true; exbRecalc(); exbLoadSaved(); renderExa(); renderExb(); };
+  $("#xbaFx").onchange=function(){ EXBS.fx=this.checked; exbRecalc(); renderExa(); };
+  $$("#xbUnit button").forEach(function(b){ b.onclick=function(){ EXBS.unit=b.dataset.u; renderExb(); }; });
+  $$("#xbaUnit button").forEach(function(b){ b.onclick=function(){ EXBS.aUnit=b.dataset.u; renderExa(); }; });
+  $("#xbRe").onchange=function(){ renderExb(); };
+  $("#btnXbNew").onclick=function(){ EXBS.bs={}; EXBS.bsPend=[]; EXBS.cache={}; EXBS.rep=null; EXBS.scan=null; EXBS.ext={}; EXBS.sel=null; EXBS.files=[]; EXBS.made=null; EXBS.baseDone=false; EXBS.loanFix=false; $("#xbRe").checked=false; exbRecalc(); renderExb(); };
+  $("#btnXbaNew").onclick=function(){ EXBS.ag={}; EXBS.agPend=[]; EXBS.agRes={}; EXBS.aSel=null; EXBS.aFiles=[]; EXBS.aDone=false; renderExa(); };
+  $("#btnXbCopyAvail").onclick=function(){ exbCopy("avail"); };
+  $("#btnXbCopyCash").onclick=function(){ exbCopy("cash"); };
+  $("#btnXbBase").onclick=function(){ var ym=exbYm(), base=EXB.lastDay(ym), cos=EXB.targetCos(ym), btn=this, name="대차대조표_"+base+"기준.xlsx"; btn.disabled=true;
+    loadExcelJS().then(function(EX){ return EXB.buildBaseXlsx(EX, cos.map(function(c){ return {co:c, bs:EXBS.bs[c].bs, ext:EXBS.ext[c]}; }), base).xlsx.writeBuffer(); })
+      .then(function(buf){ EXBS.baseDone=true; audit("export", {menu:"fep", target:"exec/bs-base", detail:name}); return offerDownload(name, buf); })
+      .catch(function(e){ toast("기준 엑셀을 만들지 못했습니다: "+(e&&e.message||e)); }).then(function(){ renderExb(); }); };
+  $("#btnXbSave").onclick=function(){ var ym=exbYm(), cos=EXB.targetCos(ym), doc={at:new Date().toISOString(), by:exbWho(), mapV:(EXBS.map&&EXBS.map.v)||0, cos:{}};
+    cos.forEach(function(c){ var e=EXBS.ext[c], o={보유예금:e.보유예금, src:[]}; EXB.ITEMS.forEach(function(it){ o[it.k]=e[it.k]; });
+      ["보유예금"].concat(EXB.ITEMS.map(function(it){ return it.k; })).forEach(function(k){ (e.src[k]||[]).forEach(function(s){ o.src.push({item:k, acct:s.acct, row:s.r, col:s.col, amt:s.amt}); }); }); doc.cos[c]=o; });
+    fepDocSet("app/exec/bs/"+ym, doc).then(function(){ EXBS.saved[ym]=doc; toast(ym+" 대차대조표 추출 값 저장됨"); audit("edit", {menu:"fep", target:"exec/bs", detail:ym}); renderExb(); }).catch(function(e){ toast("저장 실패: "+(e&&e.message||e)); }); };
+  $("#btnXbRep").onclick=function(){ var ym=exbYm(), S=EXBS.scan, btn=this; if(!S||!EXBS.rep) return; btn.disabled=true;
+    var data={}; EXB.targetCos(ym).forEach(function(c){ data[c]=EXBS.ext[c]; });
+    var LC=exbLoanCmp(), fix=(EXBS.loanFix&&exbIsAdmin()&&LC)?LC.diffs.map(function(d){ return {ref:d.ref, n:d.n}; }):[];
+    var r; try{ r=EXB.buildReport(XLSX, EXBS.rep.bytes, ym, data, {replace:!!S.exists && $("#xbRe").checked, fix:fix}); }catch(e){ toast("보고 파일을 만들지 못했습니다: "+(e&&e.message||e)); renderExb(); return; }
+    var m=EXBS.rep.name.match(/(\d\d)년\s*(\d\d)월/), file=m?EXBS.rep.name.replace(/(\d\d)년(\s*)(\d\d)월/, ym.slice(2,4)+"년$2"+ym.slice(5,7)+"월"):ym.slice(2,4)+"년 "+ym.slice(5,7)+"월 보고자료 작성 시 _에스넷 굿어스3사.xlsx";
+    if(!/\.xlsx$/i.test(file)) file=file.replace(/\.[^.]*$/,"")+".xlsx";
+    EXBS.made={file:file, name:r.name, tpl:r.tpl, prev:r.prev, notes:r.notes, replaced:r.replaced};
+    audit("export", {menu:"fep", target:"exec/report", detail:file+" · "+r.name+(r.replaced?" 다시 만들기":"")});
+    offerDownload(file, r.bytes).then(function(){ renderExb(); }); renderExb(); };
+})();
 /* ===================== [v80] 매입대금 별도지불 · 오라클 지급 — 엔진 (window.ORP) =====================
    입력: 구매팀 오라클 매입리스트(.xlsx — '종합' 시트 + 선택 '세금계산서 발행내역' 시트) · 선택 ERP 건별반제
    규칙: 지급일 = 계산서 작성일자 + 60일 · 그날이 주말·공휴일이면 전영업일(60일을 넘기지 않음)
