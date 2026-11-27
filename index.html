@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v127 · 2026-11-20</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v128 · 2026-11-27</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -4129,7 +4129,7 @@ function rcRevert(c){
   var n=0;
   Object.keys(c.days||{}).forEach(function(d){ var r=c.days[d]; if(!r||!r.txns) return;
     var k0=r.txns.length; r.txns=r.txns.filter(function(t){ return !t.rcSyn; }); n+=k0-r.txns.length;
-    r.txns.forEach(function(t){ if(t.rc0){ t.kind=t.rc0.kind; t.cat=t.rc0.cat; delete t.rc0; n++; } delete t.splits; delete t.rcInt; delete t.rcWhy; delete t.rcDup; }); });
+    r.txns.forEach(function(t){ if(t.rc0){ t.kind=t.rc0.kind; t.cat=t.rc0.cat; delete t.rc0; n++; } delete t.splits; delete t.rcInt; delete t.rcWhy; delete t.rcDup; delete t.rcSec; }); });
   return n;
 }
 function rcSet(t, kind, cat, why){ if(!t.rc0) t.rc0={kind:t.kind, cat:t.cat}; t.kind=kind; if(cat) t.cat=cat; t.rcWhy=why; }
@@ -4155,7 +4155,7 @@ function rcApply(c){
     if(r.source==="sheet"){ (r.accts||[]).forEach(function(a){ if(a.label && !a.isFx) B[a.label]=+a.close||0; }); return; }
     if(r.source==="xlsm") return;
     var seen={}, last={};
-    (r.txns||[]).forEach(function(t){ if(t.ccy&&t.ccy!=="KRW") return; seen[t.acct]=1; B[t.acct]=(+B[t.acct]||0)+(+t.deposit||0)-(+t.withdraw||0); if(t.hasAfter&&t.after!=null&&!t.rcSyn) last[t.acct]=+t.after; });
+    (r.txns||[]).forEach(function(t){ if(t.ccy&&t.ccy!=="KRW") return; seen[t.acct]=1; if(t.rcSec) return; B[t.acct]=(+B[t.acct]||0)+(+t.deposit||0)-(+t.withdraw||0); if(t.hasAfter&&t.after!=null&&!t.rcSyn) last[t.acct]=+t.after; });   // [v128] R10 제외 줄은 잔액에서도 뺀다
     Object.keys(last).forEach(function(k){ B[k]=last[k]; });
     if(r.repAccts && r.asOf===d) Object.keys(r.repAccts).forEach(function(k){ if(!seen[k]) B[k]=+r.repAccts[k]||0; }); };
   var dates=Object.keys(c.days).sort().filter(function(d){ return !fy || d>fy.asOf; });
@@ -4381,6 +4381,28 @@ function rcApply(c){
           else last=syn(r,{date:d, acct:lab, kind:l.kind==="move-out"?"자금이동(출금)":"지출", cat:l.kind==="move-out"?"자금이동":(l.cat||"운영경비"), withdraw:a, summary:"[자동] "+(String(l.memo||"").slice(0,30)||"전표 출금"), rcWhy:why}); });
         if(last){ last.hasAfter=true; last.after=tgt!=null?tgt:0; }
         st.r5++; });
+    })();
+    /* [v128] R10 증권 계좌 — 자금현황보고 마감에 맞춤. 증권 계좌(CMS 없음)는 전표 줄로 실적 행을 만드는데(matchSlipCms '전표만'),
+       자금현황보고는 증권 계좌에 들어간 돈(자금이동)만 적고 주식 매수 같은 계좌 안 거래는 적지 않는다.
+       그날 보고서 마감이 있으면: 직전 잔액 + 전표 행 합 ≠ 보고서 마감일 때, 보고서 마감과 1원까지 맞는 전표 행 조합이 하나뿐이면
+       나머지 전표 행을 자금수지·잔액에서 뺀다(rcDup + rcSec, 사유 표시). 맞는 조합이 없거나 둘 이상이면 그대로 두고 검증 줄이 차이를 보여 준다.
+       예: SN 2026-11-23 KB증권 01 — 전표 FI2026112300003 자금이동 입금 1,000,000,000 · FI2026112300025 상장주식 매수 1,000,000,000,
+           보고서 312,969,206 → 1,312,969,206(자금이동 입금만) → 매수 줄 제외 */
+    (function(){ var rep1=(r.repAccts && r.asOf===d)?r.repAccts:null; if(!rep1) return;
+      var SECR=/증권|금융투자|미래에셋|선물/, by={}, sg=function(t){ return Math.round(+t.deposit||0)-Math.round(+t.withdraw||0); };
+      r.txns.forEach(function(t){ if((t.ccy&&t.ccy!=="KRW") || !SECR.test(String(t.acct||""))) return; (by[t.acct]||(by[t.acct]=[])).push(t); });
+      Object.keys(by).forEach(function(lab){ if(!(lab in rep1) || (acctBy[lab]&&acctBy[lab].group==="외화")) return; var L=by[lab];
+        if(L.some(function(t){ return !t.fromSlip && !t.rcSyn && t.hasAfter; })) return;   // CMS 거래후잔액이 있으면 그쪽이 앵커
+        var fs=L.filter(function(t){ return t.fromSlip && !t.rcDup; }); if(!fs.length || fs.length>12) return;
+        var fixed=L.filter(function(t){ return !t.fromSlip && !t.rcDup; }).reduce(function(a,t){ return a+sg(t); },0);
+        var was=Math.round(rcBalBefore(c, lab)), tgt=Math.round(+rep1[lab]||0), all=fs.reduce(function(a,t){ return a+sg(t); },0);
+        if(was+fixed+all===tgt) return;
+        var gap=tgt-was-fixed, pick=null, n=fs.length;
+        for(var mk=0; mk<(1<<n); mk++){ var sm=0; for(var i=0;i<n;i++) if(mk&(1<<i)) sm+=sg(fs[i]); if(sm===gap){ if(pick!=null){ pick=-1; break; } pick=mk; } }
+        if(pick==null || pick<0) return;
+        fs.forEach(function(t,i){ if(pick&(1<<i)) return; t.rcDup=true; t.rcSec=true;
+          t.rcWhy="증권 계좌 — 자금현황보고 "+d+" 마감 "+fmt(tgt)+"(직전 "+fmt(was)+")에 없는 전표 줄"+(t.slipVoucher?" "+t.slipVoucher:"")+" — 보고서 기준으로 자금수지·잔액에서 제외"; st.r10=(st.r10||0)+1; });
+      });
     })();
     /* R1 자사명 앞 출금 · 받은 자사 계좌 없음 → 같은 날 같은 계좌 전표 출금 줄(합이 같은 것)로 지출 나눔 */
     var catOf=function(l){ var x=String(l.rawMemo||l.memo||"")+" "+String(l.fund||""); if(/상환/.test(x) && !/이자|수수료/.test(x)) return "상환"; if(/이자|수수료/.test(x) && /대출|차입|상환/.test(x)) return "이자비용"; return l.cat||"기타"; };
