@@ -653,7 +653,7 @@ td.ar-rule{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:no
 
 <div id="app" hidden>
   <aside id="rail">
-    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v128 · 2026-11-27</span></div>
+    <div class="railhead"><b>에스넷그룹 자금</b><span id="railSub">SNET GROUP</span><span class="rail-ver" title="대시보드 버전 — 배포본이 최신인지 확인용">v129 · 2026-11-27</span></div>
     <nav id="nav">
       <button data-v="dash" aria-current="true">대시보드<span class="k">1</span></button>
       <button data-v="ilbo">자금일보 작성<span class="k">2</span></button>
@@ -11419,9 +11419,20 @@ function fxLineKrw(x){
   var L=x||{}, fx=L.fx||{}, a=Math.round(+L.amt||0);
   if(!(fx.amt>0) || !(fx.rate>0)) return a;
   var calc=Math.round(fx.amt*fx.rate), cp=String((L.L&&L.L.cpAccount)||L.cpAccount||"");
-  if(/외화외상매출금/.test(cp) && Math.abs(a-calc)>Math.max(1000, calc*0.001)) return calc;
+  if(/외화외상매출금/.test(cp) && Math.abs(a-calc)>Math.max(1000, calc*0.001) && !fxMemoRate(L)) return calc;
   return a;
 }
+/* [v129] 적요의 '× 환율'로 외화 × 환율 = 전표 원화(±1원)이면 전표 원화가 실제 입금 원화이고 관리항목 환율은 장부 환율이다 — 그 환율을 돌려준다.
+   예: SN 2026-11-23 FI2026112300016 State Street $13,488.51 — 적요 '($13,488.51 * 1,337.30)' = 18,038,184(보통예금 차변·자금현황보고 외화 세부내역과 같음),
+       관리항목 환율 1,333.7. v107 규칙(관리항목 환율 우선)이 17,989,626으로 잡아 외화 잔액 증가와 48,558 어긋났다.
+   v107 사례(SN 11-04 씨티 438 $86,682.98, 전표 원화 = 매출 당시 장부가)는 적요 환율로 전표 원화가 나오지 않으므로 종전대로 관리항목 환율. */
+function fxMemoRate(x){
+  var L=x||{}, fx=L.fx||{}, a=Math.round(+L.amt||0); if(!(fx.amt>0) || !a) return null;
+  var s=String((L.L&&(L.L.rawMemo||L.L.memo))||L.memo||L.text||""), re=/[*×]\s*([\d,]+(?:\.\d+)?)/g, m;
+  while((m=re.exec(s))){ var r=+m[1].replace(/,/g,""); if(r>0 && Math.abs(Math.round(fx.amt*r)-a)<=1) return r; }
+  return null;
+}
+function fxLineRate(x){ return fxMemoRate(x)||((x&&x.fx&&x.fx.rate)||null); }
 
 /* ===================== [v108] 법인카드 계정대체 — 재발급 묶음 · 적요 카드분 · 차이 사유 (화면) ===================== */
 /* 재발급 묶음 후보(renew)를 이번 계산용 카드 목록에 반영 — 이전 카드 행(기존 id)에 새 번호를 aliases로, 따로 생긴 재발급 행은 뺀다 */
@@ -13083,8 +13094,8 @@ function matchSlipCms(c, iso){
         if(!(t.fxConfirmed && !t.fxFromSlip)){
           t.fxSlip0={fxRate:t.fxRate==null?null:t.fxRate, fxKrw:t.fxKrw==null?null:t.fxKrw, fxConfirmed:!!t.fxConfirmed, fxInternal:(t.fxInternal==null?null:t.fxInternal)};
           var FL=r.fxLs||[L];   // [v58] 랏 여러 개
-          t.fxLots=FL.map(function(x){ return {rate:x.fx.rate||null, fx:x.fx.amt, krw:fxLineKrw(x)}; });   // [v107] 외화외상매출금 회수 = 외화 × 입금 환율
-          var fk=FL.reduce(function(a,x){ return a+fxLineKrw(x); },0), fkBook=FL.reduce(function(a,x){ return a+Math.round(x.amt); },0), rates=FL.map(function(x){ return x.fx.rate; }).filter(function(x,j,a){ return a.indexOf(x)===j; });
+          t.fxLots=FL.map(function(x){ return {rate:fxLineRate(x), fx:x.fx.amt, krw:fxLineKrw(x)}; });   // [v107] 외화외상매출금 회수 = 외화 × 입금 환율
+          var fk=FL.reduce(function(a,x){ return a+fxLineKrw(x); },0), fkBook=FL.reduce(function(a,x){ return a+Math.round(x.amt); },0), rates=FL.map(function(x){ return fxLineRate(x); }).filter(function(x,j,a){ return a.indexOf(x)===j; });
           if(r.fxSplit){ var sh=(k===n-1) ? Math.round(L.amt)-r.acc : Math.round(smAmt(t)*(+L.fx.rate||0)); r.acc+=sh; fk=sh; t.fxLots=[{rate:L.fx.rate||null, fx:smAmt(t), krw:sh}]; }   // [v58] 줄 1개를 여러 CMS로 나눔
           if(fk!==fkBook && !r.fxSplit){ s.lineAmt=fk; s.fxBookDiff=fkBook-fk; }   // [v107] 전표 장부가 − 입금 원화 = 외환차손익
           t.fxRate=rates.length===1?(rates[0]||null):null; t.fxKrw=fk; t.fxConfirmed=true; t.fxFromSlip=true; st.fxAuto++;   // 환율 = 관리항목명7, 원화 = 전표 금액(재계산 금지)
